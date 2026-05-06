@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CIRCUIT | Revenue & Provenance Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+      <div class="brand">
+        <img
+          src="logo/logo_icon_white.svg"
+          alt="CIRCUIT Icon"
+          class="logo-img"
+        />
+        <span class="brand-name">Circuit</span>
+      </div>
+      <button class="hamburger" id="menu-toggle">☰</button>
+    </header>
+
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-main">
+            <img
+              src="logo/logo_icon_white.svg"
+              alt="CIRCUIT Icon"
+              class="logo-img"
+            />
+            <span class="brand-name">Circuit</span>
+          </div>
+          <p>Provenance Protocol</p>
+        </div>
+        <nav>
+          <ul>
+            <li class="active">
+              <a href="#"><span class="icon">📊</span> Overview</a>
+            </li>
+            <li>
+              <a href="#"><span class="icon">👗</span> Drops</a>
+            </li>
+            <li>
+              <a href="#"><span class="icon">🛡️</span> Verification</a>
+            </li>
+            <li>
+              <a href="#"><span class="icon">💼</span> Members</a>
+            </li>
+            <li>
+              <a href="#"><span class="icon">⚙️</span> Settings</a>
+            </li>
+          </ul>
+        </nav>
+        <div class="vision-statement">
+          <p>"Where physical rarity meets on-chain truth."</p>
+        </div>
+        <div class="wallet-status">
+          <div class="wallet-info-header">
+            <div class="status-dot"></div>
+            <span class="network">Mainnet Beta</span>
+          </div>
+          <span id="wallet-address">8x9j...L4qP</span>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <header>
+          <div class="header-left">
+            <h2>Operational Overview</h2>
+            <p>Real-time revenue and provenance tracking</p>
+          </div>
+          <div class="header-right">
+            <button class="btn-primary">New Drop</button>
+          </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <section class="stats-grid">
+          <div class="stat-card glass">
+            <label>Total Revenue</label>
+            <div class="value">₦<span id="total-revenue">2,340,000</span></div>
+            <div class="change positive">+15.4% vs last drop</div>
+          </div>
+          <div class="stat-card glass">
+            <label>Drop Zero Progress</label>
+            <div class="value"><span id="units-sold">36</span> / 40</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width: 90%"></div>
+            </div>
+            <div class="label-sub" id="progress-label">Limited Edition</div>
+          </div>
+          <div class="stat-card glass">
+            <label>Projected Royalties</label>
+            <div class="value">
+              ₦<span id="projected-royalties">163,800</span>
+            </div>
+            <div class="label-sub">Based on 7% resale secondary floor</div>
+          </div>
+          <div class="stat-card glass">
+            <label>On-Chain Proofs</label>
+            <div class="value"><span id="verified-count">36</span></div>
+            <div class="label-sub">100% Provenance Integrity</div>
+          </div>
+        </section>
+
+        <!-- Main Panel -->
+        <div class="content-panel">
+          <section class="verification-feed glass">
+            <div class="section-header">
+              <h3>Verification Maze</h3>
+              <span class="live-indicator">Live</span>
+            </div>
+            <div class="feed-container" id="verification-feed">
+              <!-- Feed items will be injected by JS -->
+              <div class="feed-item">
+                <div class="item-meta">
+                  <span class="time">Just now</span>
+                  <span class="status-badge verified">Verified</span>
+                </div>
+                <div class="item-content">
+                  <p><strong>Wrap Dress #07</strong> linked to NFC NTAG213</p>
+                  <code class="hash">Solana Hash: 5Z3...Y7x2</code>
+                </div>
+                <button class="btn-view" onclick="openDPP(7)">
+                  View Passport
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="secondary-panel">
+            <div class="protocol-insight glass">
+              <h3>Circuit Protocol</h3>
+              <div class="usp-item">
+                <label>The Narrative</label>
+                <p>
+                  Made-to-order fashion where physical rarity meets on-chain
+                  truth. Production begins only when demand is confirmed.
+                </p>
+              </div>
+              <div class="usp-item">
+                <label>The Mechanism</label>
+                <p>
+                  Standard brands guess demand and burn unsold stock. Circuit
+                  uses <strong>Trustless Escrow</strong> and
+                  <strong>Automatic Royalties</strong> to eliminate waste and
+                  capture perpetual value.
+                </p>
+              </div>
+            </div>
+
+            <div class="chart-container glass">
+              <h3>Secondary Market Value</h3>
+              <div class="mock-chart">
+                <!-- Simple visual placeholder -->
+                <div class="chart-bar" style="height: 40%"></div>
+                <div class="chart-bar" style="height: 60%"></div>
+                <div class="chart-bar" style="height: 55%"></div>
+                <div class="chart-bar" style="height: 80%"></div>
+                <div class="chart-bar" style="height: 95%"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- Modal for Digital Product Passport -->
+    <div id="dpp-modal" class="modal">
+      <div class="modal-content glass">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div class="dpp-header">
+          <h3>Digital Product Passport</h3>
+          <span class="serial">#CIR-001-07</span>
+        </div>
+        <div class="dpp-body">
+          <div class="product-image" id="dpp-image">
+            <!-- Image placeholder -->
+          </div>
+          <div class="product-details">
+            <h4>Circuit Wrap Dress</h4>
+            <p><strong>Edition:</strong> 07 of 40</p>
+            <p><strong>Fabric:</strong> Nigerian Cotton Silk Blend</p>
+            <p><strong>Production Date:</strong> May 1, 2026</p>
+            <hr />
+            <p class="blockchain-label">Blockchain Verification</p>
+            <div class="hash-box">
+              <label>Solana Mint Address</label>
+              <p>7p8H...Z1w9kL4...</p>
+            </div>
+            <div class="hash-box">
+              <label>NFC Chip UID</label>
+              <p>04:E1:92:A2:2C:6B:80</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
