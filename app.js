@@ -110,11 +110,16 @@
         setTimeout(() => {
             const sig = genTx();
             const url = `https://solscan.io/tx/${sig}?cluster=devnet`;
-            tx.innerHTML = `<div class="tx-msg ok">✓ Order confirmed. Payment locked in escrow. <a href="${url}" target="_blank">View on Solscan ↗</a></div>`;
+            tx.innerHTML = `<div class="tx-msg ok">✓ Order confirmed. Payment locked in escrow. <a href="${url}" target="_blank">View on Solscan ↗</a></div>
+                <button class="btn-primary btn-next" id="btn-goto-confirm"><span class="bp-text">Go to Delivery Confirmation</span><span class="bp-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span></button>`;
             if (txt) txt.textContent = 'Order Confirmed';
             toast('✓', 'Escrow created on Solana Devnet');
             state.minted = Math.min(state.minted + 1, state.max);
             updateProgress();
+            const gotoBtn = $('#btn-goto-confirm');
+            if (gotoBtn) gotoBtn.addEventListener('click', () => {
+                location.hash = '/confirm'; navigate('confirm');
+            });
         }, 2000);
     }
 
@@ -128,9 +133,14 @@
         setTimeout(() => {
             const sig = genTx();
             const url = `https://solscan.io/tx/${sig}?cluster=devnet`;
-            tx.innerHTML = `<div class="tx-msg ok">✓ Delivery confirmed. Payment released to designer. <a href="${url}" target="_blank">View on Solscan ↗</a></div>`;
+            tx.innerHTML = `<div class="tx-msg ok">✓ Delivery confirmed. Payment released to designer. <a href="${url}" target="_blank">View on Solscan ↗</a></div>
+                <button class="btn-primary btn-next" id="btn-goto-passport"><span class="bp-text">View Digital Passport</span><span class="bp-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span></button>`;
             if (txt) txt.textContent = 'Delivery Confirmed';
             toast('✓', 'Funds released from escrow');
+            const gotoBtn = $('#btn-goto-passport');
+            if (gotoBtn) gotoBtn.addEventListener('click', () => {
+                location.hash = '/garment'; navigate('garment');
+            });
         }, 2000);
     }
 
@@ -163,13 +173,16 @@
 
     // ── Mobile ──
     function toggleDrawer() {
-        $('#hamburger').classList.toggle('open');
-        $('#drawer').classList.toggle('open');
+        const h = $('#hamburger'), d = $('#drawer');
+        h.classList.toggle('open');
+        d.classList.toggle('open');
+        document.body.classList.toggle('drawer-open', d.classList.contains('open'));
     }
     function closeDrawer() {
         const h = $('#hamburger'), d = $('#drawer');
         if (h) h.classList.remove('open');
         if (d) d.classList.remove('open');
+        document.body.classList.remove('drawer-open');
     }
 
     // ── Scroll ──
