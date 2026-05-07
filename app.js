@@ -1,185 +1,241 @@
-// Simulation state for the Circuit Dashboard
-const state = {
-    revenue: 2340000,
-    sold: 36,
-    verified: 36,
-    royalties: 163800,
-    chartValues: [40, 60, 55, 80, 95], // Initial bar heights in %
-    feedItems: [
-        { id: 36, name: "Wrap Dress #36", time: "12 mins ago", hash: "9M2...P1v8", status: "Verified" },
-        { id: 35, name: "Wrap Dress #35", time: "45 mins ago", hash: "7B4...Q9m2", status: "Verified" },
-    ]
-};
+(() => {
+    'use strict';
+    const $ = (s, p = document) => p.querySelector(s);
+    const $$ = (s, p = document) => [...p.querySelectorAll(s)];
 
-// Initialize dashboard
-function init() {
-    renderFeed();
-    setupEventListeners();
-    updateChartUI(); // Initial chart render
-    
-    // Start the "WOW" factor simulation after 5 seconds
-    setTimeout(startLiveDemo, 5000);
-}
+    const state = { page: 'drop', wallet: false, addr: null, minted: 0, max: 40 };
 
-function startLiveDemo() {
-    // Simulate a new "Drop Zero" follow-up or secondary sale
-    createNewSale();
-    
-    // Periodically simulate activity
-    setInterval(() => {
-        if (Math.random() > 0.7) {
-            createNewSale();
+    // ── Particles ──
+    function initParticles() {
+        const c = $('#particles'); if (!c) return;
+        const ctx = c.getContext('2d');
+        let w, h, particles = [];
+        function resize() { w = c.width = window.innerWidth; h = c.height = window.innerHeight; }
+        resize(); window.addEventListener('resize', resize);
+        for (let i = 0; i < 50; i++) {
+            particles.push({
+                x: Math.random() * w, y: Math.random() * h,
+                vx: (Math.random() - .5) * .3, vy: (Math.random() - .5) * .3,
+                r: Math.random() * 1.5 + .5, a: Math.random() * .3 + .05
+            });
         }
-    }, 15000);
-}
-
-function createNewSale() {
-    const isResale = state.sold >= 40;
-    const id = isResale ? Math.floor(Math.random() * 40) + 1 : state.sold + 1;
-    
-    const newItem = {
-        id: id,
-        name: `Wrap Dress #${String(id).padStart(2, '0')}`,
-        time: "Just now",
-        hash: "Generating...",
-        status: isResale ? "Resale" : "Minting"
-    };
-
-    // Prepend to feed
-    state.feedItems.unshift(newItem);
-    if (state.feedItems.length > 8) state.feedItems.pop(); // Keep feed clean
-    renderFeed();
-
-    setTimeout(() => {
-        const item = state.feedItems.find(i => i.id === id && (i.status === "Minting" || i.status === "Resale"));
-        if (item) {
-            item.status = "Verified";
-            item.hash = `${Math.random().toString(36).substring(2, 5).toUpperCase()}...${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-            
-            // Logic for Financials
-            if (isResale) {
-                // Secondary market sale at a premium (e.g., ₦85,000)
-                const resalePrice = 85000;
-                const royaltyEarned = resalePrice * 0.07;
-                state.royalties += royaltyEarned;
-                
-                // Update chart to show market value bump
-                state.chartValues.shift();
-                state.chartValues.push(Math.min(98, state.chartValues[3] + (Math.random() * 10)));
-                updateChartUI();
-            } else {
-                state.revenue += 65000;
-                state.sold += 1;
-                state.verified += 1;
-                state.royalties += (65000 * 0.07);
-                
-                // Subtle chart fluctuation for primary sales
-                state.chartValues.shift();
-                state.chartValues.push(Math.min(95, 80 + (Math.random() * 15)));
-                updateChartUI();
-            }
-            
-            updateStatsUI();
-            renderFeed();
+        function draw() {
+            ctx.clearRect(0, 0, w, h);
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+                if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${p.a})`; ctx.fill();
+            });
+            requestAnimationFrame(draw);
         }
-    }, 3000);
-}
-
-function updateStatsUI() {
-    const revenueEl = document.getElementById('total-revenue');
-    const soldEl = document.getElementById('units-sold');
-    const verifiedEl = document.getElementById('verified-count');
-    const royaltiesEl = document.getElementById('projected-royalties');
-    const progressFill = document.querySelector('.progress-fill');
-    const progressLabel = document.getElementById('progress-label');
-
-    if (revenueEl) revenueEl.innerText = state.revenue.toLocaleString();
-    if (soldEl) soldEl.innerText = Math.min(state.sold, 40);
-    if (verifiedEl) verifiedEl.innerText = state.verified;
-    if (royaltiesEl) royaltiesEl.innerText = Math.floor(state.royalties).toLocaleString();
-
-    if (progressFill) {
-        const percentage = (Math.min(state.sold, 40) / 40) * 100;
-        progressFill.style.width = `${percentage}%`;
+        draw();
     }
 
-    if (progressLabel && state.sold >= 40) {
-        progressLabel.innerText = "Sold Out";
-        progressLabel.style.color = "var(--secondary)";
+    // ── Nav Pill ──
+    function updatePill() {
+        const pill = $('#nav-pill');
+        const active = $(`.nav-link.active`);
+        if (!pill || !active) return;
+        const center = $('#nav-center');
+        const cr = center.getBoundingClientRect();
+        const ar = active.getBoundingClientRect();
+        pill.style.left = (ar.left - cr.left) + 'px';
+        pill.style.width = ar.width + 'px';
     }
-}
 
-function updateChartUI() {
-    const bars = document.querySelectorAll('.chart-bar');
-    if (!bars.length) return;
-    
-    bars.forEach((bar, index) => {
-        const val = Math.floor(state.chartValues[index]);
-        bar.style.height = `${val}%`;
-        bar.setAttribute('data-value', val);
-    });
-}
+    // ── Router ──
+    function pageFromHash() {
+        const h = location.hash.replace('#/', '').replace('#', '');
+        return ['confirm', 'garment'].includes(h) ? h : 'drop';
+    }
 
-// Render the verification feed
-function renderFeed() {
-    const feedContainer = document.getElementById('verification-feed');
-    if (!feedContainer) return;
-    
-    feedContainer.innerHTML = state.feedItems.map(item => `
-        <div class="feed-item" style="animation: fadeIn 0.5s ease forwards; border-left: 4px solid ${item.status === 'Verified' ? 'var(--secondary)' : 'var(--primary)'}">
-            <div class="item-meta">
-                <span class="time">${item.time}</span>
-                <span class="status-badge ${item.status.toLowerCase()}">${item.status}</span>
-            </div>
-            <div class="item-content">
-                <p>${item.name} linked to NTAG213</p>
-                <code class="hash ${item.status === 'Verified' ? '' : 'processing'}">${item.status === 'Verified' ? 'Hash: ' + item.hash : 'Processing on Solana...'}</code>
-            </div>
-            <button class="btn-view" onclick="openDPP(${item.id})">Inspect</button>
-        </div>
-    `).join('');
-}
+    function navigate(page) {
+        if (page === state.page) return;
+        const prev = $(`#page-${state.page}`);
+        const next = $(`#page-${page}`);
+        if (!prev || !next) return;
+        prev.classList.remove('visible');
+        setTimeout(() => {
+            prev.classList.remove('active');
+            next.classList.add('active');
+            void next.offsetWidth;
+            next.classList.add('visible');
+            state.page = page;
+            setNavActive();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 280);
+    }
 
-function setupEventListeners() {
-    const menuToggle = document.getElementById('menu-toggle');
-    const sidebar = document.getElementById('sidebar');
+    function setNavActive() {
+        $$('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page === state.page));
+        $$('.drawer-link').forEach(l => l.classList.toggle('active', l.dataset.page === state.page));
+        setTimeout(updatePill, 50);
+    }
 
-    if (menuToggle && sidebar) {
-        menuToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
-            menuToggle.innerText = sidebar.classList.contains('active') ? '✕' : '☰';
+    // ── Wallet ──
+    function connectWallet() {
+        if (state.wallet) return;
+        state.wallet = true;
+        state.addr = genAddr();
+        const short = state.addr.slice(0, 4) + '...' + state.addr.slice(-4);
+        $$('.btn-wallet').forEach(b => {
+            b.classList.add('connected');
+            const label = $('span:last-child', b) || $('span', b);
+            if (label) label.textContent = short;
+        });
+        toast('✓', 'Wallet connected: ' + short);
+    }
+
+    function genAddr() {
+        const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
+        let a = ''; for (let i = 0; i < 44; i++) a += c[Math.floor(Math.random() * c.length)];
+        return a;
+    }
+
+    function genTx() {
+        const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
+        let s = ''; for (let i = 0; i < 88; i++) s += c[Math.floor(Math.random() * c.length)];
+        return s;
+    }
+
+    // ── Confirm Order ──
+    function handleOrder() {
+        if (!state.wallet) { toast('⚠', 'Connect your wallet first'); return; }
+        const btn = $('#btn-order');
+        const tx = $('#drop-tx');
+        btn.disabled = true;
+        const txt = $('.bp-text', btn); if (txt) txt.textContent = 'Signing...';
+        setTimeout(() => {
+            const sig = genTx();
+            const url = `https://solscan.io/tx/${sig}?cluster=devnet`;
+            tx.innerHTML = `<div class="tx-msg ok">✓ Order confirmed. Payment locked in escrow. <a href="${url}" target="_blank">View on Solscan ↗</a></div>`;
+            if (txt) txt.textContent = 'Order Confirmed';
+            toast('✓', 'Escrow created on Solana Devnet');
+            state.minted = Math.min(state.minted + 1, state.max);
+            updateProgress();
+        }, 2000);
+    }
+
+    // ── Confirm Delivery ──
+    function handleDeliver() {
+        if (!state.wallet) { toast('⚠', 'Connect your wallet first'); return; }
+        const btn = $('#btn-deliver');
+        const tx = $('#confirm-tx');
+        btn.disabled = true;
+        const txt = $('.bp-text', btn); if (txt) txt.textContent = 'Signing...';
+        setTimeout(() => {
+            const sig = genTx();
+            const url = `https://solscan.io/tx/${sig}?cluster=devnet`;
+            tx.innerHTML = `<div class="tx-msg ok">✓ Delivery confirmed. Payment released to designer. <a href="${url}" target="_blank">View on Solscan ↗</a></div>`;
+            if (txt) txt.textContent = 'Delivery Confirmed';
+            toast('✓', 'Funds released from escrow');
+        }, 2000);
+    }
+
+    // ── Progress ──
+    function updateProgress() {
+        const fill = $('#mint-fill');
+        const count = $('#minted-count');
+        const status = $('#mint-status');
+        if (!fill) return;
+        const pct = (state.minted / state.max) * 100;
+        fill.style.width = pct + '%';
+        if (count) count.textContent = state.minted;
+        if (status && state.minted >= state.max) {
+            status.textContent = 'Sold Out';
+            status.classList.add('sold-out');
+        }
+    }
+
+    // ── Toast ──
+    let tt = null;
+    function toast(icon, msg) {
+        const el = $('#toast');
+        if (!el) return;
+        if (tt) clearTimeout(tt);
+        $('#toast-icon').textContent = icon;
+        $('#toast-text').textContent = msg;
+        el.classList.add('show');
+        tt = setTimeout(() => el.classList.remove('show'), 3500);
+    }
+
+    // ── Mobile ──
+    function toggleDrawer() {
+        $('#hamburger').classList.toggle('open');
+        $('#drawer').classList.toggle('open');
+    }
+    function closeDrawer() {
+        const h = $('#hamburger'), d = $('#drawer');
+        if (h) h.classList.remove('open');
+        if (d) d.classList.remove('open');
+    }
+
+    // ── Scroll ──
+    function onScroll() {
+        const nav = $('#navbar');
+        if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
+    }
+
+    // ── Init ──
+    function init() {
+        initParticles();
+
+        // Initial page
+        state.page = pageFromHash();
+        $$('.page').forEach(p => p.classList.remove('active', 'visible'));
+        const ap = $(`#page-${state.page}`);
+        if (ap) {
+            ap.classList.add('active');
+            requestAnimationFrame(() => requestAnimationFrame(() => ap.classList.add('visible')));
+        }
+        setNavActive();
+        setTimeout(updatePill, 100);
+
+        // Progress animation
+        state.minted = 36;
+        setTimeout(updateProgress, 600);
+
+        // Update owner on passport if wallet connected
+        window.addEventListener('hashchange', () => navigate(pageFromHash()));
+
+        // Nav links
+        $$('.nav-link, .drawer-link').forEach(l => {
+            l.addEventListener('click', e => {
+                e.preventDefault();
+                const p = l.dataset.page;
+                location.hash = p === 'drop' ? '/' : '/' + p;
+                navigate(p);
+                closeDrawer();
+            });
+        });
+
+        // Brand
+        const brand = $('#nav-brand');
+        if (brand) brand.addEventListener('click', e => {
+            e.preventDefault(); location.hash = '/'; navigate('drop');
+        });
+
+        // Wallet buttons
+        $$('#btn-wallet, #btn-wallet-m').forEach(b => b.addEventListener('click', connectWallet));
+
+        // Action buttons
+        const ob = $('#btn-order'); if (ob) ob.addEventListener('click', handleOrder);
+        const db = $('#btn-deliver'); if (db) db.addEventListener('click', handleDeliver);
+
+        // Hamburger
+        const hm = $('#hamburger'); if (hm) hm.addEventListener('click', toggleDrawer);
+
+        // Scroll
+        window.addEventListener('scroll', onScroll, { passive: true });
+
+        // Resize: close drawer, update pill
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) closeDrawer();
+            updatePill();
         });
     }
-}
 
-// Modal logic
-const modal = document.getElementById("dpp-modal");
-
-window.openDPP = function(id) {
-    const serial = document.querySelector(".serial");
-    if (serial) serial.innerText = `#CIR-001-${String(id).padStart(2, "0")}`;
-    modal.style.display = "block";
-    // Slight delay to allow display: block to apply before adding class for transition
-    setTimeout(() => {
-        modal.classList.add("active");
-    }, 10);
-    document.body.style.overflow = "hidden"; // Prevent scroll
-}
-
-window.closeModal = function() {
-    modal.classList.remove("active");
-    // Wait for transition to finish before hiding
-    setTimeout(() => {
-        modal.style.display = "none";
-    }, 300);
-    document.body.style.overflow = "auto"; // Restore scroll
-}
-
-window.onclick = function(event) {
-    if (event.target == modal) {
-        closeModal();
-    }
-}
-
-// Start the app
-document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener('DOMContentLoaded', init);
+})();
