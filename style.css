@@ -144,6 +144,11 @@ button{font-family:var(--f);cursor:pointer;border:none;background:none;color:inh
 .os-k{font-size:.72rem;font-weight:600;color:var(--td);text-transform:uppercase;letter-spacing:.06em}
 .os-v{font-size:.88rem;font-weight:500;text-align:right}
 .confirm-note{font-size:.72rem;color:var(--tm);margin-top:1.2rem;position:relative}
+.confirm-garment{display:flex;align-items:center;gap:1rem;padding:1rem;margin:1.5rem 0;border-radius:var(--rs);background:rgba(255,255,255,.02);border:1px solid var(--brd);text-align:left;position:relative}
+.cg-img{width:56px;height:56px;border-radius:12px;object-fit:cover;border:1px solid var(--brd)}
+.cg-info{display:flex;flex-direction:column;gap:2px}
+.cg-info strong{font-size:.88rem}
+.cg-info span{font-size:.75rem;color:var(--td)}
 
 /* ═══════════ PASSPORT PAGE ═══════════ */
 .passport-page{max-width:1200px;margin:0 auto;padding:4rem 2rem 6rem}
@@ -185,6 +190,22 @@ button{font-family:var(--f);cursor:pointer;border:none;background:none;color:inh
 .tx-msg a{text-decoration:underline;margin-left:4px}
 .btn-next{margin-top:1rem;animation:fadeIn .5s var(--e) .3s both}
 .tx-area .btn-next{display:inline-flex;width:auto}
+
+/* Wallet Prompt */
+.wallet-prompt{display:flex;align-items:center;gap:10px;padding:.9rem 1.3rem;border-radius:var(--rs);background:rgba(255,160,40,.06);border:1px solid rgba(255,160,40,.18);margin-top:1rem;animation:fadeIn .4s var(--e);flex-wrap:wrap}
+.wp-icon{font-size:1.1rem}
+.wallet-prompt span{font-size:.85rem;color:var(--td)}
+.wp-btn{padding:.45rem 1rem;border-radius:var(--rp);background:#fff;color:#000;font-size:.78rem;font-weight:600;margin-left:auto;transition:var(--tr)}
+.wp-btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(255,255,255,.15)}
+
+/* Signing Spinner */
+.btn-primary.signing{pointer-events:none;opacity:.85}
+.btn-primary.signing .bp-arrow{animation:spin 1s linear infinite}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* Demo Reset */
+.btn-reset{display:inline-flex;align-items:center;gap:6px;padding:.4rem 1rem;border-radius:var(--rp);background:transparent;border:1px solid var(--brd);font-size:.72rem;font-weight:600;color:var(--td);transition:var(--tr);margin-left:.8rem}
+.btn-reset:hover{color:var(--t);border-color:var(--brd2)}
 
 /* Toast */
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(20px);display:flex;align-items:center;gap:10px;padding:.85rem 1.6rem;border-radius:var(--rp);background:rgba(5,5,5,.92);backdrop-filter:blur(20px);border:1px solid var(--brd);font-size:.85rem;font-weight:500;opacity:0;pointer-events:none;z-index:2000;transition:all .4s var(--e)}

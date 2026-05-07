@@ -51,6 +51,12 @@
         return ['confirm', 'garment'].includes(h) ? h : 'drop';
     }
 
+    const pageTitles = {
+        drop: 'CIRCUIT — Drop Zero',
+        confirm: 'CIRCUIT — Confirm Delivery',
+        garment: 'CIRCUIT — Digital Passport'
+    };
+
     function navigate(page) {
         if (page === state.page) return;
         const prev = $(`#page-${state.page}`);
@@ -64,6 +70,7 @@
             next.classList.add('visible');
             state.page = page;
             setNavActive();
+            document.title = pageTitles[page] || 'CIRCUIT';
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }, 280);
     }
@@ -79,12 +86,17 @@
         if (state.wallet) return;
         state.wallet = true;
         state.addr = genAddr();
-        const short = state.addr.slice(0, 4) + '...' + state.addr.slice(-4);
+        const short = state.addr.slice(0, 6) + '...' + state.addr.slice(-4);
         $$('.btn-wallet').forEach(b => {
             b.classList.add('connected');
             const label = $('span:last-child', b) || $('span', b);
             if (label) label.textContent = short;
         });
+        // Update passport owner address (PRD 5.4#9)
+        const ownerEl = $('#nft-owner');
+        if (ownerEl) ownerEl.textContent = short;
+        // Remove any inline wallet prompts
+        $$('.wallet-prompt').forEach(p => p.remove());
         toast('✓', 'Wallet connected: ' + short);
     }
 
@@ -100,19 +112,52 @@
         return s;
     }
 
+    // ── Show wallet prompt inline ──
+    function showWalletPrompt(container) {
+        if ($('.wallet-prompt', container)) return;
+        const prompt = document.createElement('div');
+        prompt.className = 'wallet-prompt';
+        prompt.innerHTML = `<span class="wp-icon">⚠</span> <span>Please connect your wallet to continue</span> <button class="wp-btn" id="wp-connect">Connect Wallet</button>`;
+        container.appendChild(prompt);
+        const wpBtn = $('#wp-connect', container);
+        if (wpBtn) wpBtn.addEventListener('click', connectWallet);
+    }
+
     // ── Confirm Order ──
     function handleOrder() {
-        if (!state.wallet) { toast('⚠', 'Connect your wallet first'); return; }
+        if (!state.wallet) {
+            showWalletPrompt($('#drop-tx'));
+            toast('⚠', 'Connect your wallet first');
+            return;
+        }
         const btn = $('#btn-order');
         const tx = $('#drop-tx');
         btn.disabled = true;
-        const txt = $('.bp-text', btn); if (txt) txt.textContent = 'Signing...';
+        const txt = $('.bp-text', btn);
+
+        // DropSoldOut simulation (PRD Aha Moment #2)
+        if (state.minted >= state.max) {
+            if (txt) txt.textContent = 'Signing...';
+            btn.classList.add('signing');
+            setTimeout(() => {
+                tx.innerHTML = `<div class="tx-msg err">✗ Transaction failed — DropSoldOut: Max supply of ${state.max} reached. No more orders can be registered.</div>`;
+                if (txt) txt.textContent = 'Confirm Order';
+                btn.disabled = false;
+                btn.classList.remove('signing');
+                toast('✗', 'DropSoldOut — supply cap enforced on-chain');
+            }, 1500);
+            return;
+        }
+
+        if (txt) txt.textContent = 'Signing...';
+        btn.classList.add('signing');
         setTimeout(() => {
             const sig = genTx();
             const url = `https://solscan.io/tx/${sig}?cluster=devnet`;
-            tx.innerHTML = `<div class="tx-msg ok">✓ Order confirmed. Payment locked in escrow. <a href="${url}" target="_blank">View on Solscan ↗</a></div>
+            tx.innerHTML = `<div class="tx-msg ok">✓ Order confirmed. Payment locked in escrow on Solana. <a href="${url}" target="_blank">View on Solscan ↗</a></div>
                 <button class="btn-primary btn-next" id="btn-goto-confirm"><span class="bp-text">Go to Delivery Confirmation</span><span class="bp-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span></button>`;
             if (txt) txt.textContent = 'Order Confirmed';
+            btn.classList.remove('signing');
             toast('✓', 'Escrow created on Solana Devnet');
             state.minted = Math.min(state.minted + 1, state.max);
             updateProgress();
@@ -125,17 +170,24 @@
 
     // ── Confirm Delivery ──
     function handleDeliver() {
-        if (!state.wallet) { toast('⚠', 'Connect your wallet first'); return; }
+        if (!state.wallet) {
+            showWalletPrompt($('#confirm-tx'));
+            toast('⚠', 'Connect your wallet first');
+            return;
+        }
         const btn = $('#btn-deliver');
         const tx = $('#confirm-tx');
         btn.disabled = true;
-        const txt = $('.bp-text', btn); if (txt) txt.textContent = 'Signing...';
+        const txt = $('.bp-text', btn);
+        if (txt) txt.textContent = 'Signing...';
+        btn.classList.add('signing');
         setTimeout(() => {
             const sig = genTx();
             const url = `https://solscan.io/tx/${sig}?cluster=devnet`;
             tx.innerHTML = `<div class="tx-msg ok">✓ Delivery confirmed. Payment released to designer. <a href="${url}" target="_blank">View on Solscan ↗</a></div>
                 <button class="btn-primary btn-next" id="btn-goto-passport"><span class="bp-text">View Digital Passport</span><span class="bp-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span></button>`;
             if (txt) txt.textContent = 'Delivery Confirmed';
+            btn.classList.remove('signing');
             toast('✓', 'Funds released from escrow');
             const gotoBtn = $('#btn-goto-passport');
             if (gotoBtn) gotoBtn.addEventListener('click', () => {
@@ -153,9 +205,15 @@
         const pct = (state.minted / state.max) * 100;
         fill.style.width = pct + '%';
         if (count) count.textContent = state.minted;
-        if (status && state.minted >= state.max) {
-            status.textContent = 'Sold Out';
-            status.classList.add('sold-out');
+        if (status) {
+            const remaining = state.max - state.minted;
+            if (remaining <= 0) {
+                status.textContent = 'Sold Out';
+                status.classList.add('sold-out');
+            } else if (remaining <= 5) {
+                status.textContent = `${remaining} remaining`;
+                status.style.color = '#ff9945';
+            }
         }
     }
 
@@ -183,6 +241,23 @@
         if (h) h.classList.remove('open');
         if (d) d.classList.remove('open');
         document.body.classList.remove('drawer-open');
+    }
+
+    // ── Demo Reset ──
+    function resetDemo() {
+        state.minted = 36;
+        // Reset buttons
+        const ob = $('#btn-order');
+        if (ob) { ob.disabled = false; const t = $('.bp-text', ob); if (t) t.textContent = 'Confirm Order'; ob.classList.remove('signing'); }
+        const db = $('#btn-deliver');
+        if (db) { db.disabled = false; const t = $('.bp-text', db); if (t) t.textContent = 'Confirm Delivery'; db.classList.remove('signing'); }
+        // Clear tx areas
+        $$('.tx-area').forEach(el => el.innerHTML = '');
+        // Reset progress
+        const status = $('#mint-status');
+        if (status) { status.textContent = 'Limited Edition'; status.classList.remove('sold-out'); status.style.color = ''; }
+        updateProgress();
+        toast('↻', 'Demo reset — ready for recording');
     }
 
     // ── Scroll ──
@@ -235,6 +310,10 @@
 
         // Action buttons
         const ob = $('#btn-order'); if (ob) ob.addEventListener('click', handleOrder);
+
+        // Demo reset button
+        const rb = $('#btn-reset');
+        if (rb) rb.addEventListener('click', resetDemo);
         const db = $('#btn-deliver'); if (db) db.addEventListener('click', handleDeliver);
 
         // Hamburger
