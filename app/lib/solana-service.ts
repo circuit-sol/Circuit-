@@ -291,8 +291,9 @@ export async function fetchPassportData(mintAddress?: string): Promise<PassportD
     await randomDelay(500, 1000);
     const mint = mintAddress || GARMENT_MINT;
     return {
-      garmentName: 'Circuit Drop 001 — Garment 01 of 40',
-      edition: '01 of 40',
+      garmentName: 'Circuit Drop Zero — Wrap Dress',
+      edition: '01',
+
       dropId: DROP_ID,
       productionDate: PRODUCTION_DATE,
       fabric: FABRIC,
