@@ -126,7 +126,7 @@
   }
   
   h1 {
-    @apply text-[2.5rem] !important;
+    @apply !text-[2.5rem];
   }
 }
 

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { fetchPassportData, type PassportData } from '@/lib/solana-service';
 import { truncateAddress, solscanTokenUrl } from '@/lib/utils';
-import { GARMENT_MINT } from '@/lib/constants';
+import { GARMENT_MINT, MAX_SUPPLY } from '@/lib/constants';
 
 export default function GarmentPassportPage() {
   const params = useParams();
