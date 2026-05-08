@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
 import { Montserrat, Outfit, JetBrains_Mono } from "next/font/google";
-import dynamic from "next/dynamic";
+import ClientProviders from "@/providers/ClientProviders";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Toast from "@/components/Toast";
 import "./globals.css";
-
-const SolanaWalletProvider = dynamic(
-  () => import("@/providers/WalletProvider"),
-  { ssr: false }
-);
 
 const montserrat = Montserrat({
   variable: "--font-brand",
@@ -62,14 +57,14 @@ export default function RootLayout({
       className={`${montserrat.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full`}
     >
       <body className="min-h-full flex flex-col bg-black text-white font-body antialiased overflow-x-hidden">
-        <SolanaWalletProvider>
+        <ClientProviders>
           <Navbar />
           <main className="flex-1 pt-[72px]" role="main">
             {children}
           </main>
           <Footer />
           <Toast />
-        </SolanaWalletProvider>
+        </ClientProviders>
       </body>
     </html>
   );
