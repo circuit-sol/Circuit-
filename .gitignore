@@ -3,3 +3,10 @@ skills-lock.json
 node_modules/
 .DS_Store
 *.log
+
+# Anchor
+.anchor/
+target/
+dist/
+**/*.rs.bk
+Cargo.lock

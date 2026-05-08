@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@theme {
+  --font-brand: "Montserrat", sans-serif;
+  --font-body: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-platinum: #D1D1D1;
+  --color-error: #FF5050;
+
+  --animate-fade-in: fadeIn 0.4s ease-out forwards;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-black text-white font-body overflow-x-hidden;
+    background-image: 
+      radial-gradient(circle at 50% -20%, #111 0%, transparent 60%),
+      radial-gradient(circle at 0% 100%, #050505 0%, transparent 40%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* ── Layout Containers ────────────────────────────────────────────── */
+  .section-container {
+    @apply max-w-[1400px] mx-auto w-full px-6 md:px-10 lg:px-16;
+  }
+
+  /* ── Cards & Glass ────────────────────────────────────────────────── */
+  .card-glass {
+    @apply bg-white/[0.03] backdrop-blur-[20px] border border-white/[0.08] rounded-[24px] transition-all duration-300;
+  }
+
+  .card-glass:hover {
+    @apply border-white/[0.16] bg-white/[0.05] shadow-[0_20px_50px_rgba(0,0,0,0.4)];
+  }
+
+  /* ── Premium Buttons ──────────────────────────────────────────────── */
+  .btn-circuit {
+    @apply relative flex items-center gap-4 bg-white text-black px-8 py-4 rounded-full font-bold text-[0.85rem] uppercase tracking-[0.1em] overflow-hidden transition-all duration-500 hover:shadow-[0_10px_40px_rgba(255,255,255,0.2)] disabled:opacity-50 active:scale-[0.98] select-none;
+  }
+
+  .btn-circuit span {
+    @apply relative z-10;
+  }
+
+  .btn-circuit::before {
+    content: '';
+    @apply absolute inset-0 bg-[#D1D1D1] translate-x-[-100%] transition-transform duration-500 ease-out;
+  }
+
+  .btn-circuit:hover::before {
+    @apply translate-x-0;
+  }
+
+  .btn-circuit.signing {
+    @apply cursor-wait bg-[#A3A3A3];
+  }
+
+  .btn-outline-circuit {
+    @apply flex items-center gap-3 border border-white/[0.12] px-8 py-3.5 rounded-full text-[0.75rem] font-bold uppercase tracking-[0.1em] hover:bg-white hover:text-black transition-all duration-300;
+  }
+
+  /* ── Mint Progress ────────────────────────────────────────────────── */
+  .mp-track {
+    @apply h-1.5 w-full bg-white/[0.05] rounded-full overflow-hidden border border-white/[0.08];
+  }
+
+  .mp-fill {
+    @apply h-full bg-gradient-to-r from-white via-[#D1D1D1] to-white bg-[length:200%_100%] transition-all duration-1000 ease-in-out;
+    animation: shimmer 3s infinite linear;
+  }
+
+  /* ── Ambient Effects ─────────────────────────────────────────────── */
+  .ambient-orb {
+    @apply absolute blur-[120px] rounded-full opacity-20 pointer-events-none;
+  }
+
+  .orb-white {
+    @apply w-[40vw] h-[40vw] -top-[10%] -left-[10%] bg-white;
+  }
+
+  .orb-grey {
+    @apply w-[30vw] h-[30vw] top-[40%] -right-[5%] bg-[#333];
+  }
+
+  /* ── Transaction Messages ────────────────────────────────────────── */
+  .tx-msg {
+    @apply flex items-center gap-3 px-6 py-4 rounded-2xl text-sm font-semibold border backdrop-blur-[12px] animate-fade-in;
+  }
+
+  .tx-msg.ok {
+    @apply bg-white/[0.04] border-white/[0.12] text-white shadow-[0_10px_30px_rgba(255,255,255,0.05)];
+  }
+
+  .tx-msg.err {
+    @apply bg-[#FF5050]/[0.05] border-[#FF5050]/[0.2] text-[#FF5050];
+  }
+}
+
+/* ── Custom Animations (Plain CSS) ─────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: 100% 0%; }
+  100% { background-position: -100% 0%; }
+}
+
+/* ── Responsive Refinements ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .btn-circuit {
+    @apply px-6 py-3.5 text-[0.75rem] w-full justify-center;
+  }
+  
+  h1 {
+    @apply !text-[2.5rem];
+  }
+}
+
+/* Print Overrides */
+@media print {
+  body { @apply bg-white text-black; }
+  .ambient-orb { display: none; }
+}

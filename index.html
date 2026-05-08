@@ -3,8 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CIRCUIT — Made-to-Order Fashion on Solana</title>
+    <title>Circuit — Drop Zero</title>
     <meta name="description" content="Made-to-order fashion infrastructure on Solana. Every garment confirmed, every payment trustless, every ownership permanent.">
+
+    <!-- OG / Social -->
+    <meta property="og:title" content="Circuit — Made-to-Order Fashion on Solana">
+    <meta property="og:description" content="Drop Zero: The Wrap Dress. Limited to 40 units. Payment held in trustless escrow. Ownership recorded permanently on-chain.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="dpp-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+
     <link rel="icon" type="image/svg+xml" href="logo/logo_icon_white.svg">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,33 +30,33 @@
     <canvas id="particles" class="particle-canvas" aria-hidden="true"></canvas>
 
     <!-- ══════════════════ NAVBAR ══════════════════ -->
-    <nav class="navbar" id="navbar">
+    <nav class="navbar" id="navbar" role="navigation" aria-label="Main navigation">
         <div class="nav-inner">
-            <a href="#/" class="nav-brand" id="nav-brand">
+            <a href="#/" class="nav-brand" id="nav-brand" aria-label="Circuit home">
                 <img src="logo/logo_icon_white.svg" alt="Circuit" class="nav-logo">
                 <span class="nav-wordmark">Circuit</span>
             </a>
 
-            <div class="nav-center" id="nav-center">
-                <a href="#/" class="nav-link active" data-page="drop">
+            <div class="nav-center" id="nav-center" role="tablist">
+                <a href="#/" class="nav-link active" data-page="drop" role="tab" aria-selected="true">
                     <span class="nav-link-text">Drop</span>
                 </a>
-                <a href="#/confirm" class="nav-link" data-page="confirm">
+                <a href="#/confirm" class="nav-link" data-page="confirm" role="tab" aria-selected="false">
                     <span class="nav-link-text">Confirm</span>
                 </a>
-                <a href="#/garment" class="nav-link" data-page="garment">
+                <a href="#/garment" class="nav-link" data-page="garment" role="tab" aria-selected="false">
                     <span class="nav-link-text">Passport</span>
                 </a>
-                <div class="nav-pill" id="nav-pill"></div>
+                <div class="nav-pill" id="nav-pill" aria-hidden="true"></div>
             </div>
 
             <div class="nav-right">
-                <div class="net-badge">
-                    <span class="net-dot"></span>
+                <div class="net-badge" aria-label="Network: Devnet">
+                    <span class="net-dot" aria-hidden="true"></span>
                     <span>Devnet</span>
                 </div>
-                <button class="btn-wallet" id="btn-wallet">
-                    <svg class="wallet-icon" viewBox="0 0 20 20" fill="none" width="16" height="16">
+                <button class="btn-wallet" id="btn-wallet" aria-label="Connect wallet">
+                    <svg class="wallet-icon" viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true">
                         <rect x="1" y="4" width="18" height="13" rx="3" stroke="currentColor" stroke-width="1.5"/>
                         <path d="M14 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/>
                         <path d="M4 4V5a3 3 0 013-3h6a3 3 0 013 3v0" stroke="currentColor" stroke-width="1.5"/>
@@ -57,16 +65,16 @@
                 </button>
             </div>
 
-            <button class="hamburger" id="hamburger" aria-label="Toggle menu">
-                <span class="ham-bar"></span>
-                <span class="ham-bar"></span>
-                <span class="ham-bar"></span>
+            <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+                <span class="ham-bar" aria-hidden="true"></span>
+                <span class="ham-bar" aria-hidden="true"></span>
+                <span class="ham-bar" aria-hidden="true"></span>
             </button>
         </div>
     </nav>
 
     <!-- Mobile Drawer -->
-    <div class="drawer" id="drawer">
+    <div class="drawer" id="drawer" role="dialog" aria-label="Mobile navigation">
         <div class="drawer-body">
             <a href="#/" class="drawer-link active" data-page="drop">
                 <span class="drawer-num">01</span>Drop
@@ -80,11 +88,11 @@
         </div>
         <div class="drawer-footer">
             <div class="net-badge">
-                <span class="net-dot"></span>
+                <span class="net-dot" aria-hidden="true"></span>
                 <span>Devnet</span>
             </div>
-            <button class="btn-wallet" id="btn-wallet-m">
-                <svg class="wallet-icon" viewBox="0 0 20 20" fill="none" width="16" height="16">
+            <button class="btn-wallet" id="btn-wallet-m" aria-label="Connect wallet">
+                <svg class="wallet-icon" viewBox="0 0 20 20" fill="none" width="16" height="16" aria-hidden="true">
                     <rect x="1" y="4" width="18" height="13" rx="3" stroke="currentColor" stroke-width="1.5"/>
                     <path d="M14 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/>
                     <path d="M4 4V5a3 3 0 013-3h6a3 3 0 013 3v0" stroke="currentColor" stroke-width="1.5"/>
@@ -96,10 +104,10 @@
     </div>
 
     <!-- ══════════════════ PAGES ══════════════════ -->
-    <main id="app">
+    <main id="app" role="main">
 
         <!-- ═══ PAGE 1 — DROP ═══ -->
-        <section class="page active" id="page-drop">
+        <section class="page active" id="page-drop" role="tabpanel" aria-label="Drop Zero">
             <div class="drop-hero">
                 <!-- Left: Content Column -->
                 <div class="drop-content" id="drop-content">
@@ -125,7 +133,7 @@
                     <div class="meta-strip">
                         <div class="meta-cell">
                             <span class="mc-label">Edition</span>
-                            <span class="mc-value">01 of 40</span>
+                            <span class="mc-value" id="meta-edition">01 of 40</span>
                         </div>
                         <div class="meta-divider"></div>
                         <div class="meta-cell">
@@ -153,32 +161,32 @@
                     </div>
 
                     <div class="hero-cta">
-                        <button class="btn-primary" id="btn-order">
+                        <button class="btn-primary" id="btn-order" aria-label="Confirm your order">
                             <span class="bp-text">Confirm Order</span>
-                            <span class="bp-arrow">
+                            <span class="bp-arrow" aria-hidden="true">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                             </span>
                         </button>
-                        <button class="btn-reset" id="btn-reset" title="Reset demo for re-recording">↻ Reset Demo</button>
+                        <button class="btn-reset" id="btn-reset" title="Reset demo for re-recording" aria-label="Reset demo">↻ Reset Demo</button>
                         <span class="cta-sub">Connects to Phantom · Solana Devnet</span>
                     </div>
 
                     <!-- Transaction Result -->
-                    <div class="tx-area" id="drop-tx"></div>
+                    <div class="tx-area" id="drop-tx" role="status" aria-live="polite"></div>
                 </div>
 
                 <!-- Right: Image Column -->
                 <div class="drop-visual" id="drop-visual">
                     <div class="img-wrap">
-                        <div class="img-glow"></div>
+                        <div class="img-glow" aria-hidden="true"></div>
                         <div class="img-frame">
-                            <img src="dpp-image.png" alt="Circuit Wrap Dress — Drop Zero" class="hero-img" id="hero-img">
+                            <img src="dpp-image.png" alt="Circuit Wrap Dress — Drop Zero, Edition 01 of 40" class="hero-img" id="hero-img" loading="eager">
                         </div>
-                        <div class="img-badge">
-                            <span class="ib-dot"></span>
+                        <div class="img-badge" aria-label="On-chain verified garment">
+                            <span class="ib-dot" aria-hidden="true"></span>
                             On-Chain Verified
                         </div>
-                        <div class="img-edition">01 / 40</div>
+                        <div class="img-edition" aria-label="Edition 01 of 40">01 / 40</div>
                     </div>
                 </div>
             </div>
@@ -187,25 +195,25 @@
             <div class="flow-strip" id="flow-strip">
                 <div class="flow-inner">
                     <div class="flow-step">
-                        <div class="fs-icon">
+                        <div class="fs-icon" aria-hidden="true">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/></svg>
                         </div>
                         <div class="fs-num">01</div>
                         <strong>Buyer Confirms</strong>
                         <p>Payment enters Solana escrow PDA</p>
                     </div>
-                    <div class="flow-connector"><div class="fc-line"></div><div class="fc-dot"></div></div>
+                    <div class="flow-connector" aria-hidden="true"><div class="fc-line"></div><div class="fc-dot"></div></div>
                     <div class="flow-step">
-                        <div class="fs-icon">
+                        <div class="fs-icon" aria-hidden="true">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                         </div>
                         <div class="fs-num">02</div>
                         <strong>Production Begins</strong>
                         <p>Garment is made-to-order</p>
                     </div>
-                    <div class="flow-connector"><div class="fc-line"></div><div class="fc-dot"></div></div>
+                    <div class="flow-connector" aria-hidden="true"><div class="fc-line"></div><div class="fc-dot"></div></div>
                     <div class="flow-step">
-                        <div class="fs-icon">
+                        <div class="fs-icon" aria-hidden="true">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
                         </div>
                         <div class="fs-num">03</div>
@@ -218,11 +226,11 @@
         </section>
 
         <!-- ═══ PAGE 2 — CONFIRM DELIVERY ═══ -->
-        <section class="page" id="page-confirm">
+        <section class="page" id="page-confirm" role="tabpanel" aria-label="Confirm Delivery">
             <div class="confirm-center">
                 <div class="confirm-card">
-                    <!-- Animated Shield -->
-                    <div class="shield-wrap">
+                    <!-- Animated Shield (monochrome) -->
+                    <div class="shield-wrap" aria-hidden="true">
                         <div class="shield-glow"></div>
                         <svg class="shield-svg" viewBox="0 0 80 80" fill="none">
                             <path d="M40 6L10 20V38C10 56.4 22.8 73.4 40 78C57.2 73.4 70 56.4 70 38V20L40 6Z"
@@ -231,8 +239,8 @@
                                   stroke-linecap="round" stroke-linejoin="round" class="check-path"/>
                             <defs>
                                 <linearGradient id="sg" x1="10" y1="6" x2="70" y2="78">
-                                    <stop stop-color="#9945FF"/>
-                                    <stop offset="1" stop-color="#14F195"/>
+                                    <stop stop-color="#FFFFFF"/>
+                                    <stop offset="1" stop-color="#666666"/>
                                 </linearGradient>
                             </defs>
                         </svg>
@@ -241,7 +249,7 @@
                     <h1 class="confirm-title">Confirm Your Delivery</h1>
 
                     <div class="confirm-garment">
-                        <img src="dpp-image.png" alt="Wrap Dress" class="cg-img">
+                        <img src="dpp-image.png" alt="Wrap Dress" class="cg-img" loading="lazy">
                         <div class="cg-info">
                             <strong>Circuit Drop Zero</strong>
                             <span>The Wrap Dress · Edition 01/40</span>
@@ -260,7 +268,7 @@
                         </div>
                         <div class="os-row">
                             <span class="os-k">Escrow</span>
-                            <span class="os-v mono">PDA held by program</span>
+                            <span class="os-v mono" id="escrow-pda-display">PDA held by program</span>
                         </div>
                         <div class="os-row">
                             <span class="os-k">Action</span>
@@ -268,24 +276,24 @@
                         </div>
                     </div>
 
-                    <button class="btn-primary btn-full" id="btn-deliver">
+                    <button class="btn-primary btn-full" id="btn-deliver" aria-label="Confirm delivery and release escrow">
                         <span class="bp-text">Confirm Delivery</span>
-                        <span class="bp-arrow">
+                        <span class="bp-arrow" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                         </span>
                     </button>
 
-                    <div class="tx-area" id="confirm-tx"></div>
+                    <div class="tx-area" id="confirm-tx" role="status" aria-live="polite"></div>
 
                     <p class="confirm-note">
-                        This transaction requires your Phantom wallet signature.
+                        This transaction requires your wallet signature.
                     </p>
                 </div>
             </div>
         </section>
 
         <!-- ═══ PAGE 3 — GARMENT PASSPORT ═══ -->
-        <section class="page" id="page-garment">
+        <section class="page" id="page-garment" role="tabpanel" aria-label="Digital Passport">
             <div class="passport-page">
                 <div class="passport-header">
                     <div class="tag-row">
@@ -302,13 +310,13 @@
                     <!-- Image Column -->
                     <div class="passport-img-col">
                         <div class="passport-frame">
-                            <img src="dpp-image.png" alt="Circuit Wrap Dress" class="passport-img">
+                            <img src="dpp-image.png" alt="Circuit Wrap Dress — Digital Product Passport" class="passport-img" loading="lazy">
                             <div class="pf-overlay">
                                 <span class="pf-badge">CRCT</span>
                             </div>
                         </div>
                         <div class="passport-edition">
-                            <span class="pe-dot"></span>
+                            <span class="pe-dot" aria-hidden="true"></span>
                             Edition 01 of 40
                         </div>
                     </div>
@@ -319,10 +327,10 @@
                         <div class="pd-section">
                             <h3 class="pd-label">Garment Information</h3>
                             <div class="pd-rows">
-                                <div class="pd-row"><span class="pd-k">Name</span><span class="pd-v">Circuit Drop 001 — Garment 01 of 40</span></div>
-                                <div class="pd-row"><span class="pd-k">Drop</span><span class="pd-v">Drop Zero</span></div>
-                                <div class="pd-row"><span class="pd-k">Fabric</span><span class="pd-v">Nigerian Cotton</span></div>
-                                <div class="pd-row"><span class="pd-k">Production</span><span class="pd-v">May 2026</span></div>
+                                <div class="pd-row"><span class="pd-k">Name</span><span class="pd-v" id="passport-name">Circuit Drop 001 — Garment 01 of 40</span></div>
+                                <div class="pd-row"><span class="pd-k">Drop</span><span class="pd-v" id="passport-drop">Drop Zero</span></div>
+                                <div class="pd-row"><span class="pd-k">Fabric</span><span class="pd-v" id="passport-fabric">Nigerian Cotton</span></div>
+                                <div class="pd-row"><span class="pd-k">Production</span><span class="pd-v" id="passport-date">May 2026</span></div>
                             </div>
                         </div>
 
@@ -332,26 +340,27 @@
                         <div class="pd-section">
                             <h3 class="pd-label pd-label-green">Blockchain Record</h3>
                             <div class="pd-rows">
-                                <div class="pd-row"><span class="pd-k">Symbol</span><span class="pd-v mono">CRCT</span></div>
+                                <div class="pd-row"><span class="pd-k">Symbol</span><span class="pd-v mono" id="passport-symbol">CRCT</span></div>
                                 <div class="pd-row"><span class="pd-k">Owner</span><span class="pd-v mono" id="nft-owner">7xKp4R...L4qP</span></div>
-                                <div class="pd-row"><span class="pd-k">Creator</span><span class="pd-v">Circuit</span></div>
-                                <div class="pd-row"><span class="pd-k">Royalty</span><span class="pd-v pd-highlight">7% on all resales</span></div>
+                                <div class="pd-row"><span class="pd-k">Creator</span><span class="pd-v" id="passport-creator">Circuit</span></div>
+                                <div class="pd-row"><span class="pd-k">Royalty</span><span class="pd-v pd-highlight" id="passport-royalty">7% on all resales</span></div>
+                                <div class="pd-row"><span class="pd-k">Standard</span><span class="pd-v mono" id="passport-standard">pNFT</span></div>
                             </div>
                             <div class="pd-mint-box">
                                 <span class="pd-k">Mint Address</span>
-                                <span class="pd-v mono" id="nft-mint">7p8H9xKmQr5...Z1w9kL4qP</span>
+                                <span class="pd-v mono" id="nft-mint">G17eNpsCn4S2Xtr4f9t9fmgyf6ZVFEpdXnpqJBiBCFEo</span>
                             </div>
                         </div>
 
                         <!-- Solscan Link -->
-                        <a href="https://solscan.io/?cluster=devnet" target="_blank" rel="noopener" class="btn-outline" id="btn-solscan">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        <a href="https://solscan.io/token/G17eNpsCn4S2Xtr4f9t9fmgyf6ZVFEpdXnpqJBiBCFEo?cluster=devnet" target="_blank" rel="noopener" class="btn-outline" id="btn-solscan" aria-label="View garment NFT on Solscan">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
                             <span>View on Solscan</span>
                         </a>
 
                         <!-- Permanence Notice -->
                         <div class="perm-notice">
-                            <div class="perm-icon-wrap">
+                            <div class="perm-icon-wrap" aria-hidden="true">
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                             </div>
                             <p>This record is permanent on Solana. It exists regardless of Circuit's website.</p>
@@ -363,8 +372,8 @@
     </main>
 
     <!-- ── Toast ── -->
-    <div class="toast" id="toast">
-        <span class="toast-icon" id="toast-icon"></span>
+    <div class="toast" id="toast" role="alert" aria-live="assertive">
+        <span class="toast-icon" id="toast-icon" aria-hidden="true"></span>
         <span class="toast-text" id="toast-text"></span>
     </div>
 
@@ -372,7 +381,7 @@
     <footer class="footer">
         <div class="footer-inner">
             <div class="footer-brand">
-                <img src="logo/logo_icon_white.svg" alt="" class="footer-logo">
+                <img src="logo/logo_icon_white.svg" alt="" class="footer-logo" aria-hidden="true">
                 <span class="footer-name">Circuit</span>
             </div>
             <div class="footer-center">
@@ -384,6 +393,7 @@
         </div>
     </footer>
 
+    <script src="services/solana_handshake.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
