@@ -1,38 +1,38 @@
 /**
- * Circuit — Constants & Program IDs
- * Source of Truth: Circuit-/INTEGRATION.md (backend-contracts branch)
+ * ═══════════════════════════════════════════════════════════════════════
+ * Circuit — Application Constants
+ * ═══════════════════════════════════════════════════════════════════════
  */
 
-// ── Program IDs (Devnet) ─────────────────────────────────────────────
-export const ESCROW_PROGRAM_ID = '8b866KXrU94jAEuZYNr8WTkuXJELPvu6eW1v89pSAUrN';
-export const DROPS_PROGRAM_ID = '3i1KUa7S1FjRx34SzqRAKAYsp3S8AJkCB3x7odjua7kL';
-export const GARMENT_MINT = 'G17eNpsCn4S2Xtr4f9t9fmgyf6ZVFEpdXnpqJBiBCFEo';
+// ── Environment Flags ────────────────────────────────────────────────
+export const SIMULATION_MODE = process.env.NEXT_PUBLIC_SIMULATION_MODE !== 'false';
 
-// ── Network ──────────────────────────────────────────────────────────
-export const CLUSTER = 'devnet' as const;
-export const RPC_ENDPOINT = 'https://api.devnet.solana.com';
-export const SOLSCAN_BASE = 'https://solscan.io';
+// ── Program IDs (from INTEGRATION.md & .env) ─────────────────────────
+export const ESCROW_PROGRAM_ID = 
+  process.env.NEXT_PUBLIC_ESCROW_PROGRAM_ID || '8b866KXrU94jAEuZYNr8WTkuXJELPvu6eW1v89pSAUrN';
 
-// ── Drop Config ──────────────────────────────────────────────────────
-export const DROP_ID = 'DROP001';
-export const DROP_NAME = 'Drop Zero';
-export const GARMENT_NAME = 'The Wrap Dress';
-export const DESIGNER_PUBKEY = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin';
-export const PRICE_SOL = 0.5;
-export const PRICE_DISPLAY = '$45';
+export const DROPS_PROGRAM_ID = 
+  process.env.NEXT_PUBLIC_DROPS_PROGRAM_ID || '3i1KUa7S1FjRx34SzqRAKAYsp3S8AJkCB3x7odjua7kL';
+
+export const GARMENT_MINT = 
+  process.env.NEXT_PUBLIC_GARMENT_MINT || 'G17eNpsCn4S2Xtr4f9t9fmgyf6ZVFEpdXnpqJBiBCFEo';
+
+// ── Drop Configuration ───────────────────────────────────────────────
+export const DROP_ID = 'drop-zero';
+export const PRICE_SOL = 2.5;
+export const PRICE_DISPLAY = '2.5 SOL';
 export const MAX_SUPPLY = 40;
-export const FABRIC = 'Nigerian Cotton';
-export const PRODUCTION_DATE = 'May 2026';
+export const DEMO_START_COUNT = 38; // Close to sold out for demo dramatic effect
 
-// ── Simulation ───────────────────────────────────────────────────────
-export const SIMULATION_MODE = true;
-export const DEMO_START_COUNT = 36;
-
-// ── Brand ────────────────────────────────────────────────────────────
+// ── Brand Identity ──────────────────────────────────────────────────
 export const BRAND = {
   name: 'Circuit',
-  tagline: '...with the edge',
   symbol: 'CRCT',
-  royaltyBps: 700,
-  royaltyPercent: '7%',
-} as const;
+  designer: 'Marvelous',
+  royaltyBps: 500, // 5%
+  royaltyPercent: '5%',
+};
+
+export const DESIGNER_PUBKEY = 'Marv...Design...Key';
+export const PRODUCTION_DATE = 'October 2026';
+export const FABRIC = 'Organic Tech-Silk';
