@@ -3,11 +3,11 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useAuth } from '@/lib/auth-context';
 import { confirmDelivery, parseError } from '@/lib/solana-service';
-import { DROP_ID, PRICE_SOL, MAX_SUPPLY, GARMENT_MINT } from '@/lib/constants';
-import { truncateAddress } from '@/lib/utils';
+import { DROP_ID, MAX_SUPPLY, GARMENT_MINT } from '@/lib/constants';
 import { showToast } from '@/components/Toast';
+import SignInModal from '@/components/SignInModal';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error';
 
@@ -20,13 +20,20 @@ interface TxResult {
 }
 
 export default function ConfirmPage() {
-  const { publicKey, connected } = useWallet();
+  const { user, isSignedIn } = useAuth();
   const [txState, setTxState] = useState<TxState>('idle');
   const [txResult, setTxResult] = useState<TxResult>({});
+  const [isSignInOpen, setIsSignInOpen] = useState(false);
   const processingRef = useRef(false);
 
   const handleDeliver = async () => {
     if (processingRef.current) return;
+
+    if (!isSignedIn) {
+      setIsSignInOpen(true);
+      return;
+    }
+
     processingRef.current = true;
     setTxState('signing');
     setTxResult({});
@@ -35,7 +42,7 @@ export default function ConfirmPage() {
       const result = await confirmDelivery(
         'simulation-pda',
         DROP_ID,
-        publicKey?.toBase58()
+        user?.walletAddress
       );
 
       setTxState('success');
@@ -45,7 +52,7 @@ export default function ConfirmPage() {
         fundsReleased: result.fundsReleased,
         designerAddress: result.designerAddress,
       });
-      showToast('✓', 'Delivery confirmed — funds released to designer');
+      showToast('✓', 'Delivery confirmed');
     } catch (err) {
       setTxState('error');
       setTxResult({ message: parseError(err) });
@@ -106,7 +113,7 @@ export default function ConfirmPage() {
 
         <p className="text-sm text-[#A3A3A3] leading-relaxed">
           Received your garment? Tap below to confirm. Your confirmation
-          releases payment from escrow to the designer.
+          finalizes the order and releases payment to the designer.
         </p>
 
         {/* Order Summary */}
@@ -116,12 +123,12 @@ export default function ConfirmPage() {
             <span>Circuit Drop Zero — Wrap Dress</span>
           </div>
           <div className="flex justify-between p-4 border-b border-white/[0.12]">
-            <span className="text-[#666]">Escrow</span>
-            <span className="font-mono text-xs text-[#A3A3A3]">PDA held by program</span>
+            <span className="text-[#666]">Account</span>
+            <span className="text-[#A3A3A3] truncate ml-4">{isSignedIn ? user?.email : '—'}</span>
           </div>
           <div className="flex justify-between p-4">
             <span className="text-[#666]">Action</span>
-            <span>Release funds to designer</span>
+            <span>Finalize payment</span>
           </div>
         </div>
 
@@ -130,16 +137,16 @@ export default function ConfirmPage() {
           className={`btn-circuit w-full justify-center ${txState === 'signing' ? 'signing' : ''}`}
           onClick={handleDeliver}
           disabled={txState === 'signing' || txState === 'success'}
-          aria-label="Confirm delivery and release escrow"
+          aria-label="Confirm delivery"
         >
           <span>
-            {txState === 'signing' ? 'Processing on Solana...' :
+            {txState === 'signing' ? 'Processing...' :
              txState === 'success' ? '✓ Delivery Confirmed' :
              'Confirm Delivery'}
           </span>
           <span className="btn-arrow" aria-hidden="true">
             {txState === 'signing' ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center"/></svg>
             ) : (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             )}
@@ -152,11 +159,11 @@ export default function ConfirmPage() {
             <div className="tx-msg ok flex flex-col gap-2 w-full" style={{ animation: 'celebrate 0.5s ease' }}>
               <div className="flex items-center gap-2">
                 <span>✓</span>
-                <span>Delivery confirmed. {txResult.fundsReleased} SOL released to designer.</span>
+                <span>Delivery confirmed. Payment released.</span>
               </div>
               <div className="flex flex-wrap gap-3 text-xs">
                 <a href={txResult.solscanUrl} target="_blank" rel="noopener" className="text-[#D1D1D1] hover:text-white transition-colors underline underline-offset-2">
-                  View on Solscan ↗
+                  Transaction Proof ↗
                 </a>
                 <Link href={`/garment/${GARMENT_MINT}`} className="text-[#D1D1D1] hover:text-white transition-colors underline underline-offset-2">
                   View Digital Passport →
@@ -173,8 +180,10 @@ export default function ConfirmPage() {
           )}
         </div>
 
-        <p className="text-xs text-[#666]">This transaction requires your wallet signature.</p>
+        <p className="text-xs text-[#666]">Secure, one-click confirmation</p>
       </div>
+
+      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
     </section>
   );
 }

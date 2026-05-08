@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useAuth } from '@/lib/auth-context';
 import {
   initializeEscrow,
   fetchDropData,
@@ -20,8 +20,9 @@ import {
   FABRIC,
   GARMENT_MINT,
 } from '@/lib/constants';
-import { truncateAddress, solscanTxUrl } from '@/lib/utils';
+import { solscanTxUrl } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
+import SignInModal from '@/components/SignInModal';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error' | 'soldout';
 
@@ -34,11 +35,12 @@ interface TxResult {
 }
 
 export default function DropPage() {
-  const { publicKey, connected } = useWallet();
+  const { user, isSignedIn } = useAuth();
   const [mintedCount, setMintedCount] = useState(0);
   const [txState, setTxState] = useState<TxState>('idle');
   const [txResult, setTxResult] = useState<TxResult>({});
   const [loading, setLoading] = useState(true);
+  const [isSignInOpen, setIsSignInOpen] = useState(false);
   const processingRef = useRef(false);
 
   // Fetch drop data on mount
@@ -51,6 +53,12 @@ export default function DropPage() {
 
   const handleOrder = async () => {
     if (processingRef.current) return;
+
+    if (!isSignedIn) {
+      setIsSignInOpen(true);
+      return;
+    }
+
     processingRef.current = true;
     setTxState('signing');
     setTxResult({});
@@ -59,7 +67,7 @@ export default function DropPage() {
       const result = await initializeEscrow(
         DROP_ID,
         PRICE_SOL,
-        publicKey?.toBase58()
+        user?.walletAddress
       );
 
       setMintedCount(result.currentCount);
@@ -70,17 +78,17 @@ export default function DropPage() {
         escrowPDA: result.escrowPDA,
         orderNumber: result.orderNumber,
       });
-      showToast('✓', `Order #${result.orderNumber} confirmed on Solana`);
+      showToast('✓', `Order #${result.orderNumber} confirmed`);
     } catch (err: unknown) {
       const e = err as { code?: string };
       if (e?.code === 'DropSoldOut') {
         setTxState('soldout');
         setTxResult({ message: parseError(err) });
-        showToast('✗', 'Drop sold out!');
+        showToast('Scarcity Enforced', 'Drop sold out!');
       } else {
         setTxState('error');
         setTxResult({ message: parseError(err) });
-        showToast('✗', 'Transaction failed');
+        showToast('✗', 'Order failed');
       }
     } finally {
       processingRef.current = false;
@@ -95,11 +103,10 @@ export default function DropPage() {
     showToast('↻', 'Demo reset');
   };
 
-  // For demo: force sold out state
   const handleForceSoldOut = () => {
     setCount(MAX_SUPPLY);
     setMintedCount(MAX_SUPPLY);
-    showToast('⚡', 'Supply set to max — next order will trigger DropSoldOut');
+    showToast('⚡', 'Supply filled');
   };
 
   const fillPercent = (mintedCount / MAX_SUPPLY) * 100;
@@ -124,7 +131,7 @@ export default function DropPage() {
               Limited Edition
             </span>
             <span className="px-3 py-1 rounded-full text-[0.7rem] font-semibold uppercase tracking-[0.06em] bg-white/[0.04] border border-white/[0.12] text-[#A3A3A3]">
-              Solana Devnet
+              Verified Origin
             </span>
           </div>
 
@@ -137,9 +144,8 @@ export default function DropPage() {
           <h2 className="text-[1.5rem] md:text-[1.8rem] font-light text-[#A3A3A3] tracking-[-0.01em]">The Wrap Dress</h2>
 
           <p className="text-[0.9rem] text-[#A3A3A3] leading-[1.7] max-w-[500px]">
-            Made-to-order. Nothing is manufactured until you confirm.
-            Your payment is held in a trustless Solana escrow — not by Circuit,
-            not by a bank. Code holds the funds. Code releases them.
+            Made-to-order infrastructure. Nothing is manufactured until you confirm.
+            Your payment is held in a trustless escrow — secured by code, not by middle-men.
           </p>
 
           {/* Meta Strip */}
@@ -150,7 +156,7 @@ export default function DropPage() {
             </div>
             <div className="flex-1 min-w-[120px] p-4 border-r border-white/[0.12]">
               <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-[#666] mb-1">Price</span>
-              <span className="text-sm font-semibold">{PRICE_DISPLAY} <span className="text-[0.7rem] text-[#A3A3A3]">USDC</span></span>
+              <span className="text-sm font-semibold">{PRICE_DISPLAY}</span>
             </div>
             <div className="flex-1 min-w-[120px] p-4">
               <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-[#666] mb-1">Fabric</span>
@@ -161,7 +167,7 @@ export default function DropPage() {
           {/* Mint Progress */}
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-baseline">
-              <span className="text-xs text-[#666] uppercase tracking-[0.1em] font-semibold">Minted</span>
+              <span className="text-xs text-[#666] uppercase tracking-[0.1em] font-semibold">Availability</span>
               <span className="text-sm">
                 <strong id="minted-count">{loading ? '—' : mintedCount}</strong>
                 <span className="text-[#666]"> / {MAX_SUPPLY}</span>
@@ -171,7 +177,7 @@ export default function DropPage() {
               <div className="mp-fill" style={{ width: `${fillPercent}%` }} />
             </div>
             <span className="text-[0.7rem] text-[#D1D1D1] font-semibold uppercase tracking-[0.1em]">
-              {isSoldOut ? '✗ Sold Out' : 'Limited Edition'}
+              {isSoldOut ? '✗ No longer available' : 'Limited Supply'}
             </span>
           </div>
 
@@ -185,24 +191,26 @@ export default function DropPage() {
                 aria-label="Confirm your order"
               >
                 <span>
-                  {txState === 'signing' ? 'Processing on Solana...' : 
+                  {txState === 'signing' ? 'Processing payment...' : 
                    txState === 'success' ? '✓ Order Confirmed' :
                    txState === 'soldout' ? '✗ Sold Out' :
                    'Confirm Order'}
                 </span>
                 <span className="btn-arrow" aria-hidden="true">
                   {txState === 'signing' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center"/></svg>
                   ) : (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                   )}
                 </span>
               </button>
               
-              <button onClick={handleReset} className="text-xs text-[#666] hover:text-white transition-colors" title="Reset demo">↻ Reset</button>
-              <button onClick={handleForceSoldOut} className="text-xs text-[#666] hover:text-white transition-colors" title="Force sold out for demo">⚡ Fill</button>
+              <div className="flex gap-4 ml-2">
+                <button onClick={handleReset} className="text-xs text-[#666] hover:text-white transition-colors">↻ Reset</button>
+                <button onClick={handleForceSoldOut} className="text-xs text-[#666] hover:text-white transition-colors">⚡ Fill</button>
+              </div>
             </div>
-            <span className="text-[0.7rem] text-[#666]">Connects to Phantom · Solana Devnet</span>
+            <span className="text-[0.7rem] text-[#666]">Simple, secure checkout</span>
           </div>
 
           {/* Transaction Result */}
@@ -211,14 +219,14 @@ export default function DropPage() {
               <div className="tx-msg ok flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-white">✓</span>
-                  <span>Order confirmed. Payment locked in escrow on Solana.</span>
+                  <span>Order confirmed. Payment secured in escrow.</span>
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs">
                   <a href={txResult.solscanUrl} target="_blank" rel="noopener" className="text-[#D1D1D1] hover:text-white transition-colors underline underline-offset-2">
-                    View on Solscan ↗
+                    Proof of transaction ↗
                   </a>
                   <Link href="/confirm" className="text-[#D1D1D1] hover:text-white transition-colors underline underline-offset-2">
-                    Go to Delivery Confirmation →
+                    Next: Confirm Delivery →
                   </Link>
                 </div>
               </div>
@@ -235,12 +243,11 @@ export default function DropPage() {
               <div className="sold-out-flash tx-msg err flex flex-col gap-2 !border-[#ff5050]/40 !bg-[#ff5050]/[0.08]">
                 <div className="flex items-center gap-2 text-base font-semibold">
                   <span>✗</span>
-                  <span>DropSoldOut — Error 6000</span>
+                  <span>Supply Exhausted — Order Rejected</span>
                 </div>
                 <p className="text-xs text-[#ff5050]/80 leading-relaxed">
-                  This drop has reached its maximum supply of {MAX_SUPPLY} units. 
-                  The on-chain program rejected the transaction atomically — no funds moved, 
-                  no state changed. This is scarcity enforced by code, not by promise.
+                  Scarcity Enforced. The system has reached its maximum supply of {MAX_SUPPLY} units. 
+                  Atomic validation failed. No payment was taken.
                 </p>
               </div>
             )}
@@ -257,7 +264,7 @@ export default function DropPage() {
             <div className="relative rounded-[24px] overflow-hidden border border-white/[0.12] bg-[#0D0D0D] shadow-[0_20px_60px_rgba(0,0,0,.5)]">
               <Image
                 src="/dpp-image.png"
-                alt="Circuit Wrap Dress — Drop Zero, Edition 01 of 40"
+                alt="Circuit Wrap Dress — Drop Zero"
                 width={500}
                 height={600}
                 className="w-full h-auto object-cover"
@@ -267,7 +274,7 @@ export default function DropPage() {
               {/* On-Chain badge */}
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/70 backdrop-blur-[12px] rounded-full px-3 py-1.5 text-[0.7rem] font-semibold border border-white/[0.12]">
                 <span className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.4)] animate-pulse" aria-hidden="true" />
-                On-Chain Verified
+                Verified Authentic
               </div>
 
               {/* Edition badge */}
@@ -279,17 +286,19 @@ export default function DropPage() {
         </div>
       </div>
 
+      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
+
       {/* Escrow Flow Strip */}
       <div className="border-t border-white/[0.12] py-12 px-6 md:px-8 relative z-10">
         <div className="max-w-[1000px] mx-auto flex flex-col md:flex-row items-stretch gap-0">
           {[
-            { num: '01', title: 'Buyer Confirms', desc: 'Payment enters Solana escrow PDA', icon: (
+            { num: '01', title: 'Buyer Confirms', desc: 'Payment secured in trustless escrow', icon: (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/></svg>
             )},
             { num: '02', title: 'Production Begins', desc: 'Garment is made-to-order', icon: (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             )},
-            { num: '03', title: 'Delivery Confirmed', desc: 'Funds release to designer', icon: (
+            { num: '03', title: 'Delivery Confirmed', desc: 'Payment released to designer', icon: (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
             )},
           ].map((step, i) => (

@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useState } from 'react';
 import Image from 'next/image';
+import { useAuth } from '@/lib/auth-context';
+import SignInModal from './SignInModal';
+import { truncateAddress } from '@/lib/utils';
+import { showToast } from './Toast';
 
 const NAV_LINKS = [
   { href: '/drop', label: 'Drop', page: 'drop' },
@@ -14,10 +17,22 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { user, isSignedIn, signOut, getPrivateKey } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isSignInOpen, setIsSignInOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const activePage = pathname.startsWith('/garment') ? 'garment' :
     pathname.startsWith('/confirm') ? 'confirm' : 'drop';
+
+  const handleExportKey = () => {
+    const key = getPrivateKey();
+    if (key) {
+      // In a real app, we'd use a secure modal. For demo, we alert.
+      alert(`PRIVATE KEY (Demo): ${key}\n\nWARNING: Never share this key. It grants full access to your account.`);
+      showToast('🔑', 'Private key exported');
+    }
+  };
 
   return (
     <>
@@ -50,7 +65,48 @@ export default function Navbar() {
               <span className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.4)] animate-pulse" aria-hidden="true" />
               <span>Devnet</span>
             </div>
-            <WalletMultiButton className="!bg-white !text-black !rounded-full !text-sm !font-semibold !px-5 !py-2 hover:!shadow-[0_8px_25px_rgba(255,255,255,0.15)] hover:!-translate-y-0.5 !transition-all !duration-300" />
+            
+            {isSignedIn ? (
+              <div className="relative">
+                <button 
+                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-sm font-semibold hover:shadow-[0_8px_25px_rgba(255,255,255,0.15)] transition-all"
+                >
+                  <div className="w-5 h-5 rounded-full bg-black/10 flex items-center justify-center text-[10px]">
+                    {user?.email[0].toUpperCase()}
+                  </div>
+                  <span className="max-w-[120px] truncate">{user?.email}</span>
+                </button>
+
+                {isProfileOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-64 card-glass p-2 z-[1001] animate-fadeIn">
+                    <div className="p-3 border-b border-white/[0.08] mb-1">
+                      <p className="text-[0.65rem] font-bold text-[#666] uppercase tracking-wider mb-1">Account ID</p>
+                      <p className="text-xs font-mono text-[#D1D1D1]">{truncateAddress(user?.walletAddress || '')}</p>
+                    </div>
+                    <button 
+                      onClick={handleExportKey}
+                      className="w-full text-left px-3 py-2 text-sm text-[#A3A3A3] hover:text-white hover:bg-white/[0.05] rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-[16px]">🔑</span> Export Private Key
+                    </button>
+                    <button 
+                      onClick={() => { signOut(); setIsProfileOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm text-[#ff5050] hover:bg-[#ff5050]/[0.05] rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <span className="text-[16px]">🚪</span> Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button 
+                onClick={() => setIsSignInOpen(true)}
+                className="bg-white text-black rounded-full text-sm font-semibold px-6 py-2 hover:shadow-[0_8px_25px_rgba(255,255,255,0.15)] hover:-translate-y-0.5 transition-all duration-300"
+              >
+                Sign In
+              </button>
+            )}
           </div>
 
           {/* Hamburger */}
@@ -95,10 +151,35 @@ export default function Navbar() {
             <span className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.4)] animate-pulse" aria-hidden="true" />
             <span>Devnet</span>
           </div>
-          <WalletMultiButton className="!bg-white !text-black !rounded-full !text-sm !font-semibold !px-5 !py-2 !w-fit" />
-          <p className="text-xs text-[#A3A3A3] font-semibold tracking-[0.06em]">...with the edge</p>
+          {isSignedIn ? (
+            <div className="flex flex-col gap-4">
+              <div className="text-white text-lg font-semibold truncate">{user?.email}</div>
+              <button 
+                onClick={handleExportKey}
+                className="text-left text-[#A3A3A3] hover:text-white transition-colors"
+              >
+                Export Private Key
+              </button>
+              <button 
+                onClick={() => { signOut(); setDrawerOpen(false); }}
+                className="text-left text-[#ff5050] font-semibold"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => { setIsSignInOpen(true); setDrawerOpen(false); }}
+              className="bg-white text-black rounded-full text-sm font-semibold px-6 py-3 w-fit"
+            >
+              Sign In
+            </button>
+          )}
+          <p className="text-xs text-[#A3A3A3] font-semibold tracking-[0.06em] mt-4">...with the edge</p>
         </div>
       </div>
+
+      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
     </>
   );
 }
