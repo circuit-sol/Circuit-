@@ -25,6 +25,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://circuit-solana.vercel.app'),
   title: {
     default: "Circuit — Drop Zero",
     template: "CIRCUIT — %s",
