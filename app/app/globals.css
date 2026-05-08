@@ -1,286 +1,138 @@
 @import "tailwindcss";
 
-/* ═══════════════════════════════════════════════════════════════
-   Circuit — Design System (Tailwind v4)
-   Brand Identity: Monochrome Luxury
-   ═══════════════════════════════════════════════════════════════ */
-
-@theme inline {
-  --color-background: #000000;
-  --color-foreground: #ffffff;
-  --color-surface: #0D0D0D;
-  --color-surface-2: #121212;
-  --color-muted: #A3A3A3;
-  --color-dim: #666666;
-  --color-accent: #D1D1D1;
+@theme {
+  --font-brand: "Montserrat", sans-serif;
+  --font-body: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --color-platinum: #D1D1D1;
   --color-error: #FF5050;
-  --color-border: rgba(255, 255, 255, 0.12);
-  --color-border-2: rgba(255, 255, 255, 0.2);
-  --font-body: var(--font-body);
-  --font-brand: var(--font-brand);
-  --font-mono: var(--font-mono);
 }
 
-/* ── Base ──────────────────────────────────────────────────── */
-:root {
-  --bg: #000000;
-  --bg2: rgba(255,255,255,.04);
-  --bg3: rgba(255,255,255,.08);
-  --brd: rgba(255,255,255,.12);
-  --brd2: rgba(255,255,255,.2);
-  --acc: #D1D1D1;
-  --err: #FF5050;
-}
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
 
-::selection {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-}
-
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px; }
-
-/* ── Font Classes ─────────────────────────────────────────── */
-.font-brand { font-family: var(--font-brand), system-ui, sans-serif; }
-.font-body { font-family: var(--font-body), system-ui, sans-serif; }
-.font-mono { font-family: var(--font-mono), monospace; }
-
-/* ── Ambient FX ───────────────────────────────────────────── */
-.ambient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.orb-white {
-  width: 600px;
-  height: 600px;
-  top: -8%;
-  right: -5%;
-  background: rgba(255,255,255,.03);
-  animation: orb 20s ease-in-out infinite;
-}
-
-.orb-grey {
-  width: 500px;
-  height: 500px;
-  bottom: -10%;
-  left: -5%;
-  background: rgba(209,209,209,.03);
-  animation: orb 25s ease-in-out infinite reverse;
-}
-
-@keyframes orb {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -40px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.6); }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes drawCheck {
-  to { stroke-dashoffset: 0; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes celebrate {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-
-/* ── Component Utilities ──────────────────────────────────── */
-.btn-circuit {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  padding: 1rem 2.4rem;
-  border-radius: 100px;
-  background: #fff;
-  color: #000;
-  font-size: 0.95rem;
-  font-weight: 600;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  overflow: hidden;
-  cursor: pointer;
-  border: none;
-}
-
-.btn-circuit:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 40px rgba(255,255,255,.18);
-}
-
-.btn-circuit:disabled {
-  opacity: 0.6;
-  pointer-events: none;
-  transform: none;
-}
-
-.btn-circuit.signing {
-  pointer-events: none;
-  opacity: 0.85;
-}
-
-.btn-circuit.signing .btn-arrow {
-  animation: spin 1s linear infinite;
-}
-
-.btn-outline-circuit {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0.85rem 1.8rem;
-  border-radius: 100px;
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.12);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: white;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: pointer;
-}
-
-.btn-outline-circuit:hover {
-  background: #fff;
-  color: #000;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255,255,255,.1);
-}
-
-/* ── Transaction Result ───────────────────────────────────── */
-.tx-msg {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0.85rem 1.4rem;
-  border-radius: 14px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.tx-msg.ok {
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.12);
-  color: white;
-}
-
-.tx-msg.err {
-  background: rgba(255,80,80,.08);
-  border: 1px solid rgba(255,80,80,.2);
-  color: #ff5050;
-}
-
-/* ── Progress Bar ─────────────────────────────────────────── */
-.mp-track {
-  height: 6px;
-  background: rgba(255,255,255,.05);
-  border-radius: 100px;
-  position: relative;
-  overflow: hidden;
-}
-
-.mp-fill {
-  height: 100%;
-  background: #fff;
-  border-radius: 100px;
-  transition: width 1.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ── Card Glass ───────────────────────────────────────────── */
-.card-glass {
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 24px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  position: relative;
-  overflow: hidden;
-}
-
-.card-glass::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,.03), transparent 60%);
-  pointer-events: none;
-}
-
-/* ── Shield (Confirm Page) ────────────────────────────────── */
-.check-path {
-  stroke-dasharray: 40;
-  stroke-dashoffset: 40;
-  animation: drawCheck 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
-}
-
-/* ── Sold Out Flash ───────────────────────────────────────── */
-.sold-out-flash {
-  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ── Wallet Adapter Overrides ─────────────────────────────── */
-.wallet-adapter-button {
-  font-family: var(--font-body) !important;
-}
-
-.wallet-adapter-modal-wrapper {
-  background: rgba(0, 0, 0, 0.9) !important;
-  backdrop-filter: blur(20px) !important;
-}
-
-.wallet-adapter-modal-container {
-  background: #0D0D0D !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 24px !important;
-}
-
-/* ── Print Styles (Passport) ──────────────────────────────── */
-@media print {
-  nav, footer, .ambient-orb, .toast, button { display: none !important; }
-  body { background: white !important; color: black !important; }
-  main { padding-top: 0 !important; }
-  .card-glass { border: 1px solid #ddd !important; background: white !important; }
-}
-
-/* ── Reduced Motion ───────────────────────────────────────── */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  body {
+    @apply bg-black text-white font-body overflow-x-hidden;
+    background-image: 
+      radial-gradient(circle at 50% -20%, #111 0%, transparent 60%),
+      radial-gradient(circle at 0% 100%, #050505 0%, transparent 40%);
+    background-attachment: fixed;
   }
 }
 
-/* ── Focus Visible ────────────────────────────────────────── */
-:focus-visible {
-  outline: 2px solid #D1D1D1;
-  outline-offset: 2px;
+@layer components {
+  /* ── Layout Containers ────────────────────────────────────────────── */
+  .section-container {
+    @apply max-w-[1400px] mx-auto w-full px-6 md:px-10 lg:px-16;
+  }
+
+  /* ── Cards & Glass ────────────────────────────────────────────────── */
+  .card-glass {
+    @apply bg-white/[0.03] backdrop-blur-[20px] border border-white/[0.08] rounded-[24px] transition-all duration-300;
+  }
+
+  .card-glass:hover {
+    @apply border-white/[0.16] bg-white/[0.05] shadow-[0_20px_50px_rgba(0,0,0,0.4)];
+  }
+
+  /* ── Premium Buttons ──────────────────────────────────────────────── */
+  .btn-circuit {
+    @apply relative flex items-center gap-4 bg-white text-black px-8 py-4 rounded-full font-bold text-[0.85rem] uppercase tracking-[0.1em] overflow-hidden transition-all duration-500 hover:shadow-[0_10px_40px_rgba(255,255,255,0.2)] disabled:opacity-50 active:scale-[0.98] select-none;
+  }
+
+  .btn-circuit span {
+    @apply relative z-10;
+  }
+
+  .btn-circuit::before {
+    content: '';
+    @apply absolute inset-0 bg-[#D1D1D1] translate-x-[-100%] transition-transform duration-500 ease-out;
+  }
+
+  .btn-circuit:hover::before {
+    @apply translate-x-0;
+  }
+
+  .btn-circuit.signing {
+    @apply cursor-wait bg-[#A3A3A3];
+  }
+
+  .btn-outline-circuit {
+    @apply flex items-center gap-3 border border-white/[0.12] px-8 py-3.5 rounded-full text-[0.75rem] font-bold uppercase tracking-[0.1em] hover:bg-white hover:text-black transition-all duration-300;
+  }
+
+  /* ── Mint Progress ────────────────────────────────────────────────── */
+  .mp-track {
+    @apply h-1.5 w-full bg-white/[0.05] rounded-full overflow-hidden border border-white/[0.08];
+  }
+
+  .mp-fill {
+    @apply h-full bg-gradient-to-r from-white via-[#D1D1D1] to-white bg-[length:200%_100%] transition-all duration-1000 ease-in-out;
+    animation: shimmer 3s infinite linear;
+  }
+
+  /* ── Animations ───────────────────────────────────────────────────── */
+  @keyframes shimmer {
+    0% { background-position: 100% 0%; }
+    100% { background-position: -100% 0%; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  /* ── Ambient Effects ─────────────────────────────────────────────── */
+  .ambient-orb {
+    @apply absolute blur-[120px] rounded-full opacity-20 pointer-events-none;
+  }
+
+  .orb-white {
+    @apply w-[40vw] h-[40vw] -top-[10%] -left-[10%] bg-white;
+  }
+
+  .orb-grey {
+    @apply w-[30vw] h-[30vw] top-[40%] -right-[5%] bg-[#333];
+  }
+
+  /* ── Transaction Messages ────────────────────────────────────────── */
+  .tx-msg {
+    @apply flex items-center gap-3 px-6 py-4 rounded-2xl text-sm font-semibold border backdrop-blur-[12px] animate-fadeIn;
+  }
+
+  .tx-msg.ok {
+    @apply bg-white/[0.04] border-white/[0.12] text-white shadow-[0_10px_30px_rgba(255,255,255,0.05)];
+  }
+
+  .tx-msg.err {
+    @apply bg-[#FF5050]/[0.05] border-[#FF5050]/[0.2] text-[#FF5050];
+  }
 }
 
-button:focus-visible,
-a:focus-visible {
-  outline: 2px solid #D1D1D1;
-  outline-offset: 2px;
+/* ── Responsive Refinements ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .btn-circuit {
+    @apply px-6 py-3.5 text-[0.75rem] w-full justify-center;
+  }
+  
+  h1 {
+    @apply text-[2.5rem] !important;
+  }
+}
+
+/* Print Overrides */
+@media print {
+  body { @apply bg-white text-black; }
+  .nav-blur, .ambient-orb { display: none; }
 }
