@@ -96,7 +96,8 @@ export default function ConfirmPage() {
         {/* Item Preview */}
         <div className="w-full flex items-center gap-4 bg-white/[0.03] border border-white/[0.08] p-4 rounded-2xl">
           <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-white/10">
-            <Image src="/man.jpg" alt="Wrap Dress" width={56} height={56} className="object-cover" />
+            <Image src="/satin.png" alt="Wrap Dress" width={56} height={56} className="object-cover" />
+
 
           </div>
           <div className="flex flex-col text-left">

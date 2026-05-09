@@ -80,7 +80,8 @@ export default function GarmentPassportPage() {
         <div className="flex flex-col gap-8 items-center lg:sticky lg:top-[120px]" style={{ animation: 'fadeIn 0.6s ease-out 0.1s both' }}>
           <div className="relative w-full max-w-[500px] rounded-[32px] overflow-hidden border border-white/[0.12] bg-[#0D0D0D] shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
             <Image
-              src="/man.jpg"
+              src="/satin.png"
+
 
               alt={`${passport.garmentName} — Digital Product Passport`}
               width={600}

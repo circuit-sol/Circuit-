@@ -286,8 +286,9 @@ export default function DropPage() {
             
             {/* Image Frame */}
             <div className="relative rounded-[32px] overflow-hidden border border-white/[0.12] bg-[#0D0D0D] shadow-[0_30px_100px_rgba(0,0,0,.6)]">
-              <Image
-                src="/man.jpg"
+                <Image
+                  src="/satin.png"
+
 
                 alt="Circuit Wrap Dress"
                 width={600}
