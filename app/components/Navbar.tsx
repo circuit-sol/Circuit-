@@ -64,8 +64,10 @@ export default function Navbar() {
 
   const handleExportKey = () => {
     const key = getPrivateKey();
-    if (key) {
-      alert(`PRIVATE KEY (Demo): ${key}\n\nWARNING: Never share this key. It grants full access to your account.`);
+    if (key === 'SECURED_BY_INFRASTRUCTURE') {
+      alert('🔒 Your key is secured by Circuit infrastructure.\n\nTo enable "Invisible Blockchain" UX, your keys are managed in an encrypted vault. You can use your email to access your account across any device.');
+    } else if (key) {
+      alert(`PRIVATE KEY (Demo): ${key}\n\nWARNING: Never share this key.`);
       showToast('🔑', 'Private key exported');
     }
   };

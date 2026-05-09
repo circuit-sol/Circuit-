@@ -33,15 +33,7 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-// ── Simulated Key Generation ─────────────────────────────────────────
-
-function generateSimulatedKeypair() {
-  const walletAddress = genAddress();
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
-  let privateKey = '';
-  for (let i = 0; i < 64; i++) privateKey += chars[Math.floor(Math.random() * chars.length)];
-  return { walletAddress, privateKey };
-}
+import * as backendApi from '@/lib/backendApi';
 
 // ── Provider ─────────────────────────────────────────────────────────
 
@@ -53,15 +45,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const savedEmail = localStorage.getItem('circuit_active_email');
     if (savedEmail) {
-      getUserMapping(savedEmail).then(mapping => {
-        if (mapping) {
+      // 1. Fetch wallet from backend (source of truth)
+      backendApi.getWallet(savedEmail).then(wallet => {
+        if (wallet) {
           setUser({
             email: savedEmail,
-            walletAddress: mapping.walletAddress,
-            privateKey: mapping.privateKey,
+            walletAddress: wallet.publicKey,
+            privateKey: 'SECURED_BY_INFRASTRUCTURE', // Real key is in backend
             isSignedIn: true
           });
         }
+        setIsInitializing(false);
+      }).catch(() => {
         setIsInitializing(false);
       });
     } else {
@@ -70,27 +65,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string) => {
-    // 1. Check if user already has a mapping
-    let mapping = await getUserMapping(email);
-
-    // 2. If not, generate and save new mapping
-    if (!mapping) {
-      const { walletAddress, privateKey } = generateSimulatedKeypair();
-      await saveUserMapping(email, walletAddress, privateKey);
-      mapping = { walletAddress, privateKey };
-    }
+    // 1. Create or fetch wallet from real backend
+    const { publicKey } = await backendApi.createWallet(email);
 
     const session: UserSession = {
       email,
-      walletAddress: mapping.walletAddress,
-      privateKey: mapping.privateKey,
+      walletAddress: publicKey,
+      privateKey: 'SECURED_BY_INFRASTRUCTURE',
       isSignedIn: true,
     };
 
     setUser(session);
     localStorage.setItem('circuit_active_email', email);
 
-    console.log(`%c⚡ Circuit: ${mapping === null ? 'New' : 'Returning'} user authenticated`, 'color: #D1D1D1; font-weight: bold;');
+    // 2. Also keep Supabase mapping in sync for order history lookups
+    await saveUserMapping(email, publicKey, 'SECURED_BY_INFRASTRUCTURE');
+
+    console.log(`%c⚡ Circuit: Real on-chain wallet synced for ${email}`, 'color: #D1D1D1; font-weight: bold;');
+    console.log(`%cWallet: ${publicKey}`, 'color: #888; font-size: 10px;');
   }, []);
 
   const signOut = useCallback(() => {
