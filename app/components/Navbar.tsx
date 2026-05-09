@@ -108,37 +108,40 @@ export default function Navbar() {
               <div className="relative hidden md:block" ref={profileRef}>
                 <button 
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-white text-black hover:bg-[#D1D1D1] transition-all shadow-[0_4px_20px_rgba(255,255,255,0.1)] group"
+                  className="flex items-center gap-3 pl-1.5 pr-5 py-1.5 rounded-full bg-white text-black hover:bg-[#D1D1D1] transition-all shadow-[0_8px_30px_rgba(255,255,255,0.1)] group"
                 >
-                  <div className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-bold">
+                  <div className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-[11px] font-bold shadow-inner">
                     {user?.email[0].toUpperCase()}
                   </div>
-                  <span className="text-[0.75rem] font-bold max-w-[100px] truncate">{user?.email}</span>
+                  <span className="text-[0.75rem] font-bold max-w-[120px] truncate">{user?.email}</span>
                 </button>
 
-                {/* Desktop Dropdown - World Class Polish */}
+                {/* Desktop Dropdown - Fixed Contrast */}
                 {isProfileOpen && (
-                  <div className="absolute top-[calc(100%+12px)] right-0 w-64 card-glass p-1.5 border border-white/[0.12] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in">
-                    <div className="px-4 py-3 border-b border-white/[0.08] mb-1">
-                      <p className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em] mb-1">Account ID</p>
-                      <p className="text-[0.7rem] font-mono text-[#A3A3A3] break-all">{user?.walletAddress}</p>
+                  <div className="absolute top-[calc(100%+12px)] right-0 w-64 card-glass p-2 border border-white/[0.15] shadow-[0_30px_60px_rgba(0,0,0,0.7)] animate-fade-in z-[1100]">
+                    <div className="px-4 py-3.5 border-b border-white/[0.1] mb-1">
+                      <p className="text-[0.6rem] font-bold text-[#A3A3A3] uppercase tracking-[0.15em] mb-1.5">Account Connected</p>
+                      <p className="text-[0.7rem] font-mono text-white/70 break-all leading-relaxed">{user?.walletAddress}</p>
                     </div>
-                    <button 
-                      onClick={handleExportKey}
-                      className="w-full text-left px-4 py-2.5 text-[0.75rem] font-semibold text-[#A3A3A3] hover:text-white hover:bg-white/[0.05] rounded-xl transition-all flex items-center gap-3"
-                    >
-                      <span className="w-5 flex justify-center">🔑</span>
-                      Export Private Key
-                    </button>
-                    <button 
-                      onClick={() => { signOut(); setIsProfileOpen(false); }}
-                      className="w-full text-left px-4 py-2.5 text-[0.75rem] font-bold text-[#ff5050] hover:bg-[#ff5050]/[0.05] rounded-xl transition-all flex items-center gap-3"
-                    >
-                      <span className="w-5 flex justify-center">🚪</span>
-                      Sign Out
-                    </button>
+                    <div className="p-1 flex flex-col gap-1">
+                      <button 
+                        onClick={handleExportKey}
+                        className="w-full text-left px-4 py-3 text-[0.75rem] font-semibold text-[#D1D1D1] hover:text-white hover:bg-white/[0.08] rounded-xl transition-all flex items-center gap-3.5 group"
+                      >
+                        <span className="text-base group-hover:scale-110 transition-transform">🔑</span>
+                        Export Secure Key
+                      </button>
+                      <button 
+                        onClick={() => { signOut(); setIsProfileOpen(false); }}
+                        className="w-full text-left px-4 py-3 text-[0.75rem] font-bold text-[#ff5050] hover:bg-[#ff5050]/[0.1] rounded-xl transition-all flex items-center gap-3.5 group"
+                      >
+                        <span className="text-base group-hover:scale-110 transition-transform">🚪</span>
+                        Sign Out
+                      </button>
+                    </div>
                   </div>
                 )}
+
               </div>
 
             ) : (

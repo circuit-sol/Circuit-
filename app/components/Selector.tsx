@@ -57,7 +57,8 @@ export default function Selector({ label, options, selected, onChange }: Selecto
 
       {isOpen && (
         <div 
-          className="absolute top-[calc(100%+8px)] left-0 w-full card-glass p-1.5 z-50 shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in"
+          className="absolute top-[calc(100%+8px)] left-0 w-full card-glass p-1.5 z-[100] shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-fade-in"
+
           role="listbox"
         >
           {options.map((option) => (
@@ -67,18 +68,15 @@ export default function Selector({ label, options, selected, onChange }: Selecto
                 onChange(option);
                 setIsOpen(false);
               }}
-              className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all flex items-center justify-between ${
-                selected === option 
-                  ? 'bg-white text-black font-bold' 
-                  : 'text-[#A3A3A3] hover:bg-white/[0.05] hover:text-white'
-              }`}
-              role="option"
-              aria-selected={selected === option}
+              className={`w-full text-left px-4 py-3.5 text-sm font-medium transition-all flex items-center justify-between group
+                ${selected === option 
+                  ? 'bg-white/[0.08] text-white' 
+                  : 'text-[#666] hover:text-white hover:bg-white/[0.03]'}`}
             >
-              {option}
+              <span>{option}</span>
               {selected === option && (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                  <path d="M20 6L9 17l-5-5" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-white animate-in zoom-in duration-300">
+                  <path d="M20 6L9 17l-5-5"/>
                 </svg>
               )}
             </button>
