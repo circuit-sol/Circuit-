@@ -9,12 +9,20 @@ const routes  = require('./routes');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://circuit-sol.vercel.app',
+  'https://circuit-production-9fdc.up.railway.app',
+];
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://192.168.43.77:3000',
-  ],
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error('CORS policy violation'), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
 }));
 
