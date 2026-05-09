@@ -244,11 +244,6 @@ export default function DropPage() {
                   )}
                 </span>
               </button>
-              
-              <div className="flex gap-4">
-                <button onClick={handleReset} className="text-[0.65rem] font-bold text-[#444] hover:text-white transition-colors uppercase tracking-widest">Reset</button>
-                <button onClick={handleForceSoldOut} className="text-[0.65rem] font-bold text-[#444] hover:text-white transition-colors uppercase tracking-widest">Fill</button>
-              </div>
             </div>
           </div>
 
