@@ -108,7 +108,8 @@ export default function GarmentPassportPage() {
             <div className="card-glass overflow-hidden">
               {[
                 { k: 'Collection', v: 'Drop Zero' },
-                { k: 'Material', v: passport.fabric },
+                { k: 'Main Fabric', v: passport.fabric },
+
                 { k: 'Origin', v: 'Circuit Studio — Lagos' },
                 { k: 'Produced', v: passport.productionDate },
               ].map((row, i, arr) => (

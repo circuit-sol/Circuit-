@@ -179,9 +179,10 @@ export default function DropPage() {
               <span className="text-sm font-semibold">{PRICE_DISPLAY}</span>
             </div>
             <div className="p-4 md:p-5">
-              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Fabric</span>
+              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Main Fabric</span>
               <span className="text-sm font-semibold">{FABRIC}</span>
             </div>
+
           </div>
 
 
