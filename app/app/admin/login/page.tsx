@@ -94,7 +94,7 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="text-center mt-12 text-[0.6rem] text-[#333] uppercase tracking-[0.2em] font-bold">
-          Circuit Protocol — Identity Management
+          Circuit — Identity Management
         </p>
       </div>
     </div>

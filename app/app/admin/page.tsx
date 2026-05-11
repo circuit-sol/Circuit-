@@ -120,7 +120,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 print:hidden">
           <header>
             <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-3 block">
-              Circuit Protocol Admin
+              Circuit — Identity Management
             </span>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Drop Zero Hub</h1>
             <p className="text-[#666] mt-3 text-sm max-w-md leading-relaxed">

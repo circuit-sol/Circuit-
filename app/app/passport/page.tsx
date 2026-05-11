@@ -144,7 +144,7 @@ function PassportContent() {
                 <div className="text-center">
                   <h4 className="text-sm font-bold uppercase tracking-[0.2em] mb-2">Authenticity Shield</h4>
                   <p className="text-[0.65rem] text-[#666] max-w-[220px] leading-relaxed mx-auto uppercase tracking-wide">
-                    Present this code for scanning to verify ownership on the Circuit Protocol.
+                    Present this code for scanning to verify ownership on Circuit.
                   </p>
                 </div>
               </div>
