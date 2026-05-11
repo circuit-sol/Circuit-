@@ -36,118 +36,163 @@ export default function DetailsPage() {
       <Navbar />
       
       <main className="flex-1">
-        {/* Hero Section */}
-        <section className="section-container pt-24 pb-12 md:pt-32 md:pb-16">
-          <header className="max-w-4xl relative">
-            <div className="mb-6 animate-fade-in">
-              <Image src="/logo/logo_icon_white.svg" alt="Circuit" width={38} height={38} className="brightness-110" />
-            </div>
-            <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-4 block animate-fade-in">
-              The Circuit Philosophy
+        {/* HERO SECTION */}
+        <section className="section-container pt-32 pb-16 md:pt-44 md:pb-20 text-center relative overflow-hidden">
+          {/* Ambient Glow */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)] pointer-events-none" />
+          
+          <div className="animate-fade-in flex flex-col items-center relative z-10">
+            <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-8 px-4 py-1.5 border border-white/10 rounded-full">
+              Built on Solana
             </span>
-            <h1 className="text-4xl md:text-7xl font-bold tracking-tight leading-[0.95] mb-8 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-              We only create <br />
-              what is earned.
+            <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-[0.95] mb-10 max-w-5xl">
+              Fashion sold before <br className="hidden md:block" /> it’s made.
             </h1>
-            <p className="text-base md:text-xl text-[#888] leading-relaxed max-w-xl animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              Circuit is an anti-overproduction protocol for luxury fashion. We use the Solana blockchain to ensure that every garment in existence is born from a confirmed request—never a prediction.
+            <p className="text-base md:text-xl text-[#888] leading-relaxed max-w-2xl mb-12">
+              Circuit is a demand-first fashion production system where garments are only produced after buyers commit.
             </p>
-          </header>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+              <a href="/drop" className="btn-circuit py-4 px-10 text-xs w-full sm:w-auto justify-center">
+                <span>Join Drop Zero</span>
+              </a>
+              <a href="#how-it-works" className="btn-outline-circuit py-4 px-10 text-xs w-full sm:w-auto justify-center border-white/10 hover:border-white/30">
+                How It Works
+              </a>
+            </div>
+            <p className="text-[0.65rem] font-bold uppercase tracking-widest text-[#444]">
+              No speculative inventory. No overproduction. No guesswork.
+            </p>
+          </div>
         </section>
 
-        {/* The Protocol Breakdown */}
-        <section className="bg-white/[0.02] border-y border-white/[0.06] py-12 md:py-16">
-          <div className="section-container grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="order-2 lg:order-1">
-              <h2 className="text-2xl font-bold mb-6">The Birth Certificate Model</h2>
-              <div className="space-y-5">
-                <div className="flex gap-5">
-                  <span className="text-[0.65rem] font-mono text-[#444] mt-1">01</span>
-                  <div>
-                    <h4 className="text-base font-bold mb-1">Atomic Escrow</h4>
-                    <p className="text-xs text-[#666] leading-relaxed">Your payment is locked on-chain immediately. It is secured by code and only released to the designer once you confirm delivery.</p>
-                  </div>
-                </div>
-                <div className="flex gap-5">
-                  <span className="text-[0.65rem] font-mono text-[#444] mt-1">02</span>
-                  <div>
-                    <h4 className="text-base font-bold mb-1">Digital Birth</h4>
-                    <p className="text-xs text-[#666] leading-relaxed">Unlike standard NFTs, a Circuit Passport is minted the moment the first cut of fabric is made. The digital and physical objects are inseparable.</p>
-                  </div>
-                </div>
-                <div className="flex gap-5">
-                  <span className="text-[0.65rem] font-mono text-[#444] mt-1">03</span>
-                  <div>
-                    <h4 className="text-base font-bold mb-1">Proven Identity</h4>
-                    <p className="text-xs text-[#666] leading-relaxed">By scanning the physical tag sewn into your garment, you reveal its entire provenance—from the designer's hands to your doorstep.</p>
-                  </div>
-                </div>
+        {/* SECTION TWO — WHY CIRCUIT EXISTS */}
+        <section className="bg-white/[0.01] border-y border-white/[0.05] py-20 md:py-32">
+          <div className="section-container grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+            <div className="order-2 lg:order-1 max-w-xl">
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#444] mb-8 block">
+                Why Circuit Exists
+              </span>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-8 leading-tight">
+                Fashion still produces what it hopes will sell.
+              </h2>
+              <div className="space-y-6 text-[#888] leading-relaxed text-sm md:text-base">
+                <p>Garments are often designed, manufactured, and marketed before real demand is known.</p>
+                <p>When those bets fail, the result is excess inventory, markdowns, and waste.</p>
+                <p>The problem is not fashion itself. The problem is production happening too early.</p>
+                <p className="text-white font-medium">Circuit reverses that order by making production conditional on confirmed demand.</p>
               </div>
             </div>
             
             <div className="order-1 lg:order-2">
-              <div className="card-glass overflow-hidden relative aspect-[4/5] max-h-[500px] mx-auto">
-                <Image src="/satin.png" alt="3 Piece Agbada" fill className="object-cover scale-[1.02]" />
+              <div className="card-glass overflow-hidden relative aspect-[4/5] lg:aspect-square group border-white/[0.08]">
+                <Image src="/satin.png" alt="Process shot" fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-1000" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute bottom-6 left-6">
-                  <h3 className="text-2xl font-bold tracking-tighter">Verified Origin.</h3>
-                  <p className="text-white/60 text-[0.6rem] mt-1 font-mono tracking-widest uppercase">Series Zero Collection</p>
+                <div className="absolute bottom-8 left-8">
+                   <div className="w-12 h-0.5 bg-white mb-4" />
+                   <p className="text-[0.65rem] font-bold uppercase tracking-widest text-white/40">Drop Zero Selection</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
+        {/* HOW IT WORKS */}
+        <section id="how-it-works" className="py-20 md:py-32 section-container">
+          <div className="text-center mb-20">
+            <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#444] mb-4 block">Process</span>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">How It Works.</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden">
+            {[
+              { title: 'Commit', desc: 'Secure your place in the drop by placing an order for the garment.' },
+              { title: 'Secure Payment', desc: 'Your funds are held in a trustless Solana escrow until delivery.' },
+              { title: 'Production', desc: 'The designer receives the signal and begins crafting your specific unit.' },
+              { title: 'Delivery', desc: 'Your garment is shipped. You scan to confirm and release the escrow.' }
+            ].map((item, i) => (
+              <div key={i} className="bg-black p-10 flex flex-col gap-4 group hover:bg-white/[0.02] transition-colors">
+                <span className="text-[0.6rem] font-mono text-[#333] group-hover:text-white/40 transition-colors">0{i+1}</span>
+                <h4 className="text-lg font-bold">{item.title}</h4>
+                <p className="text-xs text-[#666] leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* THE GARMENT (Full Width Visual) */}
+        <section className="relative h-[70vh] md:h-[90vh] overflow-hidden border-y border-white/10">
+          <Image src="/satin.png" alt="Craft Detail" fill className="object-cover opacity-40 brightness-75" />
+          <div className="absolute inset-0 flex items-center justify-center text-center p-8">
+            <h3 className="text-3xl md:text-6xl font-bold tracking-tighter max-w-4xl leading-tight">
+              A physical garment with a digital birth certificate.
+            </h3>
+          </div>
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-px h-20 bg-gradient-to-b from-white/0 to-white/40" />
+        </section>
+
         {/* FAQ Section */}
-        <section className="section-container py-12 md:py-16" id="faq">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <section className="section-container py-20 md:py-32" id="faq">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-20">
             <div>
-              <h2 className="text-3xl font-bold tracking-tight">FAQ</h2>
-              <p className="text-[#666] mt-2 text-xs leading-relaxed max-w-xs">
-                Common questions regarding our production model, escrow security, and digital passports.
+              <h2 className="text-4xl font-bold tracking-tight">FAQ</h2>
+              <p className="text-[#666] mt-4 text-sm leading-relaxed max-w-xs">
+                Addressing the specifics of our demand-first model.
               </p>
             </div>
             <div className="lg:col-span-2">
               <FAQItem 
-                question="How does the escrow protect my funds?" 
-                answer="When you place an order, your SOL is locked into a Solana smart contract. The designer can see the funds are there but cannot withdraw them. Only after you receive the physical item and scan the QR code to confirm delivery are the funds released."
+                question="1. What does made-to-order actually mean?" 
+                answer="Your garment is only produced after you place an order. We do not manufacture inventory in advance and hope it sells later."
               />
               <FAQItem 
-                question="What is a Garment Passport?" 
-                answer="It is a Digital Birth Certificate (NFT) that is unique to your specific piece. It contains the fabric details, the date of production, and proof of authenticity. It is sewn into your garment via a physical QR tag."
+                question="2. Do I need crypto or a wallet to use Circuit?" 
+                answer="No. You sign up with your email and complete your order normally. The blockchain runs in the background."
               />
               <FAQItem 
-                question="Do I need a crypto wallet to use Circuit?" 
-                answer="No. We use 'Invisible Blockchain' technology. You can sign in with your email, and we provision a secure vault for your digital assets in the background."
+                question="3. What happens to my payment while I wait?" 
+                answer="Your payment is secured until your order is delivered. Circuit does not receive funds upfront. Payment is only released after delivery is confirmed."
               />
               <FAQItem 
-                question="Why is there a supply cap?" 
-                answer="To maintain the highest level of craftsmanship and eliminate waste, each drop has a maximum capacity. Once the cap is reached, the drop closes and the next collection is prepared."
+                question="4. What is the digital record attached to each garment?" 
+                answer="Each Circuit garment includes a permanent digital record showing when it was produced, what drop it belongs to, and its ownership history."
               />
               <FAQItem 
-                question="How do I verify a garment I bought elsewhere?" 
-                answer="Every authentic Circuit garment has a unique QR code sewn into the interior tag. Scanning this code will always open its official Digital Passport on our platform."
+                question="5. Can I resell my Circuit garment?" 
+                answer="Yes. Each garment carries a verifiable ownership record, making resale and authenticity easier to track."
+              />
+              <FAQItem 
+                question="6. How limited is each drop?" 
+                answer="Each drop has a fixed maximum quantity. Once that number is reached, orders close."
+              />
+              <FAQItem 
+                question="7. How long does production take?" 
+                answer="Production begins only after your order is confirmed. Timeline is specific to each drop and communicated before you commit."
+              />
+              <FAQItem 
+                question="8. What is the Founding Circle?" 
+                answer="The Founding Circle is an early-access community for people joining Circuit before the first public drop. Members get first access to future releases and product updates."
               />
             </div>
           </div>
         </section>
 
-        {/* Final CTA */}
-        <section className="section-container pb-16">
-          <div className="card-glass p-10 md:p-16 text-center overflow-hidden relative">
+        {/* FINAL CTA (Drop Zero is coming) */}
+        <section className="section-container pb-32">
+          <div className="card-glass p-12 md:p-24 text-center overflow-hidden relative border-white/[0.05]">
              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_#fff_0%,_transparent_70%)]" />
-             <div className="relative z-10">
-               <h2 className="text-4xl md:text-6xl font-bold mb-8 tracking-tighter text-white">Join the Next Drop.</h2>
-               <p className="text-[#666] mb-12 max-w-md mx-auto">
-                 Don't miss out on Series One. Enter your email to be notified when the next window opens.
-               </p>
-               <div className="flex flex-col md:flex-row gap-4 justify-center items-center max-w-md mx-auto">
+             <div className="relative z-10 max-w-2xl mx-auto">
+               <h2 className="text-4xl md:text-6xl font-bold mb-8 tracking-tighter text-white">
+                 Drop Zero is coming. <br /> Be first to know.
+               </h2>
+               
+               <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
                  <input 
                    type="email" 
                    placeholder="Enter email address" 
-                   className="w-full bg-white/[0.05] border border-white/10 px-6 py-4 rounded-full text-sm focus:outline-none focus:border-white/30 transition-all"
+                   className="w-full bg-white/[0.05] border border-white/10 px-8 py-5 rounded-full text-sm focus:outline-none focus:border-white/30 transition-all placeholder:text-[#333]"
                  />
-                 <button className="btn-circuit w-full md:w-auto justify-center whitespace-nowrap">
+                 <button className="btn-circuit w-full md:w-auto justify-center whitespace-nowrap py-5 px-10">
                    <span>Notify Me</span>
                  </button>
                </div>

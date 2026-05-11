@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { QRCodeCanvas } from 'qrcode.react';
 import { supabase, getUserOrders } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 import { showToast } from '@/components/Toast';
@@ -21,6 +22,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [selectedQR, setSelectedQR] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -77,13 +79,17 @@ export default function AdminDashboard() {
     }
   }
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
       <Navbar />
       
-      <main className="flex-1 section-container pt-32 pb-20">
+      <main className="flex-1 section-container pt-32 pb-20 print:p-0 print:pt-0">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 print:hidden">
           <header>
             <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-3 block">
               Circuit Protocol Admin
@@ -106,7 +112,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 print:hidden">
           {[
             { label: 'Total Revenue', value: `${stats.totalRevenue.toFixed(1)} SOL`, color: 'text-white' },
             { label: 'Units Claimed', value: `${stats.totalClaims} / 40`, color: 'text-white' },
@@ -122,15 +128,15 @@ export default function AdminDashboard() {
 
         {/* Orders Table */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-20 print:hidden">
             <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="card-glass p-20 text-center border-dashed border-white/5">
+          <div className="card-glass p-20 text-center border-dashed border-white/5 print:hidden">
             <p className="text-[#444] font-medium">No matching orders found.</p>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-4 print:hidden">
             {filteredOrders.map((order) => (
               <div key={order.id} className="card-glass p-5 flex flex-col md:flex-row items-center justify-between gap-6 hover:bg-white/[0.02]">
                 <div className="flex items-center gap-6 flex-1 w-full">
@@ -186,11 +192,11 @@ export default function AdminDashboard() {
                       >
                         Passport
                       </a>
-                      {order.status === 'in_production' && (
+                      {order.status !== 'pending' && (
                         <button 
                           className="p-2.5 border border-white/10 rounded-full hover:bg-white/5 transition-colors"
-                          title="Print Tag QR"
-                          onClick={() => window.open(`/passport?order=${order.id}`, '_blank')}
+                          title="Generate Tag QR"
+                          onClick={() => setSelectedQR(order)}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M7 7h.01M17 7h.01M17 17h.01M7 17h.01"/>
@@ -202,6 +208,60 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* QR MODAL */}
+        {selectedQR && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 print:p-0 print:static print:inset-auto">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md print:hidden" onClick={() => setSelectedQR(null)} />
+            
+            <div className="relative w-full max-w-sm card-glass p-8 flex flex-col items-center animate-scale-in print:shadow-none print:border-none print:bg-white print:text-black print:p-0">
+              <div className="print:hidden w-full flex justify-between items-center mb-8 text-[#666]">
+                <span className="text-[0.6rem] font-bold tracking-[0.2em] uppercase">Garment Identity Tag</span>
+                <button onClick={() => setSelectedQR(null)} className="hover:text-white text-xl">×</button>
+              </div>
+
+              {/* Printable Tag Area */}
+              <div id="identity-tag" className="flex flex-col items-center bg-white p-10 rounded-3xl print:p-4 print:rounded-none">
+                <div className="mb-6 opacity-80 scale-75 invert print:invert-0">
+                   <Image src="/logo/logo_icon_white.svg" alt="Circuit" width={40} height={40} />
+                </div>
+                
+                <div className="bg-white p-4 rounded-2xl border border-black/5 mb-6">
+                  <QRCodeCanvas 
+                    value={`${window.location.origin}/passport?order=${selectedQR.id}`}
+                    size={160}
+                    level="H"
+                    includeMargin={false}
+                  />
+                </div>
+
+                <div className="text-center">
+                  <span className="text-[0.55rem] font-bold tracking-[0.2em] uppercase text-black/40 block mb-1">Serial Number</span>
+                  <span className="text-xl font-mono font-bold text-black tracking-tighter">{selectedQR.garment_serial}</span>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-black/5 w-full text-center">
+                   <span className="text-[0.5rem] font-bold tracking-[0.1em] uppercase text-black/60">Drop Zero — Series 1</span>
+                </div>
+              </div>
+
+              <div className="mt-10 flex gap-4 w-full print:hidden">
+                <button 
+                  onClick={() => setSelectedQR(null)}
+                  className="flex-1 py-4 text-xs font-bold uppercase tracking-widest border border-white/10 rounded-full hover:bg-white/5 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handlePrint}
+                  className="flex-1 btn-circuit py-4 text-xs justify-center"
+                >
+                  <span>Print Tag</span>
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

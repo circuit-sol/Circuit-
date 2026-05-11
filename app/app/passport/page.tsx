@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { QRCodeCanvas } from 'qrcode.react';
 import { supabase } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
@@ -12,6 +13,7 @@ function PassportContent() {
   const orderId = searchParams.get('order');
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showQR, setShowQR] = useState(false);
 
   useEffect(() => {
     if (orderId) fetchOrder();
@@ -54,6 +56,7 @@ function PassportContent() {
   }
 
   const status = order.status || 'pending';
+  const passportUrl = typeof window !== 'undefined' ? `${window.location.origin}/passport?order=${order.id}` : '';
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white overflow-x-hidden">
@@ -95,17 +98,48 @@ function PassportContent() {
 
           {/* Right Column: Information */}
           <div className="flex flex-col gap-10" style={{ animation: 'fadeIn 0.6s ease-out 0.2s both' }}>
-            <header>
-              <span className="text-[0.65rem] font-bold text-[#666] uppercase tracking-[0.2em] mb-3 block">
-                Digital Product Passport
-              </span>
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Garment Identity</h1>
-              <p className="text-[#666] leading-relaxed max-w-md">
-                {status === 'pending' ? 'Your garment has been reserved. The designer is currently preparing materials for Drop Zero.' :
-                 status === 'in_production' ? 'The fabric has been cut. Your digital birth certificate is active and your garment is being hand-crafted.' :
-                 'Your 3 Piece Agbada is complete. The physical garment and digital record are now permanently linked.'}
-              </p>
+            <header className="flex justify-between items-start">
+              <div>
+                <span className="text-[0.65rem] font-bold text-[#666] uppercase tracking-[0.2em] mb-3 block">
+                  Digital Product Passport
+                </span>
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Garment Identity</h1>
+                <p className="text-[#666] leading-relaxed max-w-md text-sm">
+                  {status === 'pending' ? 'Your garment has been reserved. The designer is currently preparing materials for Drop Zero.' :
+                   status === 'in_production' ? 'The fabric has been cut. Your digital birth certificate is active and your garment is being hand-crafted.' :
+                   'Your 3 Piece Agbada is complete. The physical garment and digital record are now permanently linked.'}
+                </p>
+              </div>
+
+              {/* Share/Verify Button */}
+              <button 
+                onClick={() => setShowQR(!showQR)}
+                className="hidden md:flex flex-col items-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center group-hover:bg-white/[0.06] transition-colors">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M7 7h.01M17 7h.01M17 17h.01M7 17h.01"/>
+                  </svg>
+                </div>
+                <span className="text-[0.5rem] font-bold uppercase tracking-widest text-[#444] group-hover:text-white">Verify</span>
+              </button>
             </header>
+
+            {/* Expanded QR Section */}
+            {showQR && (
+              <div className="card-glass p-8 flex flex-col items-center animate-scale-in">
+                <div className="bg-white p-3 rounded-xl mb-6">
+                  <QRCodeCanvas 
+                    value={passportUrl}
+                    size={140}
+                    level="H"
+                  />
+                </div>
+                <p className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#666] text-center max-w-[200px] leading-loose">
+                  Scan to verify this garment on the Circuit Protocol
+                </p>
+              </div>
+            )}
 
             {/* Specs Grid */}
             <div className="grid grid-cols-2 gap-px bg-white/[0.08] border border-white/[0.08] rounded-2xl overflow-hidden">
@@ -132,13 +166,13 @@ function PassportContent() {
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-4 text-sm font-medium">
                     <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
-                    <span>Processing Transaction...</span>
+                    <span>Transaction Secured</span>
                   </div>
                   <p className="text-[0.7rem] text-[#666] leading-normal">
                     Payment is currently secured in a trustless escrow. Funds will only be released to the designer once you scan the physical QR tag and confirm delivery.
                   </p>
                   <a href={`https://solscan.io/tx/${order.tx_signature}?cluster=devnet`} target="_blank" className="text-[0.65rem] font-mono text-[#444] hover:text-white transition-colors">
-                    View Escrow on Solscan →
+                    View Escrow Transaction →
                   </a>
                 </div>
               ) : (
