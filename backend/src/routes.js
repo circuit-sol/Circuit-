@@ -26,10 +26,14 @@ router.post('/wallet/create', async (req, res) => {
 });
 
 // GET /api/wallet/:userId
-router.get('/wallet/:userId', (req, res) => {
-  const wallet = getWallet(req.params.userId);
-  if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
-  res.json(wallet);
+router.get('/wallet/:userId', async (req, res) => {
+  try {
+    const wallet = await getWallet(req.params.userId);
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
+    res.json(wallet);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── Orders ────────────────────────────────────────────────────────────────────

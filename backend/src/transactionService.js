@@ -129,7 +129,7 @@ function deriveDropPDA(dropId) {
  * Returns { signature, registerSignature, escrowPDA, buyer, amountSol }.
  */
 async function initializeEscrow(userId, dropId, amountSol) {
-  const keypair  = getKeypair(userId);
+  const keypair  = await getKeypair(userId);
   const provider = makeProvider(keypair);
   const program  = new anchor.Program(ESCROW_IDL, provider);
 
@@ -164,7 +164,7 @@ async function initializeEscrow(userId, dropId, amountSol) {
  * Returns { signature }.
  */
 async function registerOrder(userId, dropId) {
-  const keypair  = getKeypair(userId);
+  const keypair  = await getKeypair(userId);
   const provider = makeProvider(keypair);
   const program  = new anchor.Program(DROPS_IDL, provider);
 
@@ -187,7 +187,7 @@ async function registerOrder(userId, dropId) {
  * Returns { signature, fundsReleased, designer }.
  */
 async function confirmDelivery(userId, dropId) {
-  const keypair  = getKeypair(userId);
+  const keypair  = await getKeypair(userId);
   const provider = makeProvider(keypair);
   const program  = new anchor.Program(ESCROW_IDL, provider);
 

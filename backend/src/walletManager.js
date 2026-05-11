@@ -1,6 +1,6 @@
 'use strict';
 
-const { DatabaseSync } = require('node:sqlite');
+const { createClient } = require('@supabase/supabase-js');
 const CryptoJS  = require('crypto-js');
 const {
   Keypair,
@@ -11,28 +11,19 @@ const {
   SystemProgram,
   sendAndConfirmTransaction,
 } = require('@solana/web3.js');
-const path = require('path');
-const fs   = require('fs');
-const os   = require('os');
+const fs = require('fs');
+const os = require('os');
 
 const SECRET_KEY = process.env.SECRET_KEY;
 if (!SECRET_KEY) throw new Error('SECRET_KEY is not set in environment');
 
-const dataDir = path.join(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+if (!process.env.SUPABASE_URL)         throw new Error('SUPABASE_URL is not set in environment');
+if (!process.env.SUPABASE_SERVICE_KEY) throw new Error('SUPABASE_SERVICE_KEY is not set in environment');
 
-const db = new DatabaseSync(path.join(__dirname, '../data/wallets.db'));
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS wallets (
-    user_id     TEXT PRIMARY KEY,
-    enc_key     TEXT NOT NULL,
-    public_key  TEXT NOT NULL,
-    created_at  TEXT NOT NULL
-  )
-`);
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 // Encrypt a byte array → AES ciphertext string
 function encrypt(secretKeyArray) {
@@ -49,10 +40,17 @@ function decrypt(ciphertext) {
 /**
  * Create a new Solana keypair for userId and persist it encrypted.
  * Idempotent — returns existing wallet if already created.
- * New wallets are auto-funded with 0.5 SOL from the deployer wallet.
+ * New wallets are auto-funded with 2 SOL from the deployer wallet.
  */
 async function createWallet(userId) {
-  const existing = db.prepare('SELECT public_key FROM wallets WHERE user_id = ?').get(userId);
+  const { data: existing, error: fetchError } = await supabase
+    .from('wallets')
+    .select('public_key')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(`Supabase fetch error: ${fetchError.message}`);
+
   if (existing) {
     return { publicKey: existing.public_key, created: false };
   }
@@ -60,14 +58,19 @@ async function createWallet(userId) {
   const keypair = Keypair.generate();
   const encKey  = encrypt(Array.from(keypair.secretKey));
 
-  db.prepare(`
-    INSERT INTO wallets (user_id, enc_key, public_key, created_at)
-    VALUES (?, ?, ?, ?)
-  `).run(userId, encKey, keypair.publicKey.toBase58(), new Date().toISOString());
+  const { error: insertError } = await supabase
+    .from('wallets')
+    .insert({
+      user_id:    userId,
+      enc_key:    encKey,
+      public_key: keypair.publicKey.toBase58(),
+      created_at: new Date().toISOString(),
+    });
+
+  if (insertError) throw new Error(`Supabase insert error: ${insertError.message}`);
 
   const connection = new Connection(clusterApiUrl('devnet'));
 
-  // Load deployer keypair - try env var first (Railway), then file (local)
   let deployerKeypair;
   if (process.env.DEPLOYER_KEYPAIR) {
     deployerKeypair = Keypair.fromSecretKey(
@@ -95,19 +98,33 @@ async function createWallet(userId) {
  * Return the decrypted Keypair for userId (used internally for signing).
  * Never expose the Keypair or secret key over the API.
  */
-function getKeypair(userId) {
-  const row = db.prepare('SELECT enc_key FROM wallets WHERE user_id = ?').get(userId);
-  if (!row) throw new Error(`No wallet found for user: ${userId}`);
-  return decrypt(row.enc_key);
+async function getKeypair(userId) {
+  const { data, error } = await supabase
+    .from('wallets')
+    .select('enc_key')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Supabase fetch error: ${error.message}`);
+  if (!data) throw new Error(`No wallet found for user: ${userId}`);
+
+  return decrypt(data.enc_key);
 }
 
 /**
  * Return the public key (safe to expose over API).
  */
-function getWallet(userId) {
-  const row = db.prepare('SELECT public_key FROM wallets WHERE user_id = ?').get(userId);
-  if (!row) return null;
-  return { publicKey: row.public_key };
+async function getWallet(userId) {
+  const { data, error } = await supabase
+    .from('wallets')
+    .select('public_key')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Supabase fetch error: ${error.message}`);
+  if (!data) return null;
+
+  return { publicKey: data.public_key };
 }
 
 module.exports = { createWallet, getKeypair, getWallet };
