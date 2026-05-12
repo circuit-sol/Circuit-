@@ -76,10 +76,6 @@ function PassportContent() {
                   className="object-cover group-hover:scale-105 transition-transform duration-1000"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
-                <div className="absolute bottom-8 left-8 flex items-center gap-2 bg-black/60 backdrop-blur-[20px] rounded-full px-5 py-2.5 text-[0.65rem] font-bold uppercase tracking-[0.15em] border border-white/[0.12]">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  Verified Protocol Asset
-                </div>
               </div>
             </div>
 
@@ -97,14 +93,14 @@ function PassportContent() {
                       'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
                     }`}>
                       {status === 'pending' ? 'Awaiting Production' : 
-                       status === 'in_production' ? 'Hand-Crafting' : 
+                       status === 'in_production' ? 'In production' : 
                        'Authenticated'}
                     </div>
                   </div>
                   <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">Garment Identity</h1>
                   <p className="text-[#888] leading-relaxed max-w-xl text-base md:text-lg font-light">
                     {status === 'pending' ? 'Your garment has been reserved.' :
-                     status === 'in_production' ? 'The fabric has been cut. Your digital birth certificate is active and your garment is being hand-crafted.' :
+                     status === 'in_production' ? 'Digital certificate ready. Production in progress.' :
                      'Your 3 Piece Agbada is complete. The physical garment and digital record are now permanently linked.'}
                   </p>
                 </div>
@@ -154,7 +150,7 @@ function PassportContent() {
                   { label: 'Serial', value: order.garment_serial || '—' },
                   { label: 'Size', value: order.size || 'M' },
                   { label: 'Edition', value: `01/${MAX_SUPPLY}` },
-                  { label: 'Origin', value: 'Lagos, NG' },
+                  { label: 'Made in', value: 'Nigeria' },
                 ].map((stat, i) => (
                   <div key={i} className="p-6 rounded-3xl bg-white/[0.02] border border-white/10">
                     <span className="block text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#444] mb-2">{stat.label}</span>
@@ -165,24 +161,24 @@ function PassportContent() {
 
               {/* Garment Details Timeline */}
               <div className="flex flex-col gap-8 mt-4">
-                <h4 className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-[#666]">Provenance & Lifecycle</h4>
+                <h4 className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-[#666]">Garment Journey</h4>
                 <div className="space-y-2">
                   <TimelineItem 
                     date={new Date(order.created_at).toLocaleDateString()} 
-                    title="Protocol Commitment" 
-                    desc="Escrow initialized on Solana. Payment secured in PDAs."
+                    title="Payment Secured" 
+                    desc="Your payment is held securely until your garment arrives."
                     active={true}
                   />
                   <TimelineItem 
                     date="—" 
-                    title="Hand-Crafting" 
-                    desc="Material allocation and initial production start in Lagos."
+                    title="In production" 
+                    desc="Materials sourced. Production begins."
                     active={status !== 'pending'}
                   />
                   <TimelineItem 
                     date="—" 
                     title="Physical Transfer" 
-                    desc="Final quality audit and handover to verified owner."
+                    desc="Quality checked and on its way to you."
                     active={status === 'delivered' || status === 'verified'}
                   />
                 </div>

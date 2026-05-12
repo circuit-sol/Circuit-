@@ -184,7 +184,7 @@ export default function DropPage() {
           </div>
 
           <p className="text-[0.95rem] text-[#A3A3A3] leading-[1.8] max-w-[540px]">
-            Made-to-order: Once you confirm receipt, your payment will be released from escrow to the designer. Circuit reverses that order by making garments only after demand is confirmed.
+            Your payment will be released to the designer once you confirm receipt
           </p>
 
           {/* Meta Grid */}

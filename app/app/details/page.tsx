@@ -37,7 +37,7 @@ export default function DetailsPage() {
       
       <main className="flex-1">
         {/* HERO SECTION */}
-        <section className="section-container pt-32 pb-16 md:pt-44 md:pb-20 text-center relative overflow-hidden">
+        <section className="section-container pt-32 pb-16 md:pt-44 md:pb-8 text-center relative overflow-hidden">
           {/* Ambient Glow */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)] pointer-events-none" />
           
@@ -60,14 +60,11 @@ export default function DetailsPage() {
                 How It Works
               </a>
             </div>
-            <p className="text-[0.65rem] font-bold uppercase tracking-widest text-[#444]">
-              No speculative inventory. No overproduction. No guesswork.
-            </p>
           </div>
         </section>
 
         {/* SECTION TWO — WHY CIRCUIT EXISTS */}
-        <section className="bg-white/[0.01] border-y border-white/[0.05] py-20 md:py-32">
+        <section className="bg-white/[0.01] border-y border-white/[0.05] py-20 md:pt-16 md:pb-32">
           <div className="section-container grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
             <div className="order-2 lg:order-1 max-w-xl">
               <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#444] mb-8 block">
@@ -125,7 +122,7 @@ export default function DetailsPage() {
           <Image src="/satin.png" alt="Craft Detail" fill className="object-cover opacity-40 brightness-75" />
           <div className="absolute inset-0 flex items-center justify-center text-center p-8">
             <h3 className="text-3xl md:text-6xl font-bold tracking-tighter max-w-4xl leading-tight">
-              A physical garment with a digital birth certificate.
+              A physical garment with a digital certificate.
             </h3>
           </div>
           <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-px h-20 bg-gradient-to-b from-white/0 to-white/40" />

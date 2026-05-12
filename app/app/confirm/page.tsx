@@ -89,7 +89,7 @@ export default function ConfirmPage() {
         <div className="flex flex-col gap-3">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Finalize Delivery</h1>
           <p className="text-sm text-[#A3A3A3] leading-relaxed max-w-[340px]">
-            Made-to-order: Once you confirm receipt, your payment will be released from escrow to the designer.
+            Your payment will be released to the designer once you confirm receipt
           </p>
         </div>
 
