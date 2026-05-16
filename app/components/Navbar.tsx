@@ -60,7 +60,7 @@ export default function Navbar() {
 
 
   const activePage = pathname.startsWith('/passport') ? 'passport' :
-    pathname.startsWith('/details') ? 'details' :
+    pathname.startsWith('/landing') ? 'landing' :
     pathname.startsWith('/confirm') ? 'confirm' : 'drop';
 
   const handleExportKey = () => {

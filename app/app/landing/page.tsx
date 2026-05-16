@@ -30,7 +30,7 @@ function FAQItem({ question, answer }: FAQItemProps) {
   );
 }
 
-export default function DetailsPage() {
+export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-black text-white selection:bg-white selection:text-black">
       <Navbar />
