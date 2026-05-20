@@ -79,7 +79,7 @@ export default function Navbar() {
         <div className="max-w-[1400px] mx-auto h-full flex items-center justify-between px-6 md:px-10">
           
           {/* Brand - Left */}
-          <Link href="/drop" className="flex items-center gap-2.5 shrink-0 z-[1001]">
+          <Link href="/landing" className="flex items-center gap-2.5 shrink-0 z-[1001]">
             <Image src="/logo/logo_icon_white.svg" alt="Circuit" width={28} height={28} className="brightness-110" />
             <span className="font-brand text-[1.2rem] font-bold tracking-[0.05em] bg-gradient-to-b from-white to-[#A3A3A3] bg-clip-text text-transparent">Circuit</span>
           </Link>
