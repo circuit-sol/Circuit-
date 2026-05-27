@@ -245,21 +245,6 @@ router.patch('/db/orders/lifecycle', async (req, res) => {
     if (garmentSerial !== undefined) updatePayload.garment_serial = garmentSerial;
     if (mintAddress !== undefined) updatePayload.mint_address = mintAddress;
 
-    if (['produced', 'shipped', 'delivered'].includes(status) && mintAddress === undefined) {
-      const { data: currentOrder } = await supabase
-        .from('orders')
-        .select('mint_address')
-        .eq('id', orderId)
-        .maybeSingle();
-
-      if (currentOrder && !currentOrder.mint_address) {
-        const ADDR_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
-        let addr = '';
-        for (let i = 0; i < 44; i++) addr += ADDR_CHARS[Math.floor(Math.random() * ADDR_CHARS.length)];
-        updatePayload.mint_address = addr;
-      }
-    }
-
     const { data, error } = await supabase
       .from('orders')
       .update(updatePayload)
