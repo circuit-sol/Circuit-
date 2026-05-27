@@ -49,20 +49,21 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
 // ── Admin Authentication ────────────────────────────────────────────
 
 export async function loginAdmin(identifier: string, passwordHash: string) {
-  if (supabase) {
-    // Check by email or username
-    const { data, error } = await supabase
-      .from('admins')
-      .select('*')
-      .or(`email.eq.${identifier},username.eq.${identifier}`)
-      .eq('password_hash', passwordHash)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Admin Auth Error:', error.message);
+  try {
+    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/auth/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, passwordHash })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Admin Auth Error:', data.error);
       return null;
     }
-    return data;
+    return data.admin;
+  } catch (err) {
+    console.error('Admin Auth Fetch Error:', err);
+    return null;
   }
 
   // Fallback: Local simulation for dev
@@ -75,16 +76,20 @@ export async function loginAdmin(identifier: string, passwordHash: string) {
 // ── Helper Functions (Simulation Fallback) ───────────────────────────
 
 export async function saveUserMapping(email: string, walletAddress: string, privateKey: string) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('users')
-      .upsert({ email, wallet_address: walletAddress, private_key: privateKey }, { onConflict: 'email' })
-      .select();
-    
-    if (error) {
-      console.error('Supabase Mapping Error:', JSON.stringify(error, null, 2));
+  try {
+    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, wallet_address: walletAddress, private_key: privateKey })
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Supabase Mapping Error:', errData.error);
+    } else {
+      return await res.json();
     }
-    return data;
+  } catch (err) {
+    console.error('Mapping Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -95,14 +100,13 @@ export async function saveUserMapping(email: string, walletAddress: string, priv
 }
 
 export async function getUserMapping(email: string) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-    
-    if (!error) return data;
+  try {
+    const res = await fetch(`https://circuit-production-9fdc.up.railway.app/api/users/${encodeURIComponent(email)}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('getUserMapping Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -124,20 +128,20 @@ export async function saveOrder(orderData: {
   size?: string;
   quantity?: number;
 }) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('orders')
-      .insert([orderData]);
-    
-    if (error) {
-      console.error('Supabase Order Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
+  try {
+    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Supabase Order Error:', errData.error);
+    } else {
+      return await res.json();
     }
-    return data;
+  } catch (err) {
+    console.error('saveOrder Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -151,14 +155,20 @@ export async function saveOrder(orderData: {
 }
 
 export async function updateOrderStatus(txSignature: string, status: 'delivered' | 'cancelled') {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ status })
-      .eq('tx_signature', txSignature);
-    
-    if (error) console.error('Supabase Update Error:', error);
-    return data;
+  try {
+    const res = await fetch(`https://circuit-production-9fdc.up.railway.app/api/db/orders/${txSignature}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Supabase Update Error:', errData.error);
+    } else {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('updateOrderStatus Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -172,15 +182,20 @@ export async function updateOrderStatus(txSignature: string, status: 'delivered'
 }
 
 export async function updateOrderDelivery(email: string, location: string, address: string) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ delivery_location: location, delivery_address: address })
-      .eq('email', email)
-      .eq('status', 'pending');
-    
-    if (error) console.error('Supabase Update Delivery Error:', error);
-    return data;
+  try {
+    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders/delivery', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, delivery_location: location, delivery_address: address })
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Supabase Update Delivery Error:', errData.error);
+    } else {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('updateOrderDelivery Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -194,14 +209,13 @@ export async function updateOrderDelivery(email: string, location: string, addre
 }
 
 export async function getUserOrders(email: string) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('email', email)
-      .order('created_at', { ascending: false });
-    
-    if (!error) return data;
+  try {
+    const res = await fetch(`https://circuit-production-9fdc.up.railway.app/api/db/orders/${encodeURIComponent(email)}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('getUserOrders Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -299,33 +313,20 @@ export async function updateOrderStatusLifecycle(
   status: string,
   garmentSerial?: string
 ) {
-  if (supabase) {
-    const updatePayload: any = { status };
-    if (garmentSerial) {
-      updatePayload.garment_serial = garmentSerial;
+  try {
+    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders/lifecycle', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, status, garmentSerial })
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Supabase Update Lifecycle Error:', errData.error);
+    } else {
+      return await res.json();
     }
-
-    // Auto-mint (generate public address) if transitioning to produced, shipped, or delivered
-    if (['produced', 'shipped', 'delivered'].includes(status)) {
-      const { data: currentOrder } = await supabase
-        .from('orders')
-        .select('mint_address')
-        .eq('id', orderId)
-        .maybeSingle();
-
-      if (currentOrder && !currentOrder.mint_address) {
-        updatePayload.mint_address = genAddress();
-      }
-    }
-
-    const { data, error } = await supabase
-      .from('orders')
-      .update(updatePayload)
-      .eq('id', orderId)
-      .select();
-
-    if (error) console.error('Supabase Update Lifecycle Error:', error);
-    return data;
+  } catch (err) {
+    console.error('updateOrderStatusLifecycle Fetch Error:', err);
   }
 
   // Fallback: Local Storage
@@ -347,15 +348,20 @@ export async function updateOrderStatusLifecycle(
 }
 
 export async function updateOrderShipmentDetails(orderId: string, details: string) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ shipment_details: details })
-      .eq('id', orderId)
-      .select();
-
-    if (error) console.error('Supabase Update Shipment Details Error:', error);
-    return data;
+  try {
+    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders/shipment', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, details })
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Supabase Update Shipment Details Error:', errData.error);
+    } else {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('updateOrderShipmentDetails Fetch Error:', err);
   }
 
   // Fallback: Local Storage

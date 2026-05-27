@@ -103,12 +103,13 @@ export default function AdminDashboard() {
       setLoading(true);
       if (!supabase) return;
 
-      // 1. Fetch Orders
-      const { data: ord, error: ordErr } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (ordErr) throw ordErr;
+      // 1. Fetch Orders securely from Railway API
+      const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch orders');
+      }
+      const ord = await res.json();
       
       const ordersList = ord || [];
       setOrders(ordersList);
