@@ -4,7 +4,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const express = require('express');
 const cors    = require('cors');
-const routes  = require('./routes');
+const routes    = require('./routes');
+const dbRoutes  = require('./dbRoutes');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -41,6 +42,7 @@ app.get('/health', (_req, res) => {
 // ── API Routes ────────────────────────────────────────────────────────────────
 
 app.use('/api', routes);
+app.use('/api', dbRoutes);
 
 // ── 404 fallback ─────────────────────────────────────────────────────────────
 
