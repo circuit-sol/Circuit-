@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import {
   initializeEscrow,
@@ -57,6 +57,17 @@ function DropPageContent() {
   const [computedPrice, setComputedPrice] = useState(0.8);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const processingRef = useRef(false);
+  const router = useRouter();
+
+  // Auto-redirect to confirmation page after successful payment
+  useEffect(() => {
+    if (txState === 'success') {
+      const timer = setTimeout(() => {
+        router.push('/confirm');
+      }, 1500); // 1.5s delay so user can see the success state briefly
+      return () => clearTimeout(timer);
+    }
+  }, [txState, router]);
 
   // Fetch Drop & Supply Details from Supabase
   useEffect(() => {

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { confirmDelivery, parseError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
@@ -30,6 +31,17 @@ export default function ConfirmPage() {
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const processingRef = useRef(false);
+  const router = useRouter();
+
+  // Auto-redirect to digital passport after successful confirmation
+  useEffect(() => {
+    if (txState === 'success' && latestOrder?.id) {
+      const timer = setTimeout(() => {
+        router.push(`/passport?order=${latestOrder.id}`);
+      }, 2000); // 2s delay to read success message
+      return () => clearTimeout(timer);
+    }
+  }, [txState, latestOrder, router]);
 
   useEffect(() => {
     if (isSignedIn && user?.email) {
