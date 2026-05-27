@@ -104,16 +104,16 @@ router.get('/users/:email', async (req, res) => {
 
 // ── Orders ────────────────────────────────────────────────────────────────────
 
-// POST /api/db/orders  { email, drop_id, tx_signature, escrow_pda, amount_sol, size?, quantity? }
+// POST /api/db/orders  { email, drop_id, tx_signature, escrow_pda, amount_usd, size?, quantity? }
 router.post('/db/orders', async (req, res) => {
-  const { email, drop_id, tx_signature, escrow_pda, amount_sol } = req.body;
+  const { email, drop_id, tx_signature, escrow_pda, amount_usd } = req.body;
 
-  if (!email || !drop_id || !tx_signature || !escrow_pda || amount_sol == null) {
-    return res.status(400).json({ error: 'email, drop_id, tx_signature, escrow_pda, and amount_sol are required' });
+  if (!email || !drop_id || !tx_signature || !escrow_pda || amount_usd == null) {
+    return res.status(400).json({ error: 'email, drop_id, tx_signature, escrow_pda, and amount_usd are required' });
   }
 
   try {
-    const payload = { email, drop_id, tx_signature, escrow_pda, amount_sol };
+    const payload = { email, drop_id, tx_signature, escrow_pda, amount_usd };
     if (req.body.size     !== undefined) payload.size     = req.body.size;
     if (req.body.quantity !== undefined) payload.quantity = req.body.quantity;
 
@@ -228,6 +228,64 @@ router.patch('/db/orders/:txSignature/status', async (req, res) => {
     res.json(data || []);
   } catch (err) {
     console.error('Error in PATCH /api/db/orders/:txSignature/status:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/db/orders/lifecycle
+router.patch('/db/orders/lifecycle', async (req, res) => {
+  const { orderId, status, garmentSerial, mintAddress } = req.body;
+
+  if (!orderId || !status) {
+    return res.status(400).json({ error: 'orderId and status are required' });
+  }
+
+  try {
+    const updatePayload = { status };
+    if (garmentSerial !== undefined) updatePayload.garment_serial = garmentSerial;
+    if (mintAddress !== undefined) updatePayload.mint_address = mintAddress;
+
+    const { data, error } = await supabase
+      .from('orders')
+      .update(updatePayload)
+      .eq('id', orderId)
+      .select();
+
+    if (error) {
+      console.error('Update lifecycle Supabase error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('Error in PATCH /api/db/orders/lifecycle:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/db/orders/shipment
+router.patch('/db/orders/shipment', async (req, res) => {
+  const { orderId, details } = req.body;
+
+  if (!orderId || details === undefined) {
+    return res.status(400).json({ error: 'orderId and details are required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ shipment_details: details })
+      .eq('id', orderId)
+      .select();
+
+    if (error) {
+      console.error('Update shipment Supabase error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('Error in PATCH /api/db/orders/shipment:', err);
     res.status(500).json({ error: err.message });
   }
 });
