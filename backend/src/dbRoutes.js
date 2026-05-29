@@ -155,6 +155,50 @@ router.get('/db/orders', async (_req, res) => {
   }
 });
 
+// GET /api/db/orders/count/:dropId  — order count for a drop (supply display)
+router.get('/db/orders/count/:dropId', async (req, res) => {
+  try {
+    const { count, error } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('drop_id', req.params.dropId);
+
+    if (error) {
+      console.error('Order count Supabase error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ count: count ?? 0 });
+  } catch (err) {
+    console.error('Error in GET /api/db/orders/count/:dropId:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/db/orders/by-tx/:txSignature  — single order lookup by transaction signature
+router.get('/db/orders/by-tx/:txSignature', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('tx_signature', req.params.txSignature)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Order by-tx Supabase error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+    if (!data) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Error in GET /api/db/orders/by-tx/:txSignature:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/db/orders/:email  — orders for a specific user
 router.get('/db/orders/:email', async (req, res) => {
   try {
