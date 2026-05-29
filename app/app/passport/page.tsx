@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
-import { supabase, getEditionById, getUserOrders } from '@/lib/db';
+import { getEditionById, getUserOrders } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
@@ -28,9 +28,9 @@ function PassportContent() {
       }
 
       if (typeof window !== 'undefined') {
-        const cachedId = localStorage.getItem('circuit_last_order_id');
-        if (cachedId) {
-          setOrderId(cachedId);
+        const cachedTx = localStorage.getItem('circuit_last_order_tx');
+        if (cachedTx) {
+          setOrderId(cachedTx);
           return;
         }
       }
@@ -41,9 +41,9 @@ function PassportContent() {
           const orders = await getUserOrders(user.email);
           if (orders && orders.length > 0) {
             const latestOrder = orders[0];
-            setOrderId(latestOrder.id);
+            setOrderId(latestOrder.tx_signature);
             if (typeof window !== 'undefined') {
-              localStorage.setItem('circuit_last_order_id', latestOrder.id);
+              localStorage.setItem('circuit_last_order_tx', latestOrder.tx_signature);
             }
             return;
           }
@@ -67,17 +67,13 @@ function PassportContent() {
   async function fetchOrderAndEdition() {
     try {
       setLoading(true);
-      if (!supabase) return;
-      
-      const { data: ord, error: ordErr } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
-      
-      if (ordErr) throw ordErr;
-      setOrder(ord);
+      const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+      const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(orderId!)}`);
 
+      if (!res.ok) throw new Error('Order not found');
+      const ord = await res.json();
+
+      setOrder(ord);
       if (ord && ord.drop_id) {
         const ed = await getEditionById(ord.drop_id);
         setEdition(ed);
@@ -119,7 +115,7 @@ function PassportContent() {
 
   const status = order.status || 'pending';
   const isMinted = ['produced', 'shipped', 'delivered'].includes(status);
-  const passportUrl = typeof window !== 'undefined' ? `${window.location.origin}/passport?order=${order.id}` : '';
+  const passportUrl = typeof window !== 'undefined' ? `${window.location.origin}/passport?order=${orderId}` : '';
   const activeEdition = edition || {
     name: '3 Piece Agbada',
     fabric: 'Duchess satin',

@@ -1,56 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
-import { genAddress } from './utils';
-
-
-// ── Supabase Configuration ───────────────────────────────────────────
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
-
-if (typeof window !== 'undefined') {
-  if (!supabaseUrl) console.warn('⚠️ Supabase: NEXT_PUBLIC_SUPABASE_URL is missing.');
-  if (!supabaseAnonKey) console.warn('⚠️ Supabase: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is missing.');
-  if (supabaseAnonKey && !supabaseAnonKey.startsWith('ey')) {
-    console.warn('⚠️ Supabase: The Anon Key looks invalid (expected a JWT starting with "ey").');
-  }
-}
-
-export const supabase = (supabaseUrl && supabaseAnonKey) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
-
-// ── Database Schema (SQL) ────────────────────────────────────────────
-/*
-  CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email TEXT UNIQUE NOT NULL,
-    wallet_address TEXT UNIQUE NOT NULL,
-    private_key TEXT NOT NULL, -- Encrypted in production
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-  );
-
-  CREATE TABLE orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id),
-    drop_id TEXT NOT NULL,
-    tx_signature TEXT UNIQUE NOT NULL,
-    escrow_pda TEXT UNIQUE NOT NULL,
-    status TEXT DEFAULT 'pending', -- pending, delivered, cancelled
-    amount_usd DECIMAL NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-  CREATE TABLE admins (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email TEXT UNIQUE NOT NULL,
-    username TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-  );
-*/
+const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 
 // ── Admin Authentication ────────────────────────────────────────────
 
 export async function loginAdmin(identifier: string, passwordHash: string) {
   try {
-    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/auth/admin', {
+    const res = await fetch(`${BASE}/api/auth/admin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, passwordHash })
@@ -65,26 +19,20 @@ export async function loginAdmin(identifier: string, passwordHash: string) {
     console.error('Admin Auth Fetch Error:', err);
     return null;
   }
-
-  // Fallback: Local simulation for dev
-  if (identifier === 'zipp' || identifier === 'marvel' || identifier.includes('@')) {
-    return { username: identifier, email: identifier };
-  }
-  return null;
 }
 
-// ── Helper Functions (Simulation Fallback) ───────────────────────────
+// ── Helper Functions ─────────────────────────────────────────────────
 
 export async function saveUserMapping(email: string, walletAddress: string, privateKey: string) {
   try {
-    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/users', {
+    const res = await fetch(`${BASE}/api/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, wallet_address: walletAddress, private_key: privateKey })
     });
     if (!res.ok) {
       const errData = await res.json();
-      console.error('Supabase Mapping Error:', errData.error);
+      console.error('Save user mapping error:', errData.error);
     } else {
       return await res.json();
     }
@@ -101,7 +49,7 @@ export async function saveUserMapping(email: string, walletAddress: string, priv
 
 export async function getUserMapping(email: string) {
   try {
-    const res = await fetch(`https://circuit-production-9fdc.up.railway.app/api/users/${encodeURIComponent(email)}`);
+    const res = await fetch(`${BASE}/api/users/${encodeURIComponent(email)}`);
     if (res.ok) {
       return await res.json();
     }
@@ -129,14 +77,14 @@ export async function saveOrder(orderData: {
   quantity?: number;
 }) {
   try {
-    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders', {
+    const res = await fetch(`${BASE}/api/db/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
     });
     if (!res.ok) {
       const errData = await res.json();
-      console.error('Supabase Order Error:', errData.error);
+      console.error('Save order error:', errData.error);
     } else {
       return await res.json();
     }
@@ -156,14 +104,14 @@ export async function saveOrder(orderData: {
 
 export async function updateOrderStatus(txSignature: string, status: 'delivered' | 'cancelled') {
   try {
-    const res = await fetch(`https://circuit-production-9fdc.up.railway.app/api/db/orders/${txSignature}/status`, {
+    const res = await fetch(`${BASE}/api/db/orders/${txSignature}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
     if (!res.ok) {
       const errData = await res.json();
-      console.error('Supabase Update Error:', errData.error);
+      console.error('Update order status error:', errData.error);
     } else {
       return await res.json();
     }
@@ -174,7 +122,7 @@ export async function updateOrderStatus(txSignature: string, status: 'delivered'
   // Fallback: Local Storage
   if (typeof window !== 'undefined') {
     const orders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-    const updatedOrders = orders.map((o: any) => 
+    const updatedOrders = orders.map((o: any) =>
       o.tx_signature === txSignature ? { ...o, status } : o
     );
     localStorage.setItem('circuit_orders', JSON.stringify(updatedOrders));
@@ -183,14 +131,14 @@ export async function updateOrderStatus(txSignature: string, status: 'delivered'
 
 export async function updateOrderDelivery(email: string, location: string, address: string) {
   try {
-    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders/delivery', {
+    const res = await fetch(`${BASE}/api/db/orders/delivery`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, delivery_location: location, delivery_address: address })
     });
     if (!res.ok) {
       const errData = await res.json();
-      console.error('Supabase Update Delivery Error:', errData.error);
+      console.error('Update delivery error:', errData.error);
     } else {
       return await res.json();
     }
@@ -201,8 +149,10 @@ export async function updateOrderDelivery(email: string, location: string, addre
   // Fallback: Local Storage
   if (typeof window !== 'undefined') {
     const orders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-    const updatedOrders = orders.map((o: any) => 
-      o.email === email && o.status === 'pending' ? { ...o, delivery_location: location, delivery_address: address } : o
+    const updatedOrders = orders.map((o: any) =>
+      o.email === email && o.status === 'pending'
+        ? { ...o, delivery_location: location, delivery_address: address }
+        : o
     );
     localStorage.setItem('circuit_orders', JSON.stringify(updatedOrders));
   }
@@ -210,7 +160,7 @@ export async function updateOrderDelivery(email: string, location: string, addre
 
 export async function getUserOrders(email: string) {
   try {
-    const res = await fetch(`https://circuit-production-9fdc.up.railway.app/api/db/orders/${encodeURIComponent(email)}`);
+    const res = await fetch(`${BASE}/api/db/orders/${encodeURIComponent(email)}`);
     if (res.ok) {
       return await res.json();
     }
@@ -227,24 +177,15 @@ export async function getUserOrders(email: string) {
 }
 
 // ── Editions / Collections ───────────────────────────────────────────
+// Supabase storage removed — editions use static fallback until backend
+// endpoints for edition management are added.
 
-export async function getEditions(activeOnly = true) {
-  if (supabase) {
-    let query = supabase.from('editions').select('*');
-    if (activeOnly) {
-      query = query.eq('is_active', true);
-    }
-    const { data, error } = await query.order('created_at', { ascending: true });
-    
-    if (!error) return data || [];
-  }
-  
-  // Fallback default edition
+export async function getEditions(_activeOnly = true) {
   return [{
     id: 'drop-zero',
     name: '3 Piece Agbada',
     images: [{ url: '/satin.png', tag: 'Front View' }],
-    description: 'Fashion sold before it’s made. Circuit reverses the order of production by making manufacturing conditional on confirmed demand.',
+    description: "Fashion sold before it's made. Circuit reverses the order of production by making manufacturing conditional on confirmed demand.",
     price_usd: 120,
     has_variable_prices: false,
     prices_by_size: { 'Small': 120, 'Medium': 120, 'Large': 120, 'Extra Large': 120 },
@@ -257,23 +198,12 @@ export async function getEditions(activeOnly = true) {
 }
 
 export async function getEditionById(id: string) {
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('editions')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-    
-    if (!error && data) return data;
-  }
-  
-  // Fallback
-  if (id === 'drop-zero') {
+  if (id === 'drop-zero' || id) {
     return {
-      id: 'drop-zero',
+      id: id || 'drop-zero',
       name: '3 Piece Agbada',
       images: [{ url: '/satin.png', tag: 'Front View' }],
-      description: 'Fashion sold before it’s made. Circuit reverses the order of production by making manufacturing conditional on confirmed demand.',
+      description: "Fashion sold before it's made. Circuit reverses the order of production by making manufacturing conditional on confirmed demand.",
       price_usd: 120,
       has_variable_prices: false,
       prices_by_size: { 'Small': 120, 'Medium': 120, 'Large': 120, 'Extra Large': 120 },
@@ -287,22 +217,7 @@ export async function getEditionById(id: string) {
   return null;
 }
 
-export async function saveEdition(editionData: any) {
-  if (supabase) {
-    // Ensure image_url is still provided to avoid NOT NULL constraint errors
-    const payload = {
-      ...editionData,
-      image_url: editionData.images?.[0]?.url || '/satin.png'
-    };
-    
-    const { data, error } = await supabase
-      .from('editions')
-      .upsert(payload, { onConflict: 'id' })
-      .select();
-    
-    if (error) console.error('Supabase Save Edition Error:', JSON.stringify(error, null, 2), error.message, error.details);
-    return data;
-  }
+export async function saveEdition(_editionData: any) {
   return null;
 }
 
@@ -314,14 +229,14 @@ export async function updateOrderStatusLifecycle(
   garmentSerial?: string
 ) {
   try {
-    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders/lifecycle', {
+    const res = await fetch(`${BASE}/api/db/orders/lifecycle`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId, status, garmentSerial })
     });
     if (!res.ok) {
       const errData = await res.json();
-      console.error('Supabase Update Lifecycle Error:', errData.error);
+      console.error('Update lifecycle error:', errData.error);
     } else {
       return await res.json();
     }
@@ -336,9 +251,6 @@ export async function updateOrderStatusLifecycle(
       if (o.id === orderId) {
         const updated = { ...o, status };
         if (garmentSerial) updated.garment_serial = garmentSerial;
-        if (['produced', 'shipped', 'delivered'].includes(status) && !o.mint_address) {
-          updated.mint_address = genAddress();
-        }
         return updated;
       }
       return o;
@@ -349,14 +261,14 @@ export async function updateOrderStatusLifecycle(
 
 export async function updateOrderShipmentDetails(orderId: string, details: string) {
   try {
-    const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders/shipment', {
+    const res = await fetch(`${BASE}/api/db/orders/shipment`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId, details })
     });
     if (!res.ok) {
       const errData = await res.json();
-      console.error('Supabase Update Shipment Details Error:', errData.error);
+      console.error('Update shipment details error:', errData.error);
     } else {
       return await res.json();
     }
@@ -367,79 +279,21 @@ export async function updateOrderShipmentDetails(orderId: string, details: strin
   // Fallback: Local Storage
   if (typeof window !== 'undefined') {
     const orders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-    const updatedOrders = orders.map((o: any) => 
+    const updatedOrders = orders.map((o: any) =>
       o.id === orderId ? { ...o, shipment_details: details } : o
     );
     localStorage.setItem('circuit_orders', JSON.stringify(updatedOrders));
   }
 }
 
-export async function uploadEditionImage(file: File, id: string): Promise<string | null> {
-  if (!supabase) {
-    // Local Simulation: Convert file to Base64 data URL for local storage persistence
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  try {
-    const fileExt = file.name.split('.').pop() || 'png';
-    const fileName = `${id}-${Date.now()}.${fileExt}`;
-    const filePath = `collections/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('collection-images')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage
-      .from('collection-images')
-      .getPublicUrl(filePath);
-
-    return data.publicUrl;
-  } catch (err) {
-    console.error('Error uploading image to Supabase:', err);
-    return null;
-  }
+export async function uploadEditionImage(file: File, _id: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
 }
 
-export async function deleteEditionImage(imageUrl: string): Promise<boolean> {
-  if (!supabase) {
-    return true; // Simulate success
-  }
-
-  // Check if it's a Supabase URL
-  if (!imageUrl.includes('supabase.co') && !imageUrl.includes('supabase.in')) {
-    return true; // Ignore placeholder or base64
-  }
-
-  try {
-    // Extract file path from public URL
-    // Public URL format: https://[project-id].supabase.co/storage/v1/object/public/collection-images/collections/[filename]
-    const parts = imageUrl.split('/collection-images/');
-    if (parts.length < 2) return false;
-    const filePath = decodeURIComponent(parts[1]);
-
-    const { error } = await supabase.storage
-      .from('collection-images')
-      .remove([filePath]);
-
-    if (error) throw error;
-    return true;
-  } catch (err) {
-    console.error('Error deleting image from Supabase:', err);
-    return false;
-  }
+export async function deleteEditionImage(_imageUrl: string): Promise<boolean> {
+  return true;
 }
-
-

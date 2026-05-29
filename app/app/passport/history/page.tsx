@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
-import { getUserOrders, getEditions, supabase } from '@/lib/db';
+import { getUserOrders, getEditions } from '@/lib/db';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import SignInModal from '@/components/SignInModal';
 import { showToast } from '@/components/Toast';

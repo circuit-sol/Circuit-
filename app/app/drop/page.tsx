@@ -14,7 +14,7 @@ import { solscanTxUrl } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
-import { saveOrder, supabase, getEditionById, getEditions } from '@/lib/db';
+import { saveOrder, getEditionById, getEditions } from '@/lib/db';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error' | 'soldout';
 
@@ -102,16 +102,16 @@ function DropPageContent() {
           setComputedPrice(Number(activeEdition.price_usd));
         }
 
-        // Fetch exact supply count from database
-        if (supabase) {
-          const { count, error } = await supabase
-            .from('orders')
-            .select('*', { count: 'exact', head: true })
-            .eq('drop_id', activeEdition.id);
-          
-          if (!error && count !== null) {
+        // Fetch exact supply count from backend
+        try {
+          const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+          const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
+          if (countRes.ok) {
+            const { count } = await countRes.json();
             setMintedCount(count);
           }
+        } catch (e) {
+          console.error('Error fetching supply count:', e);
         }
 
         // Fetch Live SOL Price
@@ -199,16 +199,19 @@ function DropPageContent() {
         quantity: quantity
       });
 
-      // Update local storage of this order ID to cache for passport retrieval
-      if (typeof window !== 'undefined' && supabase) {
-        const { data: latestOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('tx_signature', result.txSignature)
-          .maybeSingle();
-
-        if (latestOrders && latestOrders.id) {
-          localStorage.setItem('circuit_last_order_id', latestOrders.id);
+      // Cache tx_signature for passport retrieval
+      if (typeof window !== 'undefined') {
+        try {
+          const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+          const orderRes = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(result.txSignature)}`);
+          if (orderRes.ok) {
+            const orderData = await orderRes.json();
+            if (orderData?.tx_signature) {
+              localStorage.setItem('circuit_last_order_tx', orderData.tx_signature);
+            }
+          }
+        } catch (e) {
+          console.error('Error caching order tx:', e);
         }
       }
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
-import { supabase, getEditions, saveEdition, updateOrderStatusLifecycle, updateOrderShipmentDetails, uploadEditionImage, deleteEditionImage } from '@/lib/db';
+import { getEditions, saveEdition, updateOrderStatusLifecycle, updateOrderShipmentDetails, uploadEditionImage, deleteEditionImage } from '@/lib/db';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import AdminNavbar from '@/components/AdminNavbar';
 import { showToast } from '@/components/Toast';
@@ -101,10 +101,10 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      if (!supabase) return;
+      const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 
-      // 1. Fetch Orders securely from Railway API
-      const res = await fetch('https://circuit-production-9fdc.up.railway.app/api/db/orders');
+      // 1. Fetch Orders from backend
+      const res = await fetch(`${BASE}/api/db/orders`);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to fetch orders');
