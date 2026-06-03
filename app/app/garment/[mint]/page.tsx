@@ -124,15 +124,14 @@ export default function GarmentPassportPage() {
 
           {/* Garment record */}
           <div>
-            <h3 className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#444] mb-4">Garment record</h3>
+            <h3 className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#444] mb-4">Garment Record</h3>
             <div className="card-glass overflow-hidden">
               {[
                 { k: 'Owner', v: truncateAddress(passport.owner), mono: true },
 
                 { k: 'Made by', v: 'Circuit', highlight: true },
 
-                { k: 'Royalty Rule', v: `${passport.royaltyPercent} Secondary Sales`, highlight: true },
-                { k: 'Record Type', v: 'Metaplex pNFT (v1)', mono: true },
+                { k: 'Royalty Rule', v: `7% on every resale`, highlight: true },
               ].map((row, i, arr) => (
                 <div key={row.k} className={`flex justify-between items-center p-5 text-sm ${i < arr.length - 1 ? 'border-b border-white/[0.04]' : ''}`}>
                   <span className="text-[#666] font-medium">{row.k}</span>

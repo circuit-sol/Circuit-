@@ -196,7 +196,7 @@ function PassportContent() {
                     {status === 'pending' && 'Payment held securely in escrow.'}
                     {status === 'in_production' && 'Your piece is being made.'}
                     {status === 'cancelled' && 'This order has been cancelled and funds are being returned to your escrow source.'}
-                    {isMinted && 'Physical garment successfully constructed. Digital passport metadata permanently minted onto the Solana ledger.'}
+                    {isMinted && 'Made. Your ownership record is ready.'}
                   </p>
                 </div>
 
@@ -286,7 +286,7 @@ function PassportContent() {
                     <span className="text-[0.65rem] font-bold uppercase tracking-widest text-amber-500">Passport Activation</span>
                   </div>
                   <p className="text-xs text-[#888] leading-relaxed">
-                    Your digital passport activates automatically once your garment is completed.
+                    Your garment's permanent record is created when production begins.
                   </p>
                 </div>
               )}
@@ -298,7 +298,7 @@ function PassportContent() {
                   <TimelineItem 
                     date={new Date(order.created_at).toLocaleDateString()} 
                     title="Order Confirmed" 
-                    desc="Payment secured in escrow."
+                    desc="Your payment is held until delivery."
                     active={true}
                   />
                   <TimelineItem 
@@ -310,13 +310,13 @@ function PassportContent() {
                   <TimelineItem 
                     date={isMinted ? 'Minted' : '—'} 
                     title="Digital Passport Ready" 
-                    desc="Garment ready. Digital passport ready."
+                    desc="Made. Your ownership record is ready."
                     active={isMinted}
                   />
                   <TimelineItem 
                     date={status === 'shipped' || status === 'delivered' ? 'Shipped' : '—'} 
                     title="Shipment" 
-                    desc={order.shipment_details || 'Tracking details available after dispatch.'}
+                    desc={order.shipment_details || 'Your garment is on its way.'}
                     active={['shipped', 'delivered'].includes(status)}
                   />
                 </div>

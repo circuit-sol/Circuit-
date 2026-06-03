@@ -354,7 +354,7 @@ function DropPageContent() {
               <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">Drop Progress</span>
               <span className="text-sm font-mono">
                 <strong>{mintedCount}</strong>
-                <span className="text-[#444]"> / {maxSupply}</span>
+                <span className="text-[#444]"> of {maxSupply} confirmed</span>
               </span>
             </div>
             <div className="mp-track">
@@ -394,8 +394,7 @@ function DropPageContent() {
                   {txState === 'signing' ? 'Confirming...' : 
                    txState === 'success' ? '✓ Order Confirmed' :
                    isSoldOut ? 'Scarcity Reached' :
-                   paymentMethod === 'fiat' ? `Pay $${(computedPrice * quantity).toFixed(2)} USD` :
-                   `Pay $${(computedPrice * quantity).toFixed(2)} USD (~${solPrice ? ((computedPrice * quantity) / solPrice).toFixed(3) : '...'} SOL)`}
+                   'Confirm Order'}
                 </span>
                 <span className="btn-arrow">
                   {txState === 'signing' ? (
@@ -478,15 +477,15 @@ function DropPageContent() {
 
             {/* Thumbnail Gallery Grid */}
             {activeEdition.images && activeEdition.images.length > 1 && (
-              <div className="flex gap-3 mt-4 w-full overflow-x-auto pb-2 scrollbar-hide justify-center lg:justify-start">
+              <div className="flex gap-3 sm:gap-4 mt-4 w-full overflow-x-auto py-4 px-2 justify-start sm:justify-center lg:justify-start [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {activeEdition.images.map((img: any, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => setActiveImageIndex(idx)}
-                    className={`relative w-20 h-24 rounded-xl overflow-hidden border-2 transition-all duration-300 shrink-0 ${
+                    className={`relative w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden border-2 transition-all duration-300 shrink-0 ${
                       activeImageIndex === idx 
-                        ? 'border-white shadow-[0_0_15px_rgba(255,255,255,0.3)] scale-105' 
-                        : 'border-white/10 opacity-50 hover:opacity-100 hover:border-white/40'
+                        ? 'border-white shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-110 z-10' 
+                        : 'border-white/10 opacity-50 hover:opacity-100 hover:border-white/40 z-0'
                     }`}
                   >
                     <Image
