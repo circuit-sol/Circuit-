@@ -207,7 +207,22 @@ export async function getEditionById(id: string) {
   return null;
 }
 
-export async function saveEdition(_editionData: any) {
+export async function saveEdition(editionData: any) {
+  try {
+    const res = await fetch(`${BASE}/api/editions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editionData)
+    });
+    if (!res.ok) {
+      const errData = await res.json();
+      console.error('Save edition error:', errData.error);
+    } else {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('saveEdition Fetch Error:', err);
+  }
   return null;
 }
 
@@ -276,14 +291,49 @@ export async function updateOrderShipmentDetails(orderId: string, details: strin
   }
 }
 
-export async function uploadEditionImage(file: File, _id: string): Promise<string | null> {
+export async function uploadEditionImage(file: File, id: string): Promise<string | null> {
   return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
+    reader.onloadend = async () => {
+      try {
+        const base64Data = reader.result as string;
+        const res = await fetch(`${BASE}/api/editions/image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id,
+            fileName: file.name,
+            contentType: file.type,
+            base64Data
+          })
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          resolve(data.publicUrl);
+        } else {
+          console.error('Upload failed:', await res.text());
+          resolve(null);
+        }
+      } catch (err) {
+        console.error('uploadEditionImage Fetch Error:', err);
+        resolve(null);
+      }
+    };
     reader.readAsDataURL(file);
   });
 }
 
-export async function deleteEditionImage(_imageUrl: string): Promise<boolean> {
-  return true;
+export async function deleteEditionImage(imageUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/api/editions/image`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl })
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('deleteEditionImage Fetch Error:', err);
+    return false;
+  }
 }
