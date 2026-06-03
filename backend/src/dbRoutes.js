@@ -334,4 +334,55 @@ router.patch('/db/orders/shipment', async (req, res) => {
   }
 });
 
+// ── Editions ──────────────────────────────────────────────────────────────────
+
+// GET /api/editions  — all active editions
+router.get('/editions', async (req, res) => {
+  try {
+    const activeOnly = req.query.active !== 'false';
+    let query = supabase.from('editions').select('*');
+    
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Get all editions Supabase error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('Error in GET /api/editions:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/editions/:id  — specific edition
+router.get('/editions/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('editions')
+      .select('*')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Get edition by ID Supabase error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+    
+    if (!data) {
+      return res.status(404).json({ error: 'Edition not found' });
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Error in GET /api/editions/:id:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
