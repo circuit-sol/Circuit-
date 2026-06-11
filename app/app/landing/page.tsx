@@ -221,26 +221,14 @@ export default function LandingPage() {
             <div className="relative w-full aspect-[3/4] md:aspect-auto md:flex-1 md:h-full rounded-[2rem] overflow-hidden border border-white/[0.08] shadow-[0_20px_50px_rgba(0,0,0,0.5)] group bg-[#0A0A0A]">
               <Image src="/yellow-gown.jpg" alt="Craft Detail Front" fill className="object-cover object-top md:object-[center_10%] group-hover:scale-105 transition-transform duration-[2s] ease-out" />
               
-              {/* Subtle Overlay & Badge */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 transition-opacity duration-700" />
-              <div className="absolute bottom-6 left-6">
-                <span className="px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/[0.12] text-[0.65rem] font-bold uppercase tracking-[0.15em] text-white shadow-xl">
-                  Flawless Drape
-                </span>
-              </div>
+
             </div>
 
             {/* Image 2 (Staggered on Desktop) */}
             <div className="relative w-full aspect-[3/4] md:aspect-auto md:flex-1 md:h-full rounded-[2rem] overflow-hidden border border-white/[0.08] shadow-[0_20px_50px_rgba(0,0,0,0.5)] group bg-[#0A0A0A] md:mt-16">
               <Image src="/yellow-gown2.jpg" alt="Craft Detail Angle" fill className="object-cover object-top md:object-[center_10%] group-hover:scale-105 transition-transform duration-[2s] ease-out" />
               
-              {/* Subtle Overlay & Badge */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 transition-opacity duration-700" />
-              <div className="absolute bottom-6 left-6">
-                <span className="px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/[0.12] text-[0.65rem] font-bold uppercase tracking-[0.15em] text-white shadow-xl">
-                  Structured Form
-                </span>
-              </div>
+
             </div>
           </div>
         </section>
