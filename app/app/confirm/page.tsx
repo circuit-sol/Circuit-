@@ -213,6 +213,7 @@ export default function ConfirmPage() {
                   <option value="">Select Location</option>
                   <option value="Lagos">Lagos</option>
                   <option value="Ibadan">Ibadan</option>
+                  <option value="Ilorin">Ilorin</option>
                   <option value="Abuja" disabled className="text-[#444]">Abuja (Coming Soon)</option>
                   <option value="Port Harcourt" disabled className="text-[#444]">Port Harcourt (Coming Soon)</option>
                 </select>
