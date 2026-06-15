@@ -14,6 +14,9 @@ const allowedOrigins = [
   'http://localhost:3000',
   'https://circuit-sol.vercel.app',
   'https://circuit-production-9fdc.up.railway.app',
+  'https://circuit.fashion',
+  'https://www.circuit.fashion',
+  'https://circuit-sigma.vercel.app',
 ];
 
 app.use(cors({
