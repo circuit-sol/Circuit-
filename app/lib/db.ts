@@ -187,7 +187,22 @@ export async function getEditions(activeOnly = true) {
     
     const res = await fetch(url.toString());
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      return data.map((ed: any) => {
+        if (ed.images) {
+          ed.images = ed.images.map((img: any) => {
+            let finalUrl = img.url;
+            if (finalUrl && finalUrl.includes('supabase') && !finalUrl.startsWith('/api/proxy-image')) {
+              finalUrl = `/api/proxy-image?url=${encodeURIComponent(finalUrl)}`;
+            }
+            return {
+              ...img,
+              url: finalUrl.startsWith('/api/proxy-image') ? `${BASE}${finalUrl}` : finalUrl
+            };
+          });
+        }
+        return ed;
+      });
     }
   } catch (err) {
     console.error('getEditions Fetch Error:', err);
@@ -199,7 +214,20 @@ export async function getEditionById(id: string) {
   try {
     const res = await fetch(`${BASE}/api/editions/${encodeURIComponent(id)}`);
     if (res.ok) {
-      return await res.json();
+      const data = await res.json();
+      if (data && data.images) {
+        data.images = data.images.map((img: any) => {
+          let finalUrl = img.url;
+          if (finalUrl && finalUrl.includes('supabase') && !finalUrl.startsWith('/api/proxy-image')) {
+            finalUrl = `/api/proxy-image?url=${encodeURIComponent(finalUrl)}`;
+          }
+          return {
+            ...img,
+            url: finalUrl.startsWith('/api/proxy-image') ? `${BASE}${finalUrl}` : finalUrl
+          };
+        });
+      }
+      return data;
     }
   } catch (err) {
     console.error('getEditionById Fetch Error:', err);

@@ -353,7 +353,20 @@ router.get('/editions', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
-    res.json(data || []);
+    // Proxy image URLs
+    const proxyData = (data || []).map(edition => {
+      if (edition.images) {
+        edition.images = edition.images.map(img => {
+          if (img.url && img.url.includes('supabase')) {
+            return { ...img, url: `/api/proxy-image?url=${encodeURIComponent(img.url)}` };
+          }
+          return img;
+        });
+      }
+      return edition;
+    });
+
+    res.json(proxyData);
   } catch (err) {
     console.error('Error in GET /api/editions:', err);
     res.status(500).json({ error: err.message });
@@ -376,6 +389,16 @@ router.get('/editions/:id', async (req, res) => {
     
     if (!data) {
       return res.status(404).json({ error: 'Edition not found' });
+    }
+
+    // Proxy image URLs
+    if (data.images) {
+      data.images = data.images.map(img => {
+        if (img.url && img.url.includes('supabase')) {
+          return { ...img, url: `/api/proxy-image?url=${encodeURIComponent(img.url)}` };
+        }
+        return img;
+      });
     }
 
     res.json(data);
@@ -483,6 +506,29 @@ router.delete('/editions/image', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Error in DELETE /api/editions/image:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/proxy-image — Fetch image from Supabase privately
+router.get('/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl || !imageUrl.startsWith(process.env.SUPABASE_URL)) {
+    return res.status(403).json({ error: 'Forbidden or Invalid URL' });
+  }
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    res.set('Content-Type', response.headers.get('content-type') || 'image/png');
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('Error in proxy-image:', err);
     res.status(500).json({ error: err.message });
   }
 });
