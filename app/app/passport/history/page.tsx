@@ -59,7 +59,6 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
               'bg-emerald-400 shadow-[0_0_8px_#34d399]'
             }`} />
             <div>
-              <span className="text-[0.6rem] text-[#666] uppercase block font-mono">Current Lifecycle State</span>
               <strong className="text-sm font-bold uppercase tracking-wider text-white">
                 {status.replace('_', ' ')}
               </strong>
@@ -68,16 +67,16 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
 
           {/* Shipment Notes */}
           <div className="space-y-2">
-            <span className="text-[0.6rem] text-[#666] uppercase block font-mono">Admin Tracking Notes</span>
+            <span className="text-[0.6rem] text-[#666] uppercase block font-mono">Updates</span>
             <div className="p-5 rounded-2xl bg-white/[0.01] border border-white/5 text-xs text-[#888] leading-relaxed">
-              {order.shipment_details || 'The workshop is preparing packages. Detailed logistics, tracking IDs, and couriers will be logged here by the administration once shipped.'}
+              {order.shipment_details || 'Your tracking details will appear here once your garment ships.'}
             </div>
           </div>
 
           {/* Technical Specs */}
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-              <span className="text-[0.6rem] text-[#444] uppercase block mb-1">Tailored Size</span>
+              <span className="text-[0.6rem] text-[#444] uppercase block mb-1">Size</span>
               <strong className="text-xs font-semibold">{order.size || 'Medium'}</strong>
             </div>
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
@@ -85,7 +84,7 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
               <strong className="text-xs font-semibold">{order.quantity || 1} Unit(s)</strong>
             </div>
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-              <span className="text-[0.6rem] text-[#444] uppercase block mb-1">Edition Run</span>
+              <span className="text-[0.6rem] text-[#444] uppercase block mb-1">Edition</span>
               <strong className="text-xs font-semibold text-amber-400">
                 {order.garment_serial ? formatSerialNumber(order.garment_serial, activeEdition.max_supply) : 'Pending Tailoring'}
               </strong>
@@ -95,17 +94,11 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
           {/* Ledger Proofs */}
           <div className="space-y-3 font-mono text-[0.65rem] pt-4 border-t border-white/5">
             <div className="flex justify-between items-center text-[#666]">
-              <span>On-Chain Escrow</span>
+              <span>Payment Reference</span>
               <span className="text-white truncate max-w-[240px]">{order.escrow_pda}</span>
             </div>
             <div className="flex justify-between items-center text-[#666]">
-              <span>Solana Registry Key</span>
-              <span className="text-white truncate max-w-[240px]">
-                {order.mint_address || 'Registry pending production completion'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center text-[#666]">
-              <span>Secured Funds</span>
+              <span>Payment Held</span>
               <strong className="text-white">${order.amount_usd} USD</strong>
             </div>
           </div>
@@ -118,7 +111,7 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
                 rel="noopener"
                 className="btn-outline-circuit flex-1 py-3 text-[0.65rem] text-center justify-center border-white/10 hover:border-white/20"
               >
-                Solscan Proof ↗
+                View Record ↗
               </a>
             )}
             <a 
@@ -192,7 +185,7 @@ export default function HistoryPage() {
               <h1 className="text-4xl md:text-6xl font-bold tracking-tight">Purchase History.</h1>
             </div>
             <a href="/drop" className="text-xs font-bold uppercase tracking-widest text-[#888] hover:text-white transition-colors underline underline-offset-8">
-              Explore Collections Run ➔
+              See all drops ➔
             </a>
           </div>
 
@@ -296,15 +289,9 @@ export default function HistoryPage() {
                         </h3>
                         <div className="flex flex-col gap-1.5 font-mono text-[0.68rem] text-[#666]">
                           <div className="flex justify-between">
-                            <span>Edition run:</span>
+                            <span>Edition:</span>
                             <span className="text-[#aaa] font-semibold">
                               {order.garment_serial ? formatSerialNumber(order.garment_serial, activeEdition.max_supply) : 'Pending Tailoring'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Registry key:</span>
-                            <span className="text-[#888]">
-                              {order.mint_address ? `${order.mint_address.slice(0, 6)}...${order.mint_address.slice(-4)}` : 'Pending Mint'}
                             </span>
                           </div>
                         </div>
@@ -312,7 +299,7 @@ export default function HistoryPage() {
 
                       <div className="pt-4 border-t border-white/5 flex justify-between items-center">
                         <div>
-                          <span className="block text-[0.6rem] text-[#444] uppercase font-mono mb-0.5">Escrow Total</span>
+                          <span className="block text-[0.6rem] text-[#444] uppercase font-mono mb-0.5">Amount held</span>
                           <strong className="text-sm font-semibold">${order.amount_usd} USD</strong>
                         </div>
                         <span className="text-xs text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300">

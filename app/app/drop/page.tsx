@@ -244,7 +244,7 @@ function DropPageContent() {
     return (
       <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center pt-[72px] bg-black text-white">
         <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-        <span className="text-xs font-mono text-[#555] mt-4">Querying Supabase Node...</span>
+        <span className="text-xs font-mono text-[#555] mt-4">Checking availability. One moment...</span>
       </div>
     );
   }
@@ -507,13 +507,13 @@ function DropPageContent() {
         <div className="section-container">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-0">
             {[
-              { num: '01', title: 'Payment in Escrow', desc: 'Your crypto remains locked on-chain until shipment verification.', icon: (
+              { num: '01', title: 'Payment in Escrow', desc: 'Your payment is held until your garment arrives.', icon: (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 10h20"/></svg>
               )},
-              { num: '02', title: 'Dynamic Production', desc: 'Crafting process starts once order status shifts to In Production.', icon: (
+              { num: '02', title: 'Dynamic Production', desc: 'Your garment is made after your order is confirmed.', icon: (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
               )},
-              { num: '03', title: 'Verifiable Digital Tag', desc: 'Unique digital identity and Solscan verification minted upon production completion.', icon: (
+              { num: '03', title: 'Verifiable Digital Tag', desc: 'Every garment gets a permanent record when it is made.', icon: (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
               )},
             ].map((step, i) => (

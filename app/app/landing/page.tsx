@@ -73,7 +73,7 @@ export default function LandingPage() {
               Fashion sold before <br className="hidden md:block" /> it’s made.
             </h1>
             <p className="text-base md:text-xl text-[#888] leading-relaxed max-w-2xl mb-12">
-              Circuit is a demand-first fashion production system where garments are only produced after buyers commit.
+              Circuit is a demand-first fashion brand where garments are only produced after buyers commit.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
@@ -105,7 +105,7 @@ export default function LandingPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-                <span className="text-xs font-mono text-[#555]">Querying Supabase Node...</span>
+                <span className="text-xs font-mono text-[#555]">Checking availability. One moment...</span>
               </div>
             ) : (
               <div className="flex flex-col">
@@ -135,10 +135,6 @@ export default function LandingPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-white/90">
                               {edition.has_variable_prices ? 'Variable Pricing' : `${edition.price_usd} USD`}
-                            </span>
-                            <span className="text-[0.65rem] font-bold uppercase tracking-wider text-white/70 group-hover:text-white transition-colors flex items-center gap-1 border border-white/10 px-2 py-1 rounded-full bg-white/[0.05]">
-                              Architect Drop
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                             </span>
                           </div>
                         </div>
@@ -191,9 +187,9 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden">
             {[
               { title: 'Commit', desc: 'Secure your place in the drop by placing an order for the garment.' },
-              { title: 'Secure Payment', desc: 'Your funds are held in a trustless Solana escrow until delivery.' },
-              { title: 'Production', desc: 'The designer receives the signal and begins crafting your specific unit.' },
-              { title: 'Delivery', desc: 'Your garment is shipped. You scan to confirm and release the escrow.' }
+              { title: 'Secure Payment', desc: 'Your payment goes into a secure hold that neither you nor Circuit can touch until delivery' },
+              { title: 'Production', desc: 'Production begins after your order is confirmed.' },
+              { title: 'Delivery', desc: 'Confirm delivery and your payment releases to Circuit' }
             ].map((item, i) => (
               <div key={i} className="bg-black p-10 flex flex-col gap-4 group hover:bg-white/[0.02] transition-colors">
                 <span className="text-[0.6rem] font-mono text-[#333] group-hover:text-white/40 transition-colors">0{i + 1}</span>

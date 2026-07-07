@@ -18,7 +18,7 @@ const NAV_LINKS = [
 
 export default function Navbar({ customEditions }: { customEditions?: any[] }) {
   const pathname = usePathname();
-  const { user, isSignedIn, signOut, getPrivateKey } = useAuth();
+  const { user, isSignedIn, signOut } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -63,15 +63,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
     pathname.startsWith('/landing') || pathname === '/' ? 'landing' :
     pathname.startsWith('/confirm') ? 'confirm' : 'drop';
 
-  const handleExportKey = () => {
-    const key = getPrivateKey();
-    if (key === 'SECURED_BY_INFRASTRUCTURE') {
-      alert('🔒 Your key is secured by Circuit infrastructure.\n\nTo enable "Invisible Blockchain" UX, your keys are managed in an encrypted vault. You can use your email to access your account across any device.');
-    } else if (key) {
-      alert(`PRIVATE KEY (Demo): ${key}\n\nWARNING: Never share this key.`);
-      showToast('🔑', 'Private key exported');
-    }
-  };
+
 
   const handleCopyWallet = () => {
     if (user?.walletAddress) {
@@ -165,13 +157,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                         <span className="text-base group-hover:scale-110 transition-transform">📜</span>
                         Purchase History
                       </Link>
-                      <button 
-                        onClick={handleExportKey}
-                        className="w-full text-left px-4 py-3 text-[0.75rem] font-semibold text-[#D1D1D1] hover:text-white hover:bg-white/[0.08] rounded-xl transition-all flex items-center gap-3.5 group"
-                      >
-                        <span className="text-base group-hover:scale-110 transition-transform">🔑</span>
-                        Export Secure Key
-                      </button>
+
                       <button 
                         onClick={() => { signOut(); setIsProfileOpen(false); }}
                         className="w-full text-left px-4 py-3 text-[0.75rem] font-bold text-[#ff5050] hover:bg-[#ff5050]/[0.1] rounded-xl transition-all flex items-center gap-3.5 group"
@@ -283,7 +269,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                   >
                     📜 Purchase History
                   </Link>
-                  <button onClick={handleExportKey} className="text-[0.75rem] font-bold text-[#A3A3A3] underline">Export Key</button>
+
                   <button onClick={() => { signOut(); setDrawerOpen(false); }} className="text-[0.75rem] font-bold text-[#ff5050] underline">Sign Out</button>
                 </div>
               </div>
