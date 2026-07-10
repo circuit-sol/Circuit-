@@ -101,11 +101,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             </span>
           </button>
         </form>
-
-        <p className="text-[0.7rem] text-[#666] text-center leading-relaxed">
-          Your account is secured with Solana blockchain technology.
-          <br />No extensions or apps required.
-        </p>
       </div>
     </div>
   );
