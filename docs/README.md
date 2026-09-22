@@ -169,4 +169,48 @@ The Next.js application is deployed on [Vercel](https://vercel.com).
 - **Environment Variables**: Add all `.env.local` variables to the Vercel project settings, ensuring `NEXT_PUBLIC_SIMULATION_MODE` is explicitly set to `false` in production.
 
 ---
-*For detailed, copy-paste ready code snippets for integrating the smart contracts, please reference [INTEGRATION.md](../INTEGRATION.md) and [FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md).*
+
+## 🏗️ 8. Frontend Implementation & Integration Report
+
+This section details the frontend architecture implemented for the Circuit MVP. It identifies the completed features, the service layer design, and the specific modules currently running in **Simulation Mode** for demo stability.
+
+### 8.1 Service Layer Architecture
+The application is built with a clean separation between UI components and the data/blockchain logic. 
+- **Implemented**: `lib/solana-service.ts` (Blockchain interactions) and `lib/db.ts` (Persistence).
+- **Status**: These services currently operate under a global `SIMULATION_MODE` flag. They return realistic mock data with artificial latency to provide a "live" feel during local development or demo environments.
+
+### 8.2 "Invisible Wallet" Implementation
+A core UX feature of Circuit is the "Invisible Blockchain" experience.
+- **Implemented**: `lib/auth-context.tsx` automatically generates a new Solana `Keypair` for first-time email sign-ins.
+- **Status**: The public/private key mapping is currently saved via `db.ts`. 
+- **Production Note**: The `private_key` is currently stored in plain text during MVP testing. A production-ready implementation must wrap the `saveUserMapping` call in a secure encryption module.
+
+### 8.3 Mock Implementation Inventory
+The following modules in the source code are identified as the primary points for live integration:
+
+| Service Point | Location | Current Mocked Behavior |
+| :--- | :--- | :--- |
+| **Escrow Initialization** | `lib/solana-service.ts` | Generates a random TX signature and increments a local counter. |
+| **Delivery Release** | `lib/solana-service.ts` | Simulates a successful fund transfer from PDA to Designer. |
+| **Supply Tracking** | `lib/solana-service.ts` | Uses a local `_currentCount` variable starting at 38 (near-sold-out). |
+| **User Persistence** | `lib/db.ts` | Redirects to `localStorage` if Supabase keys are missing. |
+| **Email Auth** | `lib/auth-context.tsx` | Immediately signs in any valid email format. |
+
+---
+
+## 🤝 9. Contributing Guidelines
+
+We welcome contributions to the Circuit Protocol! To ensure a smooth process, please follow these guidelines:
+
+1. **Branching Strategy**: Use descriptive branch names.
+   - Features: `feat/your-feature-name`
+   - Bugfixes: `fix/your-bug-name`
+2. **Commit Messages**: Write clear and concise commit messages.
+3. **Pull Requests**:
+   - Ensure your code passes all linting rules (`npm run lint`).
+   - Describe the changes made and link to any relevant issues.
+   - Wait for a code review before merging into the `main` branch.
+4. **Code Style**: We use Prettier and ESLint. Please ensure your IDE is configured to format on save.
+
+---
+*For detailed, copy-paste ready code snippets for integrating the smart contracts, please reference [INTEGRATION.md](../INTEGRATION.md).*
