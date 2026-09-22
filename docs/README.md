@@ -1,6 +1,6 @@
-# Circuit Developer Guide
+# Circuit Documentation
 
-Welcome to the Circuit Protocol developer documentation. This guide provides comprehensive information on our architecture, tech stack, and workflows. Whether you are building frontend components, integrating with Solana, or modifying backend services, this guide will help you understand how Circuit operates.
+Welcome to the Circuit Protocol documentation. This guide provides comprehensive information on our architecture, tech stack, and workflows. Whether you are building frontend components, integrating with Solana, or modifying backend services, this guide will help you understand how Circuit operates.
 
 ## 🌟 1. Project Vision: "Invisible Blockchain"
 

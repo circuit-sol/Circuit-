@@ -2,7 +2,7 @@
 
 Circuit is a premier made-to-order fashion platform powered by Solana. We redefine the fashion supply chain by producing garments only after demand is confirmed on-chain.
 
-👉 **New to the codebase? Start by reading our comprehensive [Developer Guide](docs/README.md).**
+👉 **New to the codebase? Start by reading our comprehensive [Documentation](docs/README.md).**
 ## 🌟 The Vision: "Invisible Blockchain"
 Circuit provides a world-class luxury experience where the blockchain is a silent, robust engine.
 - **Seamless Onboarding**: Users sign up with email/social accounts.
