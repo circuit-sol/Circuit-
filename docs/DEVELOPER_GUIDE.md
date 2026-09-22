@@ -169,4 +169,4 @@ The Next.js application is deployed on [Vercel](https://vercel.com).
 - **Environment Variables**: Add all `.env.local` variables to the Vercel project settings, ensuring `NEXT_PUBLIC_SIMULATION_MODE` is explicitly set to `false` in production.
 
 ---
-*For detailed, copy-paste ready code snippets for integrating the smart contracts, please reference [INTEGRATION.md](../INTEGRATION.md) and [HANDOVER.md](HANDOVER.md).*
+*For detailed, copy-paste ready code snippets for integrating the smart contracts, please reference [INTEGRATION.md](../INTEGRATION.md) and [FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md).*
