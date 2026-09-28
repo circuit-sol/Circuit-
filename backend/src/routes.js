@@ -1,35 +1,64 @@
-'use strict';
+"use strict";
 
-const express = require('express');
-const router  = express.Router();
-const { createWallet, getWallet } = require('./walletManager');
-const { initializeEscrow, registerOrder, confirmDelivery } = require('./transactionService');
+const express = require("express");
+const { createWallet, getWallet } = require("./walletManager");
+const {
+  initializeEscrow,
+  registerOrder,
+  confirmDelivery,
+} = require("./transactionService");
+const router = express.Router();
+
+// ── LEGACY PATHS ────────────────────────────────────────────────────────────────────
+/** DISABLE THESE PATHS UNTIL WE DECIDE ON A LASTING SOLUTION FOR USING THEM */
+
+const legacyCustodyPaths = new Set([
+  "/wallet/create",
+  "/orders/confirm",
+  "/orders/register",
+  "/orders/delivery",
+]);
+
+router.use((req, res, next) => {
+  if (
+    req.method === "POST" &&
+    legacyCustodyPaths.has(req.path) &&
+    process.env.ENABLE_LEGACY_CUSTODY !== "true"
+  ) {
+    return res.status(503).json({
+      error: "LEGACY_CUSTODY_DISABLED",
+      message: "Legacy wallet creation and server-side signing are disabled.",
+    });
+  }
+
+  next();
+});
 
 // ── Wallet ────────────────────────────────────────────────────────────────────
 
 // POST /api/wallet/create  { userId }
-router.post('/wallet/create', async (req, res) => {
+router.post("/wallet/create", async (req, res) => {
   const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'userId is required' });
+  if (!userId) return res.status(400).json({ error: "userId is required" });
 
   try {
     const result = await createWallet(userId);
-    console.log('✅ Wallet created!');
-    console.log('User:', userId);
-    console.log('Public key:', result.publicKey);
+    console.log("✅ Wallet created!");
+    console.log("User:", userId);
+    console.log("Public key:", result.publicKey);
     res.json(result);
   } catch (err) {
-    console.error('Error in /api/wallet/create:', err);
-    console.error('Stack:', err.stack);
+    console.error("Error in /api/wallet/create:", err);
+    console.error("Stack:", err.stack);
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/wallet/:userId
-router.get('/wallet/:userId', async (req, res) => {
+router.get("/wallet/:userId", async (req, res) => {
   try {
     const wallet = await getWallet(req.params.userId);
-    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
+    if (!wallet) return res.status(404).json({ error: "Wallet not found" });
     res.json(wallet);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -39,35 +68,39 @@ router.get('/wallet/:userId', async (req, res) => {
 // ── Orders ────────────────────────────────────────────────────────────────────
 
 // POST /api/orders/confirm  { userId, dropId, amountSol }
-router.post('/orders/confirm', async (req, res) => {
+router.post("/orders/confirm", async (req, res) => {
   const { userId, dropId, amountSol } = req.body;
   if (!userId || !dropId || amountSol == null) {
-    return res.status(400).json({ error: 'userId, dropId, amountSol are required' });
+    return res
+      .status(400)
+      .json({ error: "userId, dropId, amountSol are required" });
   }
 
   try {
     const result = await initializeEscrow(userId, dropId, Number(amountSol));
-    console.log('✅ Order confirmed successfully!');
-    console.log('User:', userId);
-    console.log('Transaction signature:', result.signature);
-    console.log('Escrow PDA:', result.escrowPDA);
+    console.log("✅ Order confirmed successfully!");
+    console.log("User:", userId);
+    console.log("Transaction signature:", result.signature);
+    console.log("Escrow PDA:", result.escrowPDA);
     res.json(result);
   } catch (err) {
     const msg = err.message || String(err);
-    if (msg.includes('DropSoldOut') || msg.includes('6000')) {
-      return res.status(409).json({ error: 'DropSoldOut', message: 'This drop is sold out.' });
+    if (msg.includes("DropSoldOut") || msg.includes("6000")) {
+      return res
+        .status(409)
+        .json({ error: "DropSoldOut", message: "This drop is sold out." });
     }
-    console.error('Error in /api/orders/confirm:', err);
-    console.error('Stack:', err.stack);
+    console.error("Error in /api/orders/confirm:", err);
+    console.error("Stack:", err.stack);
     res.status(500).json({ error: msg });
   }
 });
 
 // POST /api/orders/register  { userId, dropId }
-router.post('/orders/register', async (req, res) => {
+router.post("/orders/register", async (req, res) => {
   const { userId, dropId } = req.body;
   if (!userId || !dropId) {
-    return res.status(400).json({ error: 'userId and dropId are required' });
+    return res.status(400).json({ error: "userId and dropId are required" });
   }
 
   try {
@@ -75,20 +108,22 @@ router.post('/orders/register', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err.message || String(err);
-    if (msg.includes('DropSoldOut') || msg.includes('6000')) {
-      return res.status(409).json({ error: 'DropSoldOut', message: 'This drop is sold out.' });
+    if (msg.includes("DropSoldOut") || msg.includes("6000")) {
+      return res
+        .status(409)
+        .json({ error: "DropSoldOut", message: "This drop is sold out." });
     }
-    console.error('Error in /api/orders/register:', err);
-    console.error('Stack:', err.stack);
+    console.error("Error in /api/orders/register:", err);
+    console.error("Stack:", err.stack);
     res.status(500).json({ error: msg });
   }
 });
 
 // POST /api/orders/delivery  { userId, dropId }
-router.post('/orders/delivery', async (req, res) => {
+router.post("/orders/delivery", async (req, res) => {
   const { userId, dropId } = req.body;
   if (!userId || !dropId) {
-    return res.status(400).json({ error: 'userId and dropId are required' });
+    return res.status(400).json({ error: "userId and dropId are required" });
   }
 
   try {
@@ -96,14 +131,19 @@ router.post('/orders/delivery', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err.message || String(err);
-    if (msg.includes('Account does not exist')) {
-      return res.status(404).json({ error: 'Escrow not found for this user + drop.' });
+    if (msg.includes("Account does not exist")) {
+      return res
+        .status(404)
+        .json({ error: "Escrow not found for this user + drop." });
     }
-    if (msg.includes('AlreadyDelivered') || msg.includes('6000')) {
-      return res.status(409).json({ error: 'AlreadyDelivered', message: 'Delivery already confirmed.' });
+    if (msg.includes("AlreadyDelivered") || msg.includes("6000")) {
+      return res.status(409).json({
+        error: "AlreadyDelivered",
+        message: "Delivery already confirmed.",
+      });
     }
-    console.error('Error in /api/orders/delivery:', err);
-    console.error('Stack:', err.stack);
+    console.error("Error in /api/orders/delivery:", err);
+    console.error("Stack:", err.stack);
     res.status(500).json({ error: msg });
   }
 });
