@@ -9,7 +9,7 @@ const {
 } = require("./transactionService");
 const router = express.Router();
 
-// ── LEGACY PATHS ────────────────────────────────────────────────────────────────────
+// ── LEGACY PATHS START ────────────────────────────────────────────────────────────────────
 /** DISABLE THESE PATHS UNTIL WE DECIDE ON A LASTING SOLUTION FOR USING THEM */
 
 const legacyCustodyPaths = new Set([
