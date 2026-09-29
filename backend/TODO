@@ -1,0 +1,17 @@
+Next: seller/brand permissions, then drop creation. 
+1. Finish the authentication checks if still outstanding: /me, email update, rejection without a token, and rejection of a reused challenge.
+2. Add brands and brand memberships.
+   - A brand has its own identity and payment-recipient wallet.
+   - Membership links a verified user to the brand they can manage.
+   - For the demo, manually assign the first seller membership in the test database.
+   - That seller can also purchase as a buyer.
+3. Protect and complete drop creation.
+   - Require a valid JWT and membership in the owning brand.
+   - Save the drop’s price, variants, quantity, dates, and brand.
+   - Connect database creation to on-chain drop initialization.
+   - Only list it as purchasable once initialization succeeds.
+4. Rebuild checkout for Phantom signing.
+   - Backend validates the selection and calculates payment.
+   - Frontend obtains the buyer’s Phantom signature.
+   - Backend verifies the transaction and persists the order.
+   - Fix the Anchor payment/supply rules alongside this.

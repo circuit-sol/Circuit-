@@ -1,0 +1,22 @@
+=> Created new branch feat/devnet-sprint
+=> disabled legacy paths until a decision is made:
+    "/wallet/create",
+    "/orders/confirm",
+    "/orders/register",
+    "/orders/delivery",
+=> created new supabase project to prevent breaking something:
+    circuit-sprint
+=> Decide with Marvelous what the message on sign in should say and what he wants me to send from the backend for message field
+=> Need phantom connect from Marvelous to see if phantom still show wallet terminology on login with email
+=> Added challenge route to prevent users from spoofing emails:
+    Here’s how it gets used:
+    1. Buyer signs in through Phantom Connect, using Google/Apple or an existing wallet.
+    2. Frontend gets their wallet address automatically.
+    3. If they don’t already have a valid Circuit session, the frontend requests a challenge.
+    4. Backend saves a unique message in the challenge table and returns it.
+    5. Frontend asks Phantom to sign that message.
+    6. Backend verifies the signature, marks the challenge used, and issues a Circuit session token.
+
+
+=> New Routes
+    "/api/auth/authRoutes"
