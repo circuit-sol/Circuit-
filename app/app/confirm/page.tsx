@@ -111,7 +111,7 @@ export default function ConfirmPage() {
       await updateOrderDelivery(user.email, deliveryLocation, deliveryAddress);
 
       // 2. Process Solana Escrow confirm release
-      const result = await confirmDelivery(user.email, latestOrder.drop_id);
+      const result = await confirmDelivery(latestOrder.drop_id);
 
       // 3. Complete order delivery state update
       await updateOrderStatus(result.txSignature, 'delivered');

@@ -185,8 +185,8 @@ function DropPageContent() {
       const currentSolPrice = solPrice || 150; // Fallback to 150 if api fails
       const totalAmountSol = totalAmountUsd / currentSolPrice;
 
-      // 1. Solana Handshake (via backend custodial escrow transaction)
-      const result = await initializeEscrow(user.email, edition.id, totalAmountSol);
+      // 1. Solana Handshake (via backend escrow transaction — user identified by JWT)
+      const result = await initializeEscrow(edition.id, totalAmountSol);
 
       // 2. Persist dynamic order state to database
       await saveOrder({

@@ -253,12 +253,11 @@ export function deriveDropPDA(dropId: string): [PublicKey, number] {
  * Maps to INTEGRATION.md §4.1: initialize_escrow.
  */
 export async function initializeEscrow(
-  userId: string,
   dropId: string,
   amount: number,
 ): Promise<EscrowResult> {
-  await backendApi.createWallet(userId);
-  const result = await backendApi.confirmOrder(userId, dropId, amount);
+  // No createWallet call needed — backend identifies the user from their JWT
+  const result = await backendApi.confirmOrder(dropId, amount);
   const drop   = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
 
   return {
@@ -277,12 +276,11 @@ export async function initializeEscrow(
  * Maps to INTEGRATION.md §5.2: register_order.
  */
 export async function registerOrder(
-  userId: string,
   dropId: string,
 ): Promise<OrderResult> {
   let result: { signature: string };
   try {
-    result = await backendApi.registerOrder(userId, dropId);
+    result = await backendApi.registerOrder(dropId);
   } catch (err) {
     const e = err as Record<string, unknown>;
     if (e['error'] === 'DropSoldOut' || String(err).includes('DropSoldOut')) {
@@ -307,10 +305,9 @@ export async function registerOrder(
  * Maps to INTEGRATION.md §4.2: confirm_delivery.
  */
 export async function confirmDelivery(
-  userId: string,
   dropId: string,
 ): Promise<DeliveryResult> {
-  const result = await backendApi.deliverOrder(userId, dropId);
+  const result = await backendApi.deliverOrder(dropId);
 
   return {
     success:         true,

@@ -130,9 +130,9 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                   className="flex items-center gap-3 pl-1.5 pr-5 py-1.5 rounded-full bg-white text-black hover:bg-[#D1D1D1] transition-all shadow-[0_8px_30px_rgba(255,255,255,0.1)] group"
                 >
                   <div className="w-7 h-7 rounded-full bg-black text-white flex items-center justify-center text-[11px] font-bold shadow-inner">
-                    {user?.email[0].toUpperCase()}
+                    {user?.email ? user.email[0].toUpperCase() : user?.walletAddress.slice(0, 2).toUpperCase()}
                   </div>
-                  <span className="text-[0.75rem] font-bold max-w-[120px] truncate">{user?.email}</span>
+                  <span className="text-[0.75rem] font-bold max-w-[120px] truncate">{user?.email ?? user?.walletAddress.slice(0, 8) + '...'}</span>
                 </button>
 
                 {/* Desktop Dropdown - Fixed Contrast */}

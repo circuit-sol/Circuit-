@@ -21,49 +21,7 @@ export async function loginAdmin(identifier: string, passwordHash: string) {
   }
 }
 
-// ── Helper Functions ─────────────────────────────────────────────────
-
-export async function saveUserMapping(email: string, walletAddress: string, privateKey: string) {
-  try {
-    const res = await fetch(`${BASE}/api/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, wallet_address: walletAddress, private_key: privateKey })
-    });
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error('Save user mapping error:', errData.error);
-    } else {
-      return await res.json();
-    }
-  } catch (err) {
-    console.error('Mapping Fetch Error:', err);
-  }
-
-  // Fallback: Local Storage
-  const mappings = JSON.parse(localStorage.getItem('circuit_users') || '{}');
-  mappings[email] = { walletAddress, privateKey };
-  localStorage.setItem('circuit_users', JSON.stringify(mappings));
-  return { email, walletAddress };
-}
-
-export async function getUserMapping(email: string) {
-  try {
-    const res = await fetch(`${BASE}/api/users/${encodeURIComponent(email)}`);
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.error('getUserMapping Fetch Error:', err);
-  }
-
-  // Fallback: Local Storage
-  if (typeof window !== 'undefined') {
-    const mappings = JSON.parse(localStorage.getItem('circuit_users') || '{}');
-    return mappings[email] || null;
-  }
-  return null;
-}
+// Note: User mapping is handled by auth-context via SIWS (/api/auth/verify) and /api/user/email
 
 // ── Order Management ────────────────────────────────────────────────
 

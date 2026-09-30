@@ -9,98 +9,192 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const { triggerConnect, isAuthenticating, isSignedIn, needsEmail, saveEmail } = useAuth();
 
+  // Email capture state (post-login prompt)
+  const [email, setEmail]           = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError]     = useState('');
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Close automatically once fully signed in and email has been handled
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+    if (isSignedIn && !needsEmail) {
+      onClose();
     }
-  }, [isOpen]);
+  }, [isSignedIn, needsEmail, onClose]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || isLoading) return;
-
-    setIsLoading(true);
-    // Simulate brief processing for premium feel
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    await signIn(email.trim());
-    setIsLoading(false);
-    setEmail('');
-    onClose();
-  };
+  // Focus email input when the email prompt appears
+  useEffect(() => {
+    if (needsEmail && emailInputRef.current) {
+      setTimeout(() => emailInputRef.current?.focus(), 100);
+    }
+  }, [needsEmail]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
+    document.body.style.overflow = isOpen ? 'hidden' : 'unset';
     return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed || emailLoading) return;
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(trimmed)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+
+    setEmailLoading(true);
+    setEmailError('');
+    await saveEmail(trimmed);
+    setEmailLoading(false);
+    setEmail('');
+  };
+
+  const handleSkipEmail = () => {
+    // User can skip — email is optional for now
+    saveEmail('');
+    onClose();
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-label="Sign in to Circuit">
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={needsEmail ? 'Add your email' : 'Sign in to Circuit'}
+    >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-[20px]" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/80 backdrop-blur-[20px]"
+        onClick={!isAuthenticating ? onClose : undefined}
+      />
 
       {/* Modal */}
-      <div className="relative card-glass max-w-[400px] w-full p-8 flex flex-col gap-6 max-h-[90vh] overflow-y-auto no-scrollbar" style={{ animation: 'fadeIn 0.3s ease-out' }}>
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-[#666] hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/[0.05]"
-          aria-label="Close"
-        >
-          ✕
-        </button>
-
-        {/* Header */}
-        <div className="text-center">
-          <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">Sign in to Circuit</h2>
-          <p className="text-sm text-[#A3A3A3]">Enter your email to continue</p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="email-input" className="block text-[0.65rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-2">
-              Email Address
-            </label>
-            <input
-              ref={inputRef}
-              id="email-input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@gmail.com"
-              required
-              className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.12] rounded-xl text-white text-sm placeholder:text-[#666] focus:border-[#D1D1D1] focus:outline-none transition-colors"
-              autoComplete="email"
-            />
-          </div>
-
+      <div
+        className="relative card-glass max-w-[400px] w-full p-8 flex flex-col gap-6 max-h-[90vh] overflow-y-auto no-scrollbar"
+        style={{ animation: 'fadeIn 0.3s ease-out' }}
+      >
+        {/* Close — hidden while authenticating to prevent half-state */}
+        {!isAuthenticating && (
           <button
-            type="submit"
-            disabled={!email.trim() || isLoading}
-            className="btn-circuit w-full justify-center"
+            onClick={onClose}
+            className="absolute top-4 right-4 text-[#666] hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/[0.05]"
+            aria-label="Close"
           >
-            <span>{isLoading ? 'Setting up your account...' : 'Continue'}</span>
-            <span className="btn-arrow" aria-hidden="true">
-              {isLoading ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center" /></svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-              )}
-            </span>
+            ✕
           </button>
-        </form>
+        )}
+
+        {/* ── View 1: Connect Wallet ─────────────────────────────────── */}
+        {!needsEmail && (
+          <>
+            <div className="text-center">
+              <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">Sign in to Circuit</h2>
+              <p className="text-sm text-[#A3A3A3]">
+                Connect with Phantom to continue. Your wallet is your identity — no password needed.
+              </p>
+            </div>
+
+            <button
+              id="phantom-connect-btn"
+              onClick={triggerConnect}
+              disabled={isAuthenticating}
+              className="btn-circuit w-full justify-center"
+            >
+              <span>
+                {isAuthenticating ? 'Verifying wallet...' : 'Connect with Phantom'}
+              </span>
+              <span className="btn-arrow" aria-hidden="true">
+                {isAuthenticating ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                )}
+              </span>
+            </button>
+
+            <p className="text-center text-[0.65rem] text-[#555]">
+              No seed phrases. No extensions. Just a quick 1-tap confirmation.
+            </p>
+          </>
+        )}
+
+        {/* ── View 2: Email Capture (post-login) ────────────────────── */}
+        {needsEmail && (
+          <>
+            <div className="text-center">
+              <div className="text-2xl mb-3">📬</div>
+              <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">
+                Where should we send your updates?
+              </h2>
+              <p className="text-sm text-[#A3A3A3]">
+                Add your email to receive order confirmations and shipping updates. You can skip this for now.
+              </p>
+            </div>
+
+            <form onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
+              <div>
+                <label
+                  htmlFor="notification-email"
+                  className="block text-[0.65rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-2"
+                >
+                  Email Address
+                </label>
+                <input
+                  ref={emailInputRef}
+                  id="notification-email"
+                  type="email"
+                  value={email}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setEmail(e.target.value); setEmailError(''); }}
+                  placeholder="you@gmail.com"
+                  className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.12] rounded-xl text-white text-sm placeholder:text-[#666] focus:border-[#D1D1D1] focus:outline-none transition-colors"
+                  autoComplete="email"
+                />
+                {emailError && (
+                  <p className="mt-1 text-xs text-red-400">{emailError}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={!email.trim() || emailLoading}
+                className="btn-circuit w-full justify-center"
+              >
+                <span>{emailLoading ? 'Saving...' : 'Continue'}</span>
+                <span className="btn-arrow" aria-hidden="true">
+                  {emailLoading ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSkipEmail}
+                className="text-sm text-[#555] hover:text-[#888] transition-colors text-center"
+              >
+                Skip for now
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
