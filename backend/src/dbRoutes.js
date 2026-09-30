@@ -502,35 +502,214 @@ router.get("/editions/:id", async (req, res) => {
 });
 
 // POST /api/editions  — insert/update edition
-router.post("/editions", async (req, res) => {
-  try {
-    const editionData = req.body;
+// router.post("/editions", async (req, res) => {
+//   try {
+//     const editionData = req.body;
 
-    // Ensure image_url is provided to avoid NOT NULL constraint errors
+//     // Ensure image_url is provided to avoid NOT NULL constraint errors
+//     const payload = {
+//       ...editionData,
+//       image_url: editionData.images?.[0]?.url || "/satin.png",
+//     };
+
+//     const { data, error } = await supabase
+//       .from("editions")
+//       .upsert(payload, { onConflict: "id" })
+//       .select();
+
+//     if (error) {
+//       console.error("Save edition Supabase error:", error.message);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     res.json(data || []);
+//   } catch (err) {
+//     console.error("Error in POST /api/editions:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// UPDATED EDITIONS
+// POST /api/editions — create an inactive draft
+router.post("/editions", requireAuth, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    const body = req.body;
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return res.status(400).json({ error: "INVALID_REQUEST_BODY" });
+    }
+
+    // Accept only fields supported by this draft-creation endpoint.
+    const allowedFields = new Set([
+      "id",
+      "brand_id",
+      "name",
+      "description",
+      "price_usd",
+      "max_supply",
+      "fabric",
+      "headpiece",
+      "embroidery",
+    ]);
+
+    const unsupportedFields = Object.keys(body).filter(
+      (key) => !allowedFields.has(key),
+    );
+
+    if (unsupportedFields.length) {
+      return res.status(400).json({
+        error: "UNSUPPORTED_FIELDS",
+        fields: unsupportedFields,
+      });
+    }
+
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (typeof body.brand_id !== "string" || !uuidPattern.test(body.brand_id)) {
+      return res.status(400).json({ error: "INVALID_BRAND_ID" });
+    }
+
+    if (
+      typeof body.id !== "string" ||
+      !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(body.id) ||
+      Buffer.byteLength(body.id, "utf8") > 32
+    ) {
+      return res.status(400).json({ error: "INVALID_EDITION_ID" });
+    }
+
+    if (
+      typeof body.name !== "string" ||
+      body.name.trim().length < 1 ||
+      body.name.trim().length > 120
+    ) {
+      return res.status(400).json({ error: "INVALID_EDITION_NAME" });
+    }
+
+    const price = body.price_usd;
+    const cents = Math.round(price * 100);
+
+    if (
+      typeof price !== "number" ||
+      !Number.isFinite(price) ||
+      price <= 0 ||
+      price > 9999999999.99 ||
+      Math.abs(price * 100 - cents) > 0.000001
+    ) {
+      return res.status(400).json({
+        error: "INVALID_PRICE",
+        message: "price_usd must be positive with at most two decimal places.",
+      });
+    }
+
+    if (
+      !Number.isInteger(body.max_supply) ||
+      body.max_supply < 1 ||
+      body.max_supply > 2147483647
+    ) {
+      return res.status(400).json({ error: "INVALID_MAX_SUPPLY" });
+    }
+
+    const textLimits = {
+      description: 10000,
+      fabric: 500,
+      headpiece: 500,
+      embroidery: 500,
+    };
+
+    for (const [field, limit] of Object.entries(textLimits)) {
+      if (
+        body[field] !== undefined &&
+        (typeof body[field] !== "string" || body[field].length > limit)
+      ) {
+        return res.status(400).json({
+          error: "INVALID_FIELD",
+          field,
+        });
+      }
+    }
+
+    // Reject a token whose wallet no longer matches the account.
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
+      });
+    }
+
+    // Signing in alone does not grant permission to create drops.
+    const { data: membership, error: membershipError } = await supabase
+      .from("brand_memberships")
+      .select("role")
+      .eq("brand_id", body.brand_id)
+      .eq("user_id", req.auth.userId)
+      .maybeSingle();
+
+    if (membershipError) throw membershipError;
+
+    if (!membership || !["owner", "editor"].includes(membership.role)) {
+      return res.status(403).json({ error: "BRAND_ACCESS_DENIED" });
+    }
+
+    // Explicit fields prevent caller-controlled ownership or chain status.
     const payload = {
-      ...editionData,
-      image_url: editionData.images?.[0]?.url || "/satin.png",
+      id: body.id,
+      brand_id: body.brand_id,
+      created_by: req.auth.userId,
+      name: body.name.trim(),
+      description: body.description?.trim() || "",
+      price_usd: cents / 100,
+      max_supply: body.max_supply,
+      fabric: body.fabric?.trim() || "",
+      headpiece: body.headpiece?.trim() || "",
+      embroidery: body.embroidery?.trim() || "",
+      is_active: false,
+      chain_status: "pending",
     };
 
     const { data, error } = await supabase
       .from("editions")
-      .upsert(payload, { onConflict: "id" })
-      .select();
+      .insert(payload)
+      .select()
+      .single();
 
     if (error) {
-      console.error("Save edition Supabase error:", error.message);
-      return res.status(500).json({ error: error.message });
+      if (error.code === "23505") {
+        return res.status(409).json({
+          error: "EDITION_ID_ALREADY_EXISTS",
+        });
+      }
+
+      throw error;
     }
 
-    res.json(data || []);
-  } catch (err) {
-    console.error("Error in POST /api/editions:", err);
-    res.status(500).json({ error: err.message });
+    // Preserve the existing frontend's array response shape.
+    return res.status(201).json([data]);
+  } catch (error) {
+    console.error("Create edition failed:", error.message);
+
+    return res.status(500).json({
+      error: "EDITION_CREATION_FAILED",
+    });
   }
 });
 
 // POST /api/editions/image — upload Base64 image
 router.post("/editions/image", async (req, res) => {
+  return res.status(503).json({
+    error: "EDITION_IMAGES_NOT_READY",
+    message: "Edition image management is being updated.",
+  });
+
   try {
     const { id, fileName, contentType, base64Data } = req.body;
     if (!base64Data || !fileName || !id) {
