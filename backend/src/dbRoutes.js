@@ -362,6 +362,63 @@ router.patch("/db/orders/shipment", async (req, res) => {
   }
 });
 
+// ── BRANDS START ──────────────────────────────────────────────────────────────────
+// GET /api/brands/me — brands managed by the authenticated user
+router.get("/brands/me", requireAuth, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    // Confirm the token still matches the account's current wallet.
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("brand_memberships")
+      .select(
+        `
+        role,
+        brand:brands (
+          id,
+          name,
+          slug,
+          payment_wallet_address
+        )
+      `,
+      )
+      .eq("user_id", req.auth.userId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return res.json({
+      brands: (data || [])
+        .filter((membership) => membership.brand)
+        .map((membership) => ({
+          ...membership.brand,
+          role: membership.role,
+        })),
+    });
+  } catch (error) {
+    console.error("Get my brands failed:", error.message);
+    return res.status(500).json({
+      error: "BRANDS_FETCH_FAILED",
+    });
+  }
+});
+
+// ── BRANDS END ──────────────────────────────────────────────────────────────────
+
 // ── Editions ──────────────────────────────────────────────────────────────────
 
 // GET /api/editions  — all active editions
