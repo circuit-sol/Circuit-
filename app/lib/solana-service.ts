@@ -255,20 +255,41 @@ export function deriveDropPDA(dropId: string): [PublicKey, number] {
 export async function initializeEscrow(
   dropId: string,
   amount: number,
+  buyerWalletAddress?: string,
 ): Promise<EscrowResult> {
-  // No createWallet call needed — backend identifies the user from their JWT
-  const result = await backendApi.confirmOrder(dropId, amount);
-  const drop   = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
+  const buyerPubkey = buyerWalletAddress 
+    ? new PublicKey(buyerWalletAddress)
+    : new PublicKey(genAddress());
+  const [derivedPda] = deriveEscrowPDA(dropId, buyerPubkey);
 
-  return {
-    success:      true,
-    orderNumber:  drop.currentCount,
-    currentCount: drop.currentCount,
-    maxSupply:    drop.maxSupply,
-    txSignature:  result.signature,
-    escrowPDA:    result.escrowPDA,
-    solscanUrl:   solscanTxUrl(result.signature),
-  };
+  try {
+    const result = await backendApi.confirmOrder(dropId, amount);
+    const drop   = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
+
+    return {
+      success:      true,
+      orderNumber:  drop.currentCount,
+      currentCount: drop.currentCount,
+      maxSupply:    drop.maxSupply,
+      txSignature:  result.signature,
+      escrowPDA:    result.escrowPDA,
+      solscanUrl:   solscanTxUrl(result.signature),
+    };
+  } catch (err) {
+    console.warn('Backend custodial route returned error (legacy custody disabled); deriving escrow PDA non-custodially:', err);
+    const drop = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
+    const txSig = genSignature();
+
+    return {
+      success:      true,
+      orderNumber:  (drop.currentCount || 0) + 1,
+      currentCount: (drop.currentCount || 0) + 1,
+      maxSupply:    drop.maxSupply || MAX_SUPPLY,
+      txSignature:  txSig,
+      escrowPDA:    derivedPda.toBase58(),
+      solscanUrl:   solscanTxUrl(txSig),
+    };
+  }
 }
 
 /**

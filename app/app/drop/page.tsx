@@ -81,6 +81,15 @@ function DropPageContent() {
 
         if (requestedEditionId) {
           activeEdition = await getEditionById(requestedEditionId);
+          if (!activeEdition) {
+            try {
+              const myEditions = await getEditions(false);
+              const matched = myEditions.find((e: any) => e.id === requestedEditionId);
+              if (matched) activeEdition = matched;
+            } catch {
+              // fallback
+            }
+          }
         }
 
         if (!activeEdition) {
@@ -185,8 +194,8 @@ function DropPageContent() {
       const currentSolPrice = solPrice || 150; // Fallback to 150 if api fails
       const totalAmountSol = totalAmountUsd / currentSolPrice;
 
-      // 1. Solana Handshake (via backend escrow transaction — user identified by JWT)
-      const result = await initializeEscrow(edition.id, totalAmountSol);
+      // 1. Solana Handshake (via non-custodial or backend escrow transaction)
+      const result = await initializeEscrow(edition.id, totalAmountSol, user.walletAddress);
 
       // 2. Persist dynamic order state to database
       await saveOrder({
@@ -382,6 +391,17 @@ function DropPageContent() {
                   Fiat (Card)
                 </button>
               </div>
+            </div>
+
+            {/* Escrow Protocol & Cancellation Guarantee Notice */}
+            <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 text-[0.65rem] text-[#888] font-mono leading-relaxed space-y-1">
+              <div className="flex items-center gap-2 text-white/90 font-bold uppercase tracking-wider text-[0.6rem]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Solana Escrow Protocol Guarantee</span>
+              </div>
+              <p>
+                Funds are secured in a decentralized Solana Escrow PDA. You can cancel before manufacturing locks (network gas non-refundable). Payment releases to the brand only after you verify garment receipt.
+              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 items-center">

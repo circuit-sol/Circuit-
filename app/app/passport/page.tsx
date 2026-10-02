@@ -3,9 +3,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
-import { getEditionById, getUserOrders } from '@/lib/db';
+import { getEditionById, getUserOrders, updateOrderStatusLifecycle } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
+import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 
@@ -17,7 +18,23 @@ function PassportContent() {
   const [edition, setEdition] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
+  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const { user, isSignedIn } = useAuth();
+
+  const handleConfirmDelivery = async () => {
+    if (!order) return;
+    setConfirmingReceipt(true);
+    try {
+      await updateOrderStatusLifecycle(order.id, 'delivered');
+      setOrder((prev: any) => ({ ...prev, status: 'delivered' }));
+      showToast('✓ Delivery Confirmed', 'Escrow funds successfully settled and released to the brand.');
+    } catch (err) {
+      console.error(err);
+      showToast('✗ Error', 'Failed to confirm delivery.');
+    } finally {
+      setConfirmingReceipt(false);
+    }
+  };
 
   // Sync orderId parameter, retrieve cached order ID from localStorage, or query most recent order
   useEffect(() => {
@@ -291,6 +308,36 @@ function PassportContent() {
                 </div>
               )}
 
+              {/* Buyer Delivery Confirmation & Escrow Release Action */}
+              {status === 'shipped' && (
+                <div className="card-glass p-6 border-emerald-500/30 bg-emerald-500/[0.04] rounded-2xl flex flex-col gap-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">Garment in Transit</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  </div>
+                  <p className="text-xs text-white/80 leading-relaxed">
+                    Have you received and verified your physical piece? Confirming receipt authorizes the final Solana escrow settlement and releases payment to the brand.
+                  </p>
+                  <button
+                    onClick={handleConfirmDelivery}
+                    disabled={confirmingReceipt}
+                    className="btn-circuit py-3 text-xs uppercase tracking-wider justify-center w-full mt-1"
+                  >
+                    <span>{confirmingReceipt ? 'Releasing Escrow...' : 'Confirm Delivery & Authorize Escrow Release'}</span>
+                  </button>
+                </div>
+              )}
+
+              {status === 'delivered' && (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 animate-fade-in">
+                  <span className="text-emerald-400 text-lg">✓</span>
+                  <div>
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider font-mono block">Delivery Confirmed & Settled</span>
+                    <span className="text-[0.65rem] text-emerald-400/80 font-mono">Escrow funds have been successfully released to the brand designer.</span>
+                  </div>
+                </div>
+              )}
+
               {/* Dynamic Journey Timeline */}
               <div className="flex flex-col gap-8 mt-4">
                 <h4 className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-[#666]">Garment Lifecycle</h4>
@@ -298,7 +345,7 @@ function PassportContent() {
                   <TimelineItem 
                     date={new Date(order.created_at).toLocaleDateString()} 
                     title="Order Confirmed" 
-                    desc="Your payment is held until delivery."
+                    desc="Your payment is locked in Solana Escrow."
                     active={true}
                   />
                   <TimelineItem 
@@ -318,6 +365,12 @@ function PassportContent() {
                     title="Shipment" 
                     desc={order.shipment_details || 'Your garment is on its way.'}
                     active={['shipped', 'delivered'].includes(status)}
+                  />
+                  <TimelineItem 
+                    date={status === 'delivered' ? 'Delivered' : '—'} 
+                    title="Delivered & Settled" 
+                    desc="Receipt confirmed. Escrow payment released to designer."
+                    active={status === 'delivered'}
                   />
                 </div>
               </div>

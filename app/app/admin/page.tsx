@@ -1215,8 +1215,21 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="flex justify-between items-center text-[0.6rem] text-[#666] pt-4 border-t border-white/5 font-mono">
-                        <span>Max Cap: {ed.max_supply} Units</span>
-                        <span>Fabric: {ed.fabric}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${ed.chain_status === 'initialized' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                          <span className={ed.chain_status === 'initialized' ? 'text-emerald-400' : 'text-amber-400/80'}>
+                            {ed.chain_status === 'initialized' ? 'Live on Solana' : 'Draft'}
+                          </span>
+                        </div>
+                        <a
+                          href={`/drop?id=${encodeURIComponent(ed.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-white hover:text-white/80 font-bold uppercase tracking-wider hover:underline transition-colors"
+                        >
+                          View Storefront ➔
+                        </a>
                       </div>
                     </div>
                   ))}
