@@ -240,14 +240,21 @@ export default function AdminDashboard() {
 
   const handleEditionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editionForm.id) {
-      showToast('ID Required', 'Please specify a unique drop collection ID slug.');
+    const rawSlug = editionForm.id.trim();
+    const slugId = rawSlug
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 32);
+
+    if (!slugId) {
+      showToast('ID Required', 'Please specify a valid slug ID (lowercase letters, numbers, hyphens, max 32 chars).');
       return;
     }
 
     setUploading(true);
     try {
-      const slugId = editionForm.id;
 
       if (selectedEdition) {
         // 1. Updating an existing draft edition

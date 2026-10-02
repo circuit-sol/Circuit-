@@ -206,17 +206,33 @@ export function getMyEditions(brandId?: string) {
 
 /** Create a new inactive draft edition */
 export function createEdition(payload: CreateEditionPayload) {
+  const cleanPayload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (value !== undefined && value !== '') cleanPayload[key] = value;
+  }
+  // Ensure required fields are always present
+  cleanPayload.id = payload.id;
+  cleanPayload.brand_id = payload.brand_id;
+  cleanPayload.name = payload.name;
+  cleanPayload.price_usd = payload.price_usd;
+  cleanPayload.max_supply = payload.max_supply;
+
   return request<Edition[]>('/api/editions', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(cleanPayload),
   }, true);
 }
 
 /** Update an uninitialized draft edition */
 export function updateEditionDraft(id: string, payload: UpdateEditionPayload) {
+  const cleanPayload: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (value !== undefined) cleanPayload[key] = value;
+  }
+
   return request<{ edition: Edition }>(`/api/editions/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(cleanPayload),
   }, true);
 }
 
