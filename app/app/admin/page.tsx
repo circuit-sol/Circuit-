@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getEditions, saveEdition, updateOrderStatusLifecycle, updateOrderShipmentDetails, uploadEditionImage, deleteEditionImage } from '@/lib/db';
 import { getMyBrands, updateEditionDraft, type Brand } from '@/lib/backendApi';
+import { useAuth } from '@/lib/auth-context';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import AdminNavbar from '@/components/AdminNavbar';
 import { showToast } from '@/components/Toast';
@@ -43,6 +44,7 @@ interface Edition {
 }
 
 export default function AdminDashboard() {
+  const { user, isSignedIn, triggerConnect, isAuthenticating } = useAuth();
   const [activeTab, setActiveTab] = useState<'orders' | 'collections'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [editions, setEditions] = useState<Edition[]>([]);
@@ -163,7 +165,7 @@ export default function AdminDashboard() {
     }
     setIsAuthorized(true);
     fetchData();
-  }, [router]);
+  }, [router, isSignedIn]);
 
   if (!isAuthorized) {
     return (
@@ -240,16 +242,22 @@ export default function AdminDashboard() {
 
   const handleEditionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isSignedIn) {
+      showToast('Wallet Required', 'Please connect your brand manager wallet first to authorize drop creation.');
+      triggerConnect();
+      return;
+    }
+
     const rawSlug = editionForm.id.trim();
     const slugId = rawSlug
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 32);
+      .slice(0, 32)
+      .replace(/^-+|-+$/g, '');
 
-    if (!slugId) {
-      showToast('ID Required', 'Please specify a valid slug ID (lowercase letters, numbers, hyphens, max 32 chars).');
+    if (!slugId || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slugId)) {
+      showToast('ID Required', 'Please specify a valid slug ID (lowercase alphanumeric words separated by single hyphens, max 32 chars).');
       return;
     }
 
@@ -284,7 +292,7 @@ export default function AdminDashboard() {
         // 1. Creating a brand new draft edition
         const brandIdToUse = selectedBrandId || (brands[0]?.id ?? '');
         if (!brandIdToUse) {
-          showToast('Brand Required', 'Please select or configure an authorized brand first.');
+          showToast('Brand Required', 'No managed brand found. Ensure your connected wallet is registered as a brand owner or editor.');
           return;
         }
 
@@ -317,7 +325,7 @@ export default function AdminDashboard() {
       setSelectedEdition(null);
       setIsFormActive(false);
       setEditionForm({
-        id: '', brand_id: '', name: '', images: [{ url: '/satin.png', tag: 'Front View' }], description: '', price_usd: 0.8,
+        id: '', brand_id: '', name: '', images: [], description: '', price_usd: 0.8,
         has_variable_prices: false, prices_by_size: { Small: 0.8, Medium: 0.8, Large: 0.8, 'Extra Large': 0.8 },
         max_supply: 40, fabric: 'Duchess satin', headpiece: 'Velvet', embroidery: 'Metallic thread', is_active: true
       });
@@ -363,7 +371,7 @@ export default function AdminDashboard() {
       id: '',
       brand_id: '',
       name: '',
-      images: [{ url: '/satin.png', tag: 'Front View' }],
+      images: [],
       description: '',
       price_usd: 0.8,
       has_variable_prices: false,
@@ -793,7 +801,7 @@ export default function AdminDashboard() {
         {/* Tab 2: Collections Manager */}
         {activeTab === 'collections' && (
           <div>
-            <header className="mb-12">
+            <header className="mb-8">
               <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-3 block font-mono">
                 Circuit — Collection Architect
               </span>
@@ -802,6 +810,29 @@ export default function AdminDashboard() {
                 Add multiple editions dynamically, enable size variable prices overrides, toggle storefront visibility, and configure spec fields.
               </p>
             </header>
+
+            {!isSignedIn && (
+              <div className="mb-10 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wider font-mono">
+                      Seller Wallet Required for Brand Drops
+                    </h4>
+                    <p className="text-[0.65rem] text-amber-400/80 font-mono mt-0.5">
+                      Connect your brand owner or editor wallet to load managed brand collections and authorize drop draft creation.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={triggerConnect}
+                  disabled={isAuthenticating}
+                  className="px-4 py-2 rounded-full bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-white/90 transition-all shrink-0"
+                >
+                  {isAuthenticating ? 'Connecting...' : 'Connect Wallet'}
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
               {/* Left Column: Form Editor */}

@@ -146,11 +146,12 @@ export async function getEditions(activeOnly = true) {
     if (!activeOnly) {
       try {
         const mine = await backendApi.getMyEditions();
-        if (mine && Array.isArray(mine) && mine.length > 0) {
+        if (mine && Array.isArray(mine)) {
           return mine.map(formatEditionImages);
         }
-      } catch {
-        // Fallback to public list if unauthenticated
+      } catch (err) {
+        console.warn('Could not fetch /api/editions/mine (unauthenticated or error):', err);
+        return [];
       }
     }
 

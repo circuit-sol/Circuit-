@@ -206,16 +206,34 @@ export function getMyEditions(brandId?: string) {
 
 /** Create a new inactive draft edition */
 export function createEdition(payload: CreateEditionPayload) {
+  // Whitelist matching backend dbRoutes.js allowedFields exactly
+  const ALLOWED_CREATE_FIELDS = [
+    'id', 'brand_id', 'name', 'description', 'price_usd', 'max_supply', 'fabric', 'headpiece', 'embroidery'
+  ] as const;
+
   const cleanPayload: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (value !== undefined && value !== '') cleanPayload[key] = value;
+  const rawPayload = payload as unknown as Record<string, unknown>;
+  for (const field of ALLOWED_CREATE_FIELDS) {
+    const val = rawPayload[field];
+    if (val !== undefined && val !== null && val !== '') {
+      if (field === 'price_usd') {
+        cleanPayload[field] = Math.round(Number(val) * 100) / 100;
+      } else if (field === 'max_supply') {
+        cleanPayload[field] = Math.floor(Number(val));
+      } else if (typeof val === 'string') {
+        cleanPayload[field] = val.trim();
+      } else {
+        cleanPayload[field] = val;
+      }
+    }
   }
-  // Ensure required fields are always present
-  cleanPayload.id = payload.id;
-  cleanPayload.brand_id = payload.brand_id;
-  cleanPayload.name = payload.name;
-  cleanPayload.price_usd = payload.price_usd;
-  cleanPayload.max_supply = payload.max_supply;
+
+  // Ensure mandatory fields
+  cleanPayload.id = String(cleanPayload.id || '').trim();
+  cleanPayload.brand_id = String(cleanPayload.brand_id || '').trim();
+  cleanPayload.name = String(cleanPayload.name || '').trim();
+  cleanPayload.price_usd = Math.round(Number(payload.price_usd || 0) * 100) / 100;
+  cleanPayload.max_supply = Math.floor(Number(payload.max_supply || 1));
 
   return request<Edition[]>('/api/editions', {
     method: 'POST',
@@ -225,9 +243,26 @@ export function createEdition(payload: CreateEditionPayload) {
 
 /** Update an uninitialized draft edition */
 export function updateEditionDraft(id: string, payload: UpdateEditionPayload) {
+  // Whitelist matching backend dbRoutes.js allowedFields exactly
+  const ALLOWED_UPDATE_FIELDS = [
+    'name', 'description', 'fabric', 'headpiece', 'embroidery', 'price_usd', 'max_supply'
+  ] as const;
+
   const cleanPayload: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (value !== undefined) cleanPayload[key] = value;
+  const rawPayload = payload as unknown as Record<string, unknown>;
+  for (const field of ALLOWED_UPDATE_FIELDS) {
+    const val = rawPayload[field];
+    if (val !== undefined && val !== null) {
+      if (field === 'price_usd') {
+        cleanPayload[field] = Math.round(Number(val) * 100) / 100;
+      } else if (field === 'max_supply') {
+        cleanPayload[field] = Math.floor(Number(val));
+      } else if (typeof val === 'string') {
+        cleanPayload[field] = val.trim();
+      } else {
+        cleanPayload[field] = val;
+      }
+    }
   }
 
   return request<{ edition: Edition }>(`/api/editions/${encodeURIComponent(id)}`, {
@@ -238,13 +273,14 @@ export function updateEditionDraft(id: string, payload: UpdateEditionPayload) {
 
 /** Upload an image to an existing draft edition */
 export function uploadEditionImage(id: string, base64Data: string, tag?: string) {
+  const cleanTag = tag ? tag.trim().slice(0, 100) : undefined;
   return request<{
     publicUrl: string;
     image: { path: string; url: string; tag?: string };
     edition: Edition;
   }>('/api/editions/image', {
     method: 'POST',
-    body: JSON.stringify({ id, base64Data, ...(tag ? { tag } : {}) }),
+    body: JSON.stringify({ id, base64Data, ...(cleanTag ? { tag: cleanTag } : {}) }),
   }, true);
 }
 
