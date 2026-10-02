@@ -3,6 +3,7 @@
 const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
+const createEditionImageRoutes = require("./editionImageRoutes");
 
 if (!process.env.SUPABASE_URL)
   throw new Error("SUPABASE_URL is not set in environment");
@@ -362,195 +363,771 @@ router.patch("/db/orders/shipment", async (req, res) => {
   }
 });
 
-// ── Editions ──────────────────────────────────────────────────────────────────
+// ── BRANDS START ──────────────────────────────────────────────────────────────────
+// GET /api/brands/me — brands managed by the authenticated user
+router.get("/brands/me", requireAuth, async (req, res) => {
+  res.set("Cache-Control", "no-store");
 
-// GET /api/editions  — all active editions
-router.get("/editions", async (req, res) => {
   try {
-    const activeOnly = req.query.active !== "false";
-    let query = supabase.from("editions").select("*");
-
-    if (activeOnly) {
-      query = query.eq("is_active", true);
-    }
-
-    const { data, error } = await query.order("created_at", {
-      ascending: true,
-    });
-
-    if (error) {
-      console.error("Get all editions Supabase error:", error.message);
-      return res.status(500).json({ error: error.message });
-    }
-
-    // Proxy image URLs
-    const proxyData = (data || []).map((edition) => {
-      if (edition.images) {
-        edition.images = edition.images.map((img) => {
-          if (img.url && img.url.includes("supabase")) {
-            return {
-              ...img,
-              url: `/api/proxy-image?url=${encodeURIComponent(img.url)}`,
-            };
-          }
-          return img;
-        });
-      }
-      return edition;
-    });
-
-    res.json(proxyData);
-  } catch (err) {
-    console.error("Error in GET /api/editions:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/editions/:id  — specific edition
-router.get("/editions/:id", async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("editions")
-      .select("*")
-      .eq("id", req.params.id)
+    // Confirm the token still matches the account's current wallet.
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
       .maybeSingle();
 
-    if (error) {
-      console.error("Get edition by ID Supabase error:", error.message);
-      return res.status(500).json({ error: error.message });
-    }
+    if (userError) throw userError;
 
-    if (!data) {
-      return res.status(404).json({ error: "Edition not found" });
-    }
-
-    // Proxy image URLs
-    if (data.images) {
-      data.images = data.images.map((img) => {
-        if (img.url && img.url.includes("supabase")) {
-          return {
-            ...img,
-            url: `/api/proxy-image?url=${encodeURIComponent(img.url)}`,
-          };
-        }
-        return img;
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
       });
     }
 
-    res.json(data);
-  } catch (err) {
-    console.error("Error in GET /api/editions/:id:", err);
-    res.status(500).json({ error: err.message });
+    const { data, error } = await supabase
+      .from("brand_memberships")
+      .select(
+        `
+        role,
+        brand:brands (
+          id,
+          name,
+          slug,
+          payment_wallet_address
+        )
+      `,
+      )
+      .eq("user_id", req.auth.userId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return res.json({
+      brands: (data || [])
+        .filter((membership) => membership.brand)
+        .map((membership) => ({
+          ...membership.brand,
+          role: membership.role,
+        })),
+    });
+  } catch (error) {
+    console.error("Get my brands failed:", error.message);
+    return res.status(500).json({
+      error: "BRANDS_FETCH_FAILED",
+    });
   }
 });
 
-// POST /api/editions  — insert/update edition
-router.post("/editions", async (req, res) => {
-  try {
-    const editionData = req.body;
+// ── BRANDS END ──────────────────────────────────────────────────────────────────
 
-    // Ensure image_url is provided to avoid NOT NULL constraint errors
+// ── Editions ──────────────────────────────────────────────────────────────────
+
+// Verify that the JWT still matches the user's current wallet.
+async function requireCurrentAccount(req, res, next) {
+  try {
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Account validation failed:", error.message);
+
+    return res.status(500).json({
+      error: "ACCOUNT_VALIDATION_FAILED",
+    });
+  }
+}
+
+// Preserve the existing image-proxy response format.
+// Keep image.path intact for deletion requests.
+function formatEditionImages(edition) {
+  return {
+    ...edition,
+    images: (edition.images || []).map((image) => {
+      if (
+        typeof image.url === "string" &&
+        image.url.startsWith(`${process.env.SUPABASE_URL}/storage/`)
+      ) {
+        return {
+          ...image,
+          url: `/api/proxy-image?url=${encodeURIComponent(image.url)}`,
+        };
+      }
+
+      return image;
+    }),
+  };
+}
+
+// GET /api/editions  — all active editions
+// router.get("/editions", async (req, res) => {
+//   try {
+//     const activeOnly = req.query.active !== "false";
+//     let query = supabase.from("editions").select("*");
+
+//     if (activeOnly) {
+//       query = query.eq("is_active", true);
+//     }
+
+//     const { data, error } = await query.order("created_at", {
+//       ascending: true,
+//     });
+
+//     if (error) {
+//       console.error("Get all editions Supabase error:", error.message);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     // Proxy image URLs
+//     const proxyData = (data || []).map((edition) => {
+//       if (edition.images) {
+//         edition.images = edition.images.map((img) => {
+//           if (img.url && img.url.includes("supabase")) {
+//             return {
+//               ...img,
+//               url: `/api/proxy-image?url=${encodeURIComponent(img.url)}`,
+//             };
+//           }
+//           return img;
+//         });
+//       }
+//       return edition;
+//     });
+
+//     res.json(proxyData);
+//   } catch (err) {
+//     console.error("Error in GET /api/editions:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // GET /api/editions/:id  — specific edition
+// router.get("/editions/:id", async (req, res) => {
+//   try {
+//     const { data, error } = await supabase
+//       .from("editions")
+//       .select("*")
+//       .eq("id", req.params.id)
+//       .maybeSingle();
+
+//     if (error) {
+//       console.error("Get edition by ID Supabase error:", error.message);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     if (!data) {
+//       return res.status(404).json({ error: "Edition not found" });
+//     }
+
+//     // Proxy image URLs
+//     if (data.images) {
+//       data.images = data.images.map((img) => {
+//         if (img.url && img.url.includes("supabase")) {
+//           return {
+//             ...img,
+//             url: `/api/proxy-image?url=${encodeURIComponent(img.url)}`,
+//           };
+//         }
+//         return img;
+//       });
+//     }
+
+//     res.json(data);
+//   } catch (err) {
+//     console.error("Error in GET /api/editions/:id:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// POST /api/editions  — insert/update edition
+// router.post("/editions", async (req, res) => {
+//   try {
+//     const editionData = req.body;
+
+//     // Ensure image_url is provided to avoid NOT NULL constraint errors
+//     const payload = {
+//       ...editionData,
+//       image_url: editionData.images?.[0]?.url || "/satin.png",
+//     };
+
+//     const { data, error } = await supabase
+//       .from("editions")
+//       .upsert(payload, { onConflict: "id" })
+//       .select();
+
+//     if (error) {
+//       console.error("Save edition Supabase error:", error.message);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     res.json(data || []);
+//   } catch (err) {
+//     console.error("Error in POST /api/editions:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// UPDATED EDITIONS
+// POST /api/editions — create an inactive draft
+router.post("/editions", requireAuth, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    const body = req.body;
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return res.status(400).json({ error: "INVALID_REQUEST_BODY" });
+    }
+
+    // Accept only fields supported by this draft-creation endpoint.
+    const allowedFields = new Set([
+      "id",
+      "brand_id",
+      "name",
+      "description",
+      "price_usd",
+      "max_supply",
+      "fabric",
+      "headpiece",
+      "embroidery",
+    ]);
+
+    const unsupportedFields = Object.keys(body).filter(
+      (key) => !allowedFields.has(key),
+    );
+
+    if (unsupportedFields.length) {
+      return res.status(400).json({
+        error: "UNSUPPORTED_FIELDS",
+        fields: unsupportedFields,
+      });
+    }
+
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (typeof body.brand_id !== "string" || !uuidPattern.test(body.brand_id)) {
+      return res.status(400).json({ error: "INVALID_BRAND_ID" });
+    }
+
+    if (
+      typeof body.id !== "string" ||
+      !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(body.id) ||
+      Buffer.byteLength(body.id, "utf8") > 32
+    ) {
+      return res.status(400).json({ error: "INVALID_EDITION_ID" });
+    }
+
+    if (
+      typeof body.name !== "string" ||
+      body.name.trim().length < 1 ||
+      body.name.trim().length > 120
+    ) {
+      return res.status(400).json({ error: "INVALID_EDITION_NAME" });
+    }
+
+    const price = body.price_usd;
+    const cents = Math.round(price * 100);
+
+    if (
+      typeof price !== "number" ||
+      !Number.isFinite(price) ||
+      price <= 0 ||
+      price > 9999999999.99 ||
+      Math.abs(price * 100 - cents) > 0.000001
+    ) {
+      return res.status(400).json({
+        error: "INVALID_PRICE",
+        message: "price_usd must be positive with at most two decimal places.",
+      });
+    }
+
+    if (
+      !Number.isInteger(body.max_supply) ||
+      body.max_supply < 1 ||
+      body.max_supply > 2147483647
+    ) {
+      return res.status(400).json({ error: "INVALID_MAX_SUPPLY" });
+    }
+
+    const textLimits = {
+      description: 10000,
+      fabric: 500,
+      headpiece: 500,
+      embroidery: 500,
+    };
+
+    for (const [field, limit] of Object.entries(textLimits)) {
+      if (
+        body[field] !== undefined &&
+        (typeof body[field] !== "string" || body[field].length > limit)
+      ) {
+        return res.status(400).json({
+          error: "INVALID_FIELD",
+          field,
+        });
+      }
+    }
+
+    // Reject a token whose wallet no longer matches the account.
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
+      });
+    }
+
+    // Signing in alone does not grant permission to create drops.
+    const { data: membership, error: membershipError } = await supabase
+      .from("brand_memberships")
+      .select("role")
+      .eq("brand_id", body.brand_id)
+      .eq("user_id", req.auth.userId)
+      .maybeSingle();
+
+    if (membershipError) throw membershipError;
+
+    if (!membership || !["owner", "editor"].includes(membership.role)) {
+      return res.status(403).json({ error: "BRAND_ACCESS_DENIED" });
+    }
+
+    // Explicit fields prevent caller-controlled ownership or chain status.
     const payload = {
-      ...editionData,
-      image_url: editionData.images?.[0]?.url || "/satin.png",
+      id: body.id,
+      brand_id: body.brand_id,
+      created_by: req.auth.userId,
+      name: body.name.trim(),
+      description: body.description?.trim() || "",
+      price_usd: cents / 100,
+      max_supply: body.max_supply,
+      fabric: body.fabric?.trim() || "",
+      headpiece: body.headpiece?.trim() || "",
+      embroidery: body.embroidery?.trim() || "",
+      is_active: false,
+      chain_status: "pending",
     };
 
     const { data, error } = await supabase
       .from("editions")
-      .upsert(payload, { onConflict: "id" })
-      .select();
+      .insert(payload)
+      .select()
+      .single();
 
     if (error) {
-      console.error("Save edition Supabase error:", error.message);
-      return res.status(500).json({ error: error.message });
+      if (error.code === "23505") {
+        return res.status(409).json({
+          error: "EDITION_ID_ALREADY_EXISTS",
+        });
+      }
+
+      throw error;
     }
 
-    res.json(data || []);
-  } catch (err) {
-    console.error("Error in POST /api/editions:", err);
-    res.status(500).json({ error: err.message });
+    // Preserve the existing frontend's array response shape.
+    return res.status(201).json([data]);
+  } catch (error) {
+    console.error("Create edition failed:", error.message);
+
+    return res.status(500).json({
+      error: "EDITION_CREATION_FAILED",
+    });
   }
 });
 
-// POST /api/editions/image — upload Base64 image
-router.post("/editions/image", async (req, res) => {
+router.use("/editions/image", createEditionImageRoutes(supabase));
+
+// GET /api/editions — public, published editions only
+router.get("/editions", async (req, res) => {
   try {
-    const { id, fileName, contentType, base64Data } = req.body;
-    if (!base64Data || !fileName || !id) {
-      return res
-        .status(400)
-        .json({ error: "Missing required image payload fields" });
+    // Retire the old public route for listing drafts.
+    if (req.query.active !== undefined && req.query.active !== "true") {
+      return res.status(400).json({
+        error: "USE_AUTHENTICATED_EDITION_LIST",
+        message: "Use GET /api/editions/mine to view your drafts.",
+      });
     }
 
-    // Convert Base64 back to binary buffer
-    // base64Data usually comes as "data:image/png;base64,iVBORw0KGgo..."
-    const base64String = base64Data.split(",")[1] || base64Data;
-    const buffer = Buffer.from(base64String, "base64");
+    const { data, error } = await supabase
+      .from("editions")
+      .select("*")
+      .eq("is_active", true)
+      .eq("chain_status", "initialized")
+      .order("created_at", { ascending: true });
 
-    const safeFileName = `${id}-${Date.now()}-${fileName}`;
-    const filePath = `collections/${safeFileName}`;
+    if (error) throw error;
 
-    const { error: uploadError } = await supabase.storage
-      .from("collection-images")
-      .upload(filePath, buffer, {
-        contentType: contentType || "image/png",
-        cacheControl: "3600",
-        upsert: true,
+    return res.json((data || []).map(formatEditionImages));
+  } catch (error) {
+    console.error("Public edition list failed:", error.message);
+
+    return res.status(500).json({
+      error: "EDITIONS_FETCH_FAILED",
+    });
+  }
+});
+
+// GET /api/editions/mine — drafts and published editions
+// belonging to brands managed by the authenticated user.
+router.get(
+  "/editions/mine",
+  requireAuth,
+  requireCurrentAccount,
+  async (req, res) => {
+    res.set("Cache-Control", "no-store");
+
+    try {
+      const requestedBrandId = req.query.brand_id;
+
+      if (
+        requestedBrandId !== undefined &&
+        (typeof requestedBrandId !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            requestedBrandId,
+          ))
+      ) {
+        return res.status(400).json({
+          error: "INVALID_BRAND_ID",
+        });
+      }
+
+      const { data: memberships, error: membershipError } = await supabase
+        .from("brand_memberships")
+        .select("brand_id")
+        .eq("user_id", req.auth.userId)
+        .in("role", ["owner", "editor"]);
+
+      if (membershipError) throw membershipError;
+
+      const brandIds = (memberships || []).map(
+        (membership) => membership.brand_id,
+      );
+
+      if (
+        requestedBrandId &&
+        !brandIds.includes(requestedBrandId.toLowerCase())
+      ) {
+        return res.status(403).json({
+          error: "BRAND_ACCESS_DENIED",
+        });
+      }
+
+      if (!brandIds.length) {
+        return res.json([]);
+      }
+
+      const selectedBrands = requestedBrandId
+        ? [requestedBrandId.toLowerCase()]
+        : brandIds;
+
+      const { data, error } = await supabase
+        .from("editions")
+        .select("*")
+        .in("brand_id", selectedBrands)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      return res.json((data || []).map(formatEditionImages));
+    } catch (error) {
+      console.error("Managed edition list failed:", error.message);
+
+      return res.status(500).json({
+        error: "EDITIONS_FETCH_FAILED",
+      });
+    }
+  },
+);
+
+// GET /api/editions/:id — public, published edition only
+router.get("/editions/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (
+      !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(id) ||
+      Buffer.byteLength(id, "utf8") > 32
+    ) {
+      return res.status(400).json({
+        error: "INVALID_EDITION_ID",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("editions")
+      .select("*")
+      .eq("id", id)
+      .eq("is_active", true)
+      .eq("chain_status", "initialized")
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({
+        error: "EDITION_NOT_FOUND",
+      });
+    }
+
+    return res.json(formatEditionImages(data));
+  } catch (error) {
+    console.error("Public edition lookup failed:", error.message);
+
+    return res.status(500).json({
+      error: "EDITION_FETCH_FAILED",
+    });
+  }
+});
+
+// PATCH /api/editions/:id — edit an uninitialized draft
+router.patch(
+  "/editions/:id",
+  requireAuth,
+  requireCurrentAccount,
+  async (req, res) => {
+    res.set("Cache-Control", "no-store");
+
+    try {
+      const { id } = req.params;
+      const body = req.body;
+
+      if (
+        !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(id) ||
+        Buffer.byteLength(id, "utf8") > 32
+      ) {
+        return res.status(400).json({
+          error: "INVALID_EDITION_ID",
+        });
+      }
+
+      if (
+        !body ||
+        typeof body !== "object" ||
+        Array.isArray(body) ||
+        Object.keys(body).length === 0
+      ) {
+        return res.status(400).json({
+          error: "INVALID_EDITION_CHANGES",
+        });
+      }
+
+      const textLimits = {
+        name: 120,
+        description: 10000,
+        fabric: 500,
+        headpiece: 500,
+        embroidery: 500,
+      };
+
+      const allowedFields = new Set([
+        ...Object.keys(textLimits),
+        "price_usd",
+        "max_supply",
+      ]);
+
+      const unsupportedFields = Object.keys(body).filter(
+        (key) => !allowedFields.has(key),
+      );
+
+      if (unsupportedFields.length) {
+        return res.status(400).json({
+          error: "UNSUPPORTED_FIELDS",
+          fields: unsupportedFields,
+        });
+      }
+
+      const changes = {};
+
+      for (const [field, limit] of Object.entries(textLimits)) {
+        if (!Object.hasOwn(body, field)) continue;
+
+        if (
+          typeof body[field] !== "string" ||
+          body[field].length > limit ||
+          (field === "name" && !body[field].trim())
+        ) {
+          return res.status(400).json({
+            error: "INVALID_FIELD",
+            field,
+          });
+        }
+
+        changes[field] = body[field].trim();
+      }
+
+      if (Object.hasOwn(body, "price_usd")) {
+        const price = body.price_usd;
+        const cents = Math.round(price * 100);
+
+        if (
+          typeof price !== "number" ||
+          !Number.isFinite(price) ||
+          price <= 0 ||
+          price > 9999999999.99 ||
+          Math.abs(price * 100 - cents) > 0.000001
+        ) {
+          return res.status(400).json({
+            error: "INVALID_PRICE",
+          });
+        }
+
+        changes.price_usd = cents / 100;
+      }
+
+      if (Object.hasOwn(body, "max_supply")) {
+        if (
+          !Number.isInteger(body.max_supply) ||
+          body.max_supply < 1 ||
+          body.max_supply > 2147483647
+        ) {
+          return res.status(400).json({
+            error: "INVALID_MAX_SUPPLY",
+          });
+        }
+
+        changes.max_supply = body.max_supply;
+      }
+
+      const { data, error } = await supabase.rpc("update_edition_draft", {
+        p_edition_id: id,
+        p_user_id: req.auth.userId,
+        p_wallet_address: req.auth.walletAddress,
+        p_changes: changes,
       });
 
-    if (uploadError) {
-      console.error("Upload image Supabase error:", uploadError.message);
-      return res.status(500).json({ error: uploadError.message });
+      if (error) {
+        const statusByError = {
+          INVALID_OR_EXPIRED_SESSION: 401,
+          EDITION_NOT_FOUND: 404,
+          BRAND_ACCESS_DENIED: 403,
+          EDITION_NOT_EDITABLE: 409,
+          INVALID_EDITION_CHANGES: 400,
+          UNSUPPORTED_FIELDS: 400,
+        };
+
+        if (error.code === "P0001" && statusByError[error.message]) {
+          return res.status(statusByError[error.message]).json({
+            error: error.message,
+          });
+        }
+
+        throw error;
+      }
+
+      return res.json({
+        edition: formatEditionImages(data),
+      });
+    } catch (error) {
+      console.error("Edition draft update failed:", error.message);
+
+      return res.status(500).json({
+        error: "EDITION_UPDATE_FAILED",
+      });
     }
+  },
+);
 
-    const { data } = supabase.storage
-      .from("collection-images")
-      .getPublicUrl(filePath);
+// // POST /api/editions/image — upload Base64 image
+// router.post("/editions/image", async (req, res) => {
+//   return res.status(503).json({
+//     error: "EDITION_IMAGES_NOT_READY",
+//     message: "Edition image management is being updated.",
+//   });
 
-    res.json({ publicUrl: data.publicUrl });
-  } catch (err) {
-    console.error("Error in POST /api/editions/image:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+//   try {
+//     const { id, fileName, contentType, base64Data } = req.body;
+//     if (!base64Data || !fileName || !id) {
+//       return res
+//         .status(400)
+//         .json({ error: "Missing required image payload fields" });
+//     }
 
-// DELETE /api/editions/image — delete image from storage
-router.delete("/editions/image", async (req, res) => {
-  try {
-    const { imageUrl } = req.body;
-    if (!imageUrl) {
-      return res.status(400).json({ error: "imageUrl is required" });
-    }
+//     // Convert Base64 back to binary buffer
+//     // base64Data usually comes as "data:image/png;base64,iVBORw0KGgo..."
+//     const base64String = base64Data.split(",")[1] || base64Data;
+//     const buffer = Buffer.from(base64String, "base64");
 
-    // Ignore placeholder
-    if (
-      !imageUrl.includes("supabase.co") &&
-      !imageUrl.includes("supabase.in")
-    ) {
-      return res.json({ success: true });
-    }
+//     const safeFileName = `${id}-${Date.now()}-${fileName}`;
+//     const filePath = `collections/${safeFileName}`;
 
-    // Extract file path from public URL
-    const parts = imageUrl.split("/collection-images/");
-    if (parts.length < 2)
-      return res.status(400).json({ error: "Invalid Supabase URL format" });
-    const filePath = decodeURIComponent(parts[1]);
+//     const { error: uploadError } = await supabase.storage
+//       .from("collection-images")
+//       .upload(filePath, buffer, {
+//         contentType: contentType || "image/png",
+//         cacheControl: "3600",
+//         upsert: true,
+//       });
 
-    const { error } = await supabase.storage
-      .from("collection-images")
-      .remove([filePath]);
+//     if (uploadError) {
+//       console.error("Upload image Supabase error:", uploadError.message);
+//       return res.status(500).json({ error: uploadError.message });
+//     }
 
-    if (error) {
-      console.error("Delete image Supabase error:", error.message);
-      return res.status(500).json({ error: error.message });
-    }
+//     const { data } = supabase.storage
+//       .from("collection-images")
+//       .getPublicUrl(filePath);
 
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Error in DELETE /api/editions/image:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+//     res.json({ publicUrl: data.publicUrl });
+//   } catch (err) {
+//     console.error("Error in POST /api/editions/image:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
+// // DELETE /api/editions/image — delete image from storage
+// router.delete("/editions/image", async (req, res) => {
+//   try {
+//     const { imageUrl } = req.body;
+//     if (!imageUrl) {
+//       return res.status(400).json({ error: "imageUrl is required" });
+//     }
+
+//     // Ignore placeholder
+//     if (
+//       !imageUrl.includes("supabase.co") &&
+//       !imageUrl.includes("supabase.in")
+//     ) {
+//       return res.json({ success: true });
+//     }
+
+//     // Extract file path from public URL
+//     const parts = imageUrl.split("/collection-images/");
+//     if (parts.length < 2)
+//       return res.status(400).json({ error: "Invalid Supabase URL format" });
+//     const filePath = decodeURIComponent(parts[1]);
+
+//     const { error } = await supabase.storage
+//       .from("collection-images")
+//       .remove([filePath]);
+
+//     if (error) {
+//       console.error("Delete image Supabase error:", error.message);
+//       return res.status(500).json({ error: error.message });
+//     }
+
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error("Error in DELETE /api/editions/image:", err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 // GET /api/proxy-image — Fetch image from Supabase privately
 router.get("/proxy-image", async (req, res) => {
