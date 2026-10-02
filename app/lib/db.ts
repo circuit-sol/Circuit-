@@ -1,3 +1,5 @@
+import * as backendApi from './backendApi';
+
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 
 // ── Admin Authentication ────────────────────────────────────────────
@@ -140,27 +142,22 @@ export async function getUserOrders(email: string) {
 
 export async function getEditions(activeOnly = true) {
   try {
-    const url = new URL(`${BASE}/api/editions`);
-    if (!activeOnly) url.searchParams.append('active', 'false');
-    
-    const res = await fetch(url.toString());
+    // If administrative/inactive editions are requested, use the authenticated /mine endpoint
+    if (!activeOnly) {
+      try {
+        const mine = await backendApi.getMyEditions();
+        if (mine && Array.isArray(mine) && mine.length > 0) {
+          return mine.map(formatEditionImages);
+        }
+      } catch {
+        // Fallback to public list if unauthenticated
+      }
+    }
+
+    const res = await fetch(`${BASE}/api/editions`);
     if (res.ok) {
       const data = await res.json();
-      return data.map((ed: any) => {
-        if (ed.images) {
-          ed.images = ed.images.map((img: any) => {
-            let finalUrl = img.url;
-            if (finalUrl && finalUrl.includes('supabase') && !finalUrl.startsWith('/api/proxy-image')) {
-              finalUrl = `/api/proxy-image?url=${encodeURIComponent(finalUrl)}`;
-            }
-            return {
-              ...img,
-              url: finalUrl.startsWith('/api/proxy-image') ? `${BASE}${finalUrl}` : finalUrl
-            };
-          });
-        }
-        return ed;
-      });
+      return (data || []).map(formatEditionImages);
     }
   } catch (err) {
     console.error('getEditions Fetch Error:', err);
@@ -168,24 +165,28 @@ export async function getEditions(activeOnly = true) {
   return [];
 }
 
+function formatEditionImages(ed: any) {
+  if (ed && ed.images) {
+    ed.images = ed.images.map((img: any) => {
+      let finalUrl = img.url;
+      if (finalUrl && finalUrl.includes('supabase') && !finalUrl.startsWith('/api/proxy-image')) {
+        finalUrl = `/api/proxy-image?url=${encodeURIComponent(finalUrl)}`;
+      }
+      return {
+        ...img,
+        url: finalUrl && finalUrl.startsWith('/api/proxy-image') ? `${BASE}${finalUrl}` : finalUrl
+      };
+    });
+  }
+  return ed;
+}
+
 export async function getEditionById(id: string) {
   try {
     const res = await fetch(`${BASE}/api/editions/${encodeURIComponent(id)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data && data.images) {
-        data.images = data.images.map((img: any) => {
-          let finalUrl = img.url;
-          if (finalUrl && finalUrl.includes('supabase') && !finalUrl.startsWith('/api/proxy-image')) {
-            finalUrl = `/api/proxy-image?url=${encodeURIComponent(finalUrl)}`;
-          }
-          return {
-            ...img,
-            url: finalUrl.startsWith('/api/proxy-image') ? `${BASE}${finalUrl}` : finalUrl
-          };
-        });
-      }
-      return data;
+      return formatEditionImages(data);
     }
   } catch (err) {
     console.error('getEditionById Fetch Error:', err);
@@ -195,21 +196,25 @@ export async function getEditionById(id: string) {
 
 export async function saveEdition(editionData: any) {
   try {
-    const res = await fetch(`${BASE}/api/editions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editionData)
-    });
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error('Save edition error:', errData.error);
-    } else {
-      return await res.json();
-    }
+    // Separate supported fields for draft creation
+    const payload: backendApi.CreateEditionPayload = {
+      id: editionData.id,
+      brand_id: editionData.brand_id,
+      name: editionData.name,
+      description: editionData.description,
+      price_usd: Number(editionData.price_usd),
+      max_supply: Number(editionData.max_supply),
+      fabric: editionData.fabric,
+      headpiece: editionData.headpiece,
+      embroidery: editionData.embroidery,
+    };
+
+    const res = await backendApi.createEdition(payload);
+    return res;
   } catch (err) {
-    console.error('saveEdition Fetch Error:', err);
+    console.error('saveEdition API Error:', err);
+    throw err;
   }
-  return null;
 }
 
 // ── Complete Order Lifecycle Management ──────────────────────────────
@@ -277,28 +282,19 @@ export async function updateOrderShipmentDetails(orderId: string, details: strin
   }
 }
 
-export async function uploadEditionImage(file: File, id: string): Promise<string | null> {
+export async function uploadEditionImage(file: File, id: string, tag?: string): Promise<{ url: string; path: string } | null> {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
         const base64Data = reader.result as string;
-        const res = await fetch(`${BASE}/api/editions/image`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id,
-            fileName: file.name,
-            contentType: file.type,
-            base64Data
-          })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          resolve(data.publicUrl);
+        const res = await backendApi.uploadEditionImage(id, base64Data, tag);
+        if (res && res.publicUrl) {
+          resolve({
+            url: res.publicUrl,
+            path: res.image.path
+          });
         } else {
-          console.error('Upload failed:', await res.text());
           resolve(null);
         }
       } catch (err) {
@@ -310,14 +306,10 @@ export async function uploadEditionImage(file: File, id: string): Promise<string
   });
 }
 
-export async function deleteEditionImage(imageUrl: string): Promise<boolean> {
+export async function deleteEditionImage(id: string, path: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE}/api/editions/image`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageUrl })
-    });
-    return res.ok;
+    const res = await backendApi.deleteEditionImage(id, path);
+    return res && res.success;
   } catch (err) {
     console.error('deleteEditionImage Fetch Error:', err);
     return false;

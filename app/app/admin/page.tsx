@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getEditions, saveEdition, updateOrderStatusLifecycle, updateOrderShipmentDetails, uploadEditionImage, deleteEditionImage } from '@/lib/db';
+import { getMyBrands, updateEditionDraft, type Brand } from '@/lib/backendApi';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import AdminNavbar from '@/components/AdminNavbar';
 import { showToast } from '@/components/Toast';
@@ -26,23 +27,27 @@ interface Order {
 
 interface Edition {
   id: string;
+  brand_id?: string;
   name: string;
-  images: { url: string; tag: string; file?: File }[];
+  images: { url: string; tag: string; path?: string; file?: File }[];
   description: string;
   price_usd: number;
-  has_variable_prices: boolean;
-  prices_by_size: Record<string, number>;
+  has_variable_prices?: boolean;
+  prices_by_size?: Record<string, number>;
   max_supply: number;
   fabric: string;
   headpiece: string;
   embroidery: string;
   is_active: boolean;
+  chain_status?: string;
 }
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'orders' | 'collections'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [editions, setEditions] = useState<Edition[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -62,8 +67,9 @@ export default function AdminDashboard() {
   const [selectedEdition, setSelectedEdition] = useState<Edition | null>(null);
   const [editionForm, setEditionForm] = useState<{
     id: string;
+    brand_id?: string;
     name: string;
-    images: { url: string; tag: string; file?: File }[];
+    images: { url: string; tag: string; path?: string; file?: File }[];
     description: string;
     price_usd: number;
     has_variable_prices: boolean;
@@ -75,6 +81,7 @@ export default function AdminDashboard() {
     is_active: boolean;
   }>({
     id: '',
+    brand_id: '',
     name: '',
     images: [{ url: '/satin.png', tag: 'Front View' }],
     description: '',
@@ -103,7 +110,20 @@ export default function AdminDashboard() {
       setLoading(true);
       const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 
-      // 1. Fetch Orders from backend
+      // 1. Fetch Brands for Drop creation
+      try {
+        const brandsRes = await getMyBrands();
+        if (brandsRes?.brands && Array.isArray(brandsRes.brands)) {
+          setBrands(brandsRes.brands);
+          if (brandsRes.brands.length > 0) {
+            setSelectedBrandId(prev => prev || brandsRes.brands[0].id);
+          }
+        }
+      } catch (brandErr) {
+        console.warn('Could not fetch brands:', brandErr);
+      }
+
+      // 2. Fetch Orders from backend
       const res = await fetch(`${BASE}/api/db/orders`);
       if (!res.ok) {
         const errorData = await res.json();
@@ -125,7 +145,7 @@ export default function AdminDashboard() {
       });
       setEditableStates(statesMap);
 
-      // 2. Fetch Editions (Fetch all for administrative visibility)
+      // 3. Fetch Editions (Fetch managed drafts and active editions)
       const editionsList = await getEditions(false);
       setEditions(editionsList || []);
     } catch (err) {
@@ -227,48 +247,76 @@ export default function AdminDashboard() {
 
     setUploading(true);
     try {
-      // 1. Process Garbage Collection (delete removed remote images)
-      for (const url of deletedRemoteImages) {
-        await deleteEditionImage(url);
-      }
-      
-      // 2. Process Pending Uploads
-      const finalizedImages = [];
       const slugId = editionForm.id;
-      
-      for (let i = 0; i < editionForm.images.length; i++) {
-        const img = editionForm.images[i];
-        if (img.file) {
-          const publicUrl = await uploadEditionImage(img.file, slugId);
-          if (!publicUrl) throw new Error('Failed to upload image asset');
-          finalizedImages.push({ url: publicUrl, tag: img.tag });
-          
-          // Free browser memory
-          URL.revokeObjectURL(img.url);
-        } else {
-          finalizedImages.push({ url: img.url, tag: img.tag });
+
+      if (selectedEdition) {
+        // 1. Updating an existing draft edition
+        await updateEditionDraft(slugId, {
+          name: editionForm.name,
+          description: editionForm.description,
+          price_usd: Number(editionForm.price_usd),
+          max_supply: Number(editionForm.max_supply),
+          fabric: editionForm.fabric,
+          headpiece: editionForm.headpiece,
+          embroidery: editionForm.embroidery,
+        });
+
+        // 2. Delete removed remote images using path
+        for (const path of deletedRemoteImages) {
+          await deleteEditionImage(slugId, path);
+        }
+
+        // 3. Upload new images for this draft
+        for (const img of editionForm.images) {
+          if (img.file) {
+            await uploadEditionImage(img.file, slugId, img.tag);
+            URL.revokeObjectURL(img.url);
+          }
+        }
+      } else {
+        // 1. Creating a brand new draft edition
+        const brandIdToUse = selectedBrandId || (brands[0]?.id ?? '');
+        if (!brandIdToUse) {
+          showToast('Brand Required', 'Please select or configure an authorized brand first.');
+          return;
+        }
+
+        await saveEdition({
+          id: slugId,
+          brand_id: brandIdToUse,
+          name: editionForm.name,
+          description: editionForm.description,
+          price_usd: Number(editionForm.price_usd),
+          max_supply: Number(editionForm.max_supply),
+          fabric: editionForm.fabric,
+          headpiece: editionForm.headpiece,
+          embroidery: editionForm.embroidery,
+        });
+
+        // 2. Upload images for newly created draft
+        for (const img of editionForm.images) {
+          if (img.file) {
+            await uploadEditionImage(img.file, slugId, img.tag);
+            URL.revokeObjectURL(img.url);
+          }
         }
       }
 
-      // 3. Database Sync
-      const payload = { ...editionForm, images: finalizedImages };
-      await saveEdition(payload);
-      
       showToast('✓ Success', 'Drop collection synchronized perfectly.');
       fetchData();
-      
+
       // Clear tracking states
       setDeletedRemoteImages([]);
       setSelectedEdition(null);
       setIsFormActive(false);
       setEditionForm({
-        id: '', name: '', images: [{ url: '/satin.png', tag: 'Front View' }], description: '', price_usd: 0.8,
+        id: '', brand_id: '', name: '', images: [{ url: '/satin.png', tag: 'Front View' }], description: '', price_usd: 0.8,
         has_variable_prices: false, prices_by_size: { Small: 0.8, Medium: 0.8, Large: 0.8, 'Extra Large': 0.8 },
         max_supply: 40, fabric: 'Duchess satin', headpiece: 'Velvet', embroidery: 'Metallic thread', is_active: true
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast('✗ Error', 'Failed to synchronize drop collection.');
+      showToast('✗ Error', err?.message || 'Failed to synchronize drop collection.');
     } finally {
       setUploading(false);
     }
@@ -277,13 +325,15 @@ export default function AdminDashboard() {
   const editEdition = (ed: Edition) => {
     setSelectedEdition(ed);
     setIsFormActive(true);
+    if (ed.brand_id) setSelectedBrandId(ed.brand_id);
     setEditionForm({
       id: ed.id,
+      brand_id: ed.brand_id || '',
       name: ed.name,
       images: ed.images || [],
       description: ed.description,
       price_usd: ed.price_usd,
-      has_variable_prices: ed.has_variable_prices,
+      has_variable_prices: ed.has_variable_prices ?? false,
       prices_by_size: ed.prices_by_size || { Small: 0.8, Medium: 0.8, Large: 0.8, 'Extra Large': 0.8 },
       max_supply: ed.max_supply,
       fabric: ed.fabric,
@@ -304,6 +354,7 @@ export default function AdminDashboard() {
     setIsFormActive(false);
     setEditionForm({
       id: '',
+      brand_id: '',
       name: '',
       images: [{ url: '/satin.png', tag: 'Front View' }],
       description: '',
@@ -322,8 +373,8 @@ export default function AdminDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (editionForm.images.length >= 4) {
-      showToast('✗ Limit Reached', 'Maximum 4 images allowed per collection.');
+    if (editionForm.images.length >= 10) {
+      showToast('✗ Limit Reached', 'Maximum 10 images allowed per collection.');
       e.target.value = '';
       return;
     }
@@ -361,9 +412,9 @@ export default function AdminDashboard() {
     // If it's a pending local file, just revoke the URL to free memory
     if (imageToDelete.file) {
       URL.revokeObjectURL(imageToDelete.url);
-    } else if (imageToDelete.url !== '/satin.png' && !imageToDelete.url.startsWith('blob:')) {
-      // If it's a remote file, queue it for deletion on submit
-      setDeletedRemoteImages(prev => [...prev, imageToDelete.url]);
+    } else if (imageToDelete.path) {
+      // If it's a remote file with a storage path, queue it for deletion on submit
+      setDeletedRemoteImages(prev => [...prev, imageToDelete.path!]);
     }
 
     // Remove from state immediately
@@ -788,6 +839,28 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    <label className="text-[0.65rem] text-[#666] uppercase tracking-wider font-bold">Brand / Label</label>
+                    {brands.length > 0 ? (
+                      <select
+                        value={selectedBrandId}
+                        disabled={!!selectedEdition}
+                        onChange={(e) => setSelectedBrandId(e.target.value)}
+                        className="w-full bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 font-mono disabled:opacity-50"
+                      >
+                        {brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} ({b.slug}) — {b.role}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-[0.65rem] text-amber-400/80 font-mono bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
+                        No managed brands found. Verify wallet login with brand ownership.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
                     <label className="text-[0.65rem] text-[#666] uppercase tracking-wider font-bold">Unique Slug ID</label>
                     <input
                       type="text"
@@ -811,7 +884,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] text-[#666] uppercase tracking-wider font-bold">Apparel Images (Max 4)</label>
+                    <label className="text-[0.65rem] text-[#666] uppercase tracking-wider font-bold">Apparel Images (Max 10)</label>
                     
                     <div className="grid grid-cols-2 gap-4">
                       {editionForm.images.map((img, idx) => (
@@ -854,7 +927,7 @@ export default function AdminDashboard() {
                         </div>
                       ))}
 
-                      {editionForm.images.length < 4 && (
+                      {editionForm.images.length < 10 && (
                         <div className="relative w-full h-40 border-2 border-dashed border-white/10 hover:border-white/20 hover:bg-white/[0.01] bg-[#0D0D0D] rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group">
                           {uploading ? (
                             <div className="flex flex-col items-center justify-center gap-3">
