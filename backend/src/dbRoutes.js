@@ -4,6 +4,7 @@ const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
 const createEditionImageRoutes = require("./editionImageRoutes");
+const createBatchRoutes = require("./batchRoutes");
 
 if (!process.env.SUPABASE_URL)
   throw new Error("SUPABASE_URL is not set in environment");
@@ -1210,5 +1211,7 @@ router.post("/user/email", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "EMAIL_UPDATE_FAILED" });
   }
 });
+
+router.use("/batches", createBatchRoutes(supabase));
 
 module.exports = router;
