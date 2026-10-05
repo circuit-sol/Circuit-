@@ -2,13 +2,15 @@
   "name": "circuit-backend",
   "version": "1.0.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "24.x"
   },
-  "description": "Circuit custodial wallet + transaction service",
+  "description": "Circuit wallet-authenticated backend and verified Devnet checkout",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test:chain": "node --test tests/chain-*.test.cjs",
+    "sync:chain-idls": "node scripts/sync-chain-idls.cjs"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",

@@ -5,6 +5,7 @@ const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
 const createEditionImageRoutes = require("./editionImageRoutes");
 const createBatchRoutes = require("./batchRoutes");
+const createChainRoutes = require("./chain/routes");
 
 if (!process.env.SUPABASE_URL)
   throw new Error("SUPABASE_URL is not set in environment");
@@ -25,6 +26,11 @@ router.use("/users", (_req, res) => {
     error: "LEGACY_USER_ROUTES_DISABLED",
   });
 });
+
+// Retire legacy public order reads/writes and password-based admin lookup.
+router.use("/db/orders", (_req, res) => res.status(410).json({error:"USE_VERIFIED_CHAIN_ORDER_ROUTES"}));
+router.use("/auth/admin", (_req, res) => res.status(410).json({error:"USE_ADMIN_WALLET_AUTH"}));
+router.use("/chain", createChainRoutes(supabase));
 
 // ── Admin Auth ────────────────────────────────────────────────────────────────
 
@@ -769,8 +775,7 @@ router.get("/editions", async (req, res) => {
     const { data, error } = await supabase
       .from("editions")
       .select("*")
-      .eq("is_active", true)
-      .eq("chain_status", "initialized")
+      .eq("published", true)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
@@ -875,8 +880,7 @@ router.get("/editions/:id", async (req, res) => {
       .from("editions")
       .select("*")
       .eq("id", id)
-      .eq("is_active", true)
-      .eq("chain_status", "initialized")
+      .eq("published", true)
       .maybeSingle();
 
     if (error) throw error;

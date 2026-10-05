@@ -7,7 +7,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EDITION_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const HOUR_MS = 3600000;
 const SELECT = "*,edition:editions!inner(brand_id)";
-const PUBLIC_SELECT = "id,edition_id,name,opens_at,closes_at,production_starts_at,release_at,pickup_locations,chain_status,chain_batch_address,initialization_tx_signature,is_active,revision,created_at,updated_at,edition:editions!inner(brand_id)";
+const PUBLIC_SELECT = "id,edition_id,name,opens_at,closes_at,production_starts_at,release_at,pickup_locations,chain_terms,chain_vault_address,chain_status,chain_batch_address,initialization_tx_signature,is_active,revision,created_at,updated_at,edition:editions!inner(brand_id)";
 const ERROR_STATUS = {
   INVALID_OR_EXPIRED_SESSION: 401,
   BRAND_ACCESS_DENIED: 403,
@@ -37,8 +37,10 @@ function formatBatch(row, now = Date.now()) {
     fulfillment_method: "pickup",
     sales_window_status: !initialized ? "draft" : now < opens ? "scheduled"
       : now < closes ? "open" : "closed",
-    // Remains false until checkout and the replacement Anchor program are wired.
-    checkout_enabled: false,
+    // Advisory schedule flag; purchase preparation also checks the live vault.
+    checkout_enabled: typeof process !== "undefined" && process.env.CHAIN_ENABLED === "true"
+      && !!initialized && now >= opens && now < closes && !!batch.chain_vault_address,
+    pricing: batch.chain_terms?.pricing || null,
     cancellation_window_hours: 24,
     advance_payout_percent: 30,
     balance_payout_percent: 70,
