@@ -5,7 +5,10 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getEditions, saveEdition, updateOrderStatusLifecycle, updateOrderShipmentDetails, uploadEditionImage, deleteEditionImage } from '@/lib/db';
-import { getMyBrands, updateEditionDraft, type Brand } from '@/lib/backendApi';
+import * as backendApi from '@/lib/backendApi';
+import { updateEditionDraft, type Brand } from '@/lib/backendApi';
+import { executeBatchInitialize } from '@/lib/solana-service';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/lib/auth-context';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import AdminNavbar from '@/components/AdminNavbar';
@@ -107,6 +110,142 @@ export default function AdminDashboard() {
   const [isFormActive, setIsFormActive] = useState(false);
   const [deletedRemoteImages, setDeletedRemoteImages] = useState<string[]>([]);
 
+  // ── Preorder Batch Management ──────────────────────────────────────────
+  const { signTransaction } = useWallet();
+  const [batchesByEdition, setBatchesByEdition] = useState<Record<string, backendApi.Batch[]>>({});
+  const [isCreateBatchModalOpen, setIsCreateBatchModalOpen] = useState(false);
+  const [batchForEditionId, setBatchForEditionId] = useState<string | null>(null);
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false);
+  const [isInitializingBatch, setIsInitializingBatch] = useState<string | null>(null);
+
+  const [batchForm, setBatchForm] = useState({
+    name: '',
+    opens_at: new Date().toISOString().slice(0, 16),
+    closes_at: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 16),
+    production_starts_at: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 16),
+    release_at: new Date(Date.now() + 25 * 86400000).toISOString().slice(0, 16),
+    pickup_name: 'Circuit Atelier HQ',
+    pickup_address: '14 Victoria Island',
+    pickup_city: 'Lagos',
+    pickup_country: 'Nigeria',
+    pickup_instructions: 'Show digital passport QR code at the desk.',
+  });
+
+  const fetchBatchesForEdition = async (editionId: string) => {
+    try {
+      const res = await backendApi.getMyBatches({ editionId });
+      if (res?.batches) {
+        setBatchesByEdition(prev => ({ ...prev, [editionId]: res.batches }));
+      }
+    } catch (e) {
+      console.warn(`Could not load batches for edition ${editionId}:`, e);
+    }
+  };
+
+  const handleOpenCreateBatch = (editionId: string) => {
+    setBatchForEditionId(editionId);
+    const now = Date.now();
+    setBatchForm({
+      name: `Batch ${(batchesByEdition[editionId]?.length || 0) + 1}`,
+      opens_at: new Date(now).toISOString().slice(0, 16),
+      closes_at: new Date(now + 7 * 86400000).toISOString().slice(0, 16),
+      production_starts_at: new Date(now + 10 * 86400000).toISOString().slice(0, 16),
+      release_at: new Date(now + 25 * 86400000).toISOString().slice(0, 16),
+      pickup_name: 'Circuit Atelier HQ',
+      pickup_address: '14 Victoria Island',
+      pickup_city: 'Lagos',
+      pickup_country: 'Nigeria',
+      pickup_instructions: 'Show digital passport QR code at the desk.',
+    });
+    setIsCreateBatchModalOpen(true);
+  };
+
+  const handleCreateBatch = async () => {
+    if (!batchForEditionId) return;
+    if (!batchForm.name.trim()) {
+      showToast('Validation Error', 'Please enter a batch name.');
+      return;
+    }
+    const opensMs = Date.parse(batchForm.opens_at);
+    const closesMs = Date.parse(batchForm.closes_at);
+    const prodMs = Date.parse(batchForm.production_starts_at);
+    const relMs = Date.parse(batchForm.release_at);
+
+    if (isNaN(opensMs) || isNaN(closesMs) || isNaN(prodMs) || isNaN(relMs)) {
+      showToast('Validation Error', 'Please provide valid dates.');
+      return;
+    }
+    if (closesMs <= opensMs) {
+      showToast('Validation Error', 'Closing date must be after opening date.');
+      return;
+    }
+    // Production starts at must be >= closing date + 48 hours
+    if (prodMs < closesMs + 48 * 3600000) {
+      showToast('Validation Error', 'Production start must be at least 48 hours after batch closing.');
+      return;
+    }
+    if (relMs <= prodMs) {
+      showToast('Validation Error', 'Release date must be after production start.');
+      return;
+    }
+
+    setIsCreatingBatch(true);
+    try {
+      await backendApi.createBatchDraft({
+        edition_id: batchForEditionId,
+        name: batchForm.name.trim(),
+        opens_at: new Date(opensMs).toISOString(),
+        closes_at: new Date(closesMs).toISOString(),
+        production_starts_at: new Date(prodMs).toISOString(),
+        release_at: new Date(relMs).toISOString(),
+        pickup_locations: [
+          {
+            name: batchForm.pickup_name.trim() || 'Circuit Atelier HQ',
+            address: batchForm.pickup_address.trim() || '14 Victoria Island',
+            city: batchForm.pickup_city.trim() || 'Lagos',
+            country: batchForm.pickup_country.trim() || 'Nigeria',
+            instructions: batchForm.pickup_instructions.trim(),
+          }
+        ],
+      });
+      showToast('✓ Batch Created', `Batch "${batchForm.name}" draft created.`);
+      setIsCreateBatchModalOpen(false);
+      fetchBatchesForEdition(batchForEditionId);
+    } catch (err: any) {
+      console.error('Batch creation error:', err);
+      showToast('✗ Error', err?.message || 'Failed to create batch.');
+    } finally {
+      setIsCreatingBatch(false);
+    }
+  };
+
+  const handleInitializeBatch = async (b: backendApi.Batch) => {
+    if (!signTransaction) {
+      showToast('Wallet Required', 'Please connect your seller wallet to initialize the batch on Solana.');
+      return;
+    }
+    setIsInitializingBatch(b.id);
+    try {
+      showToast('Initializing on Solana', 'Preparing batch and escrow vault on Devnet...');
+      const unitLamports = String(Math.floor(0.8 * 1e9));
+      await executeBatchInitialize(
+        b.id,
+        {
+          expected_revision: b.revision || 1,
+          unit_price_lamports: unitLamports,
+        },
+        signTransaction
+      );
+      showToast('✓ Initialized', `Batch "${b.name}" is now live on Solana Devnet!`);
+      if (b.edition_id) fetchBatchesForEdition(b.edition_id);
+    } catch (err: any) {
+      console.error('Initialization error:', err);
+      showToast('✗ Init Failed', err?.message || 'Failed to initialize batch on-chain.');
+    } finally {
+      setIsInitializingBatch(null);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -114,7 +253,7 @@ export default function AdminDashboard() {
 
       // 1. Fetch Brands for Drop creation
       try {
-        const brandsRes = await getMyBrands();
+        const brandsRes = await backendApi.getMyBrands();
         if (brandsRes?.brands && Array.isArray(brandsRes.brands)) {
           setBrands(brandsRes.brands);
           if (brandsRes.brands.length > 0) {
@@ -150,6 +289,11 @@ export default function AdminDashboard() {
       // 3. Fetch Editions (Fetch managed drafts and active editions)
       const editionsList = await getEditions(false);
       setEditions(editionsList || []);
+
+      // 4. Fetch Batches for each edition
+      for (const ed of editionsList || []) {
+        fetchBatchesForEdition(ed.id);
+      }
     } catch (err) {
       console.error('Error querying dynamic dashboard data:', err);
     } finally {
@@ -1184,56 +1328,255 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {editions.map((ed) => (
-                    <div 
-                      key={ed.id} 
-                      onClick={() => editEdition(ed)}
-                      className={`card-glass p-5 flex flex-col justify-between gap-6 overflow-hidden border cursor-pointer hover:border-white/30 hover:bg-white/[0.02] transition-all duration-300 ${
-                        selectedEdition?.id === ed.id ? 'border-white bg-white/[0.04]' : 'border-white/[0.06]'
-                      }`}
-                    >
-                      <div className="flex gap-4">
-                        <div className="w-16 h-20 rounded-xl border border-white/10 relative overflow-hidden shrink-0">
-                          <Image src={ed.images?.[0]?.url || '/satin.png'} alt={ed.name} fill className="object-cover" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className="font-bold text-white truncate text-md">{ed.name}</h4>
-                            <span className={`text-[0.55rem] font-mono px-2 py-0.2 rounded font-bold uppercase shrink-0 ${
-                              ed.is_active 
-                                ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
-                                : 'text-white/30 bg-white/5 border border-white/5'
-                            }`}>
-                              {ed.is_active ? 'Active' : 'Inactive'}
+                  {editions.map((ed) => {
+                    const editionBatches = batchesByEdition[ed.id] || [];
+                    return (
+                      <div 
+                        key={ed.id} 
+                        onClick={() => editEdition(ed)}
+                        className={`card-glass p-5 flex flex-col justify-between gap-4 overflow-hidden border cursor-pointer hover:border-white/30 hover:bg-white/[0.02] transition-all duration-300 ${
+                          selectedEdition?.id === ed.id ? 'border-white bg-white/[0.04]' : 'border-white/[0.06]'
+                        }`}
+                      >
+                        <div className="flex gap-4">
+                          <div className="w-16 h-20 rounded-xl border border-white/10 relative overflow-hidden shrink-0">
+                            <Image src={ed.images?.[0]?.url || '/satin.png'} alt={ed.name} fill className="object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="font-bold text-white truncate text-md">{ed.name}</h4>
+                              <span className={`text-[0.55rem] font-mono px-2 py-0.2 rounded font-bold uppercase shrink-0 ${
+                                ed.is_active 
+                                  ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
+                                  : 'text-white/30 bg-white/5 border border-white/5'
+                              }`}>
+                                {ed.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                            <span className="text-[0.6rem] font-mono text-white/40 block mt-0.5">Slug ID: {ed.id}</span>
+                            <span className="text-xs text-emerald-400 font-bold block mt-2 font-mono">
+                              {ed.has_variable_prices ? 'Variable Sizing' : `${ed.price_usd} USD`}
                             </span>
                           </div>
-                          <span className="text-[0.6rem] font-mono text-white/40 block mt-0.5">Slug ID: {ed.id}</span>
-                          <span className="text-xs text-emerald-400 font-bold block mt-2 font-mono">
-                            {ed.has_variable_prices ? 'Variable Sizing' : `${ed.price_usd} USD`}
-                          </span>
                         </div>
-                      </div>
 
-                      <div className="flex justify-between items-center text-[0.6rem] text-[#666] pt-4 border-t border-white/5 font-mono">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${ed.chain_status === 'initialized' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                          <span className={ed.chain_status === 'initialized' ? 'text-emerald-400' : 'text-amber-400/80'}>
-                            {ed.chain_status === 'initialized' ? 'Live on Solana' : 'Draft'}
-                          </span>
+                        {/* Batches Preview */}
+                        <div className="space-y-2 pt-2 border-t border-white/5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#888] font-mono">
+                              Preorder Batches ({editionBatches.length})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenCreateBatch(ed.id);
+                              }}
+                              className="text-[0.6rem] font-bold text-emerald-400 hover:text-emerald-300 uppercase font-mono px-2 py-0.5 rounded border border-emerald-500/20 hover:border-emerald-500/40"
+                            >
+                              + New Batch
+                            </button>
+                          </div>
+
+                          {editionBatches.length > 0 ? (
+                            <div className="space-y-1.5 max-h-36 overflow-y-auto no-scrollbar">
+                              {editionBatches.map((b) => (
+                                <div key={b.id} className="p-2 rounded-xl bg-white/[0.02] border border-white/5 text-[0.6rem] font-mono flex items-center justify-between">
+                                  <div className="truncate mr-2">
+                                    <span className="text-white font-semibold block truncate">{b.name}</span>
+                                    <span className="text-[#666] block">
+                                      Closes: {new Date(b.closes_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  <div className="shrink-0 flex items-center gap-2">
+                                    {b.chain_status === 'initialized' ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[0.55rem] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        Live on Chain
+                                      </span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleInitializeBatch(b);
+                                        }}
+                                        disabled={isInitializingBatch === b.id}
+                                        className="px-2 py-0.5 rounded text-[0.55rem] font-bold uppercase bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 transition-colors"
+                                      >
+                                        {isInitializingBatch === b.id ? 'Initializing...' : 'Init on Solana'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[0.6rem] text-[#555] font-mono italic block">
+                              No batches yet. Create a batch to open preorders.
+                            </span>
+                          )}
                         </div>
-                        <a
-                          href={`/drop?id=${encodeURIComponent(ed.id)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-white hover:text-white/80 font-bold uppercase tracking-wider hover:underline transition-colors"
-                        >
-                          View Storefront ➔
-                        </a>
+
+                        <div className="flex justify-between items-center text-[0.6rem] text-[#666] pt-3 border-t border-white/5 font-mono">
+                          <span className="text-[#555]">
+                            {ed.max_supply} Units Cap
+                          </span>
+                          <a
+                            href={`/drop?edition=${encodeURIComponent(ed.id)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-white hover:text-white/80 font-bold uppercase tracking-wider hover:underline transition-colors"
+                          >
+                            View Storefront ➔
+                          </a>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CREATE PREORDER BATCH MODAL */}
+        {isCreateBatchModalOpen && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <div className="card-glass p-6 md:p-8 border border-white/10 rounded-3xl max-w-lg w-full flex flex-col gap-5 max-h-[90vh] overflow-y-auto no-scrollbar">
+              <div className="flex justify-between items-center pb-3 border-b border-white/10">
+                <div>
+                  <h3 className="text-base font-bold text-white uppercase tracking-wider">Create Preorder Batch</h3>
+                  <span className="text-[0.65rem] text-[#777] font-mono">For Edition: {batchForEditionId}</span>
+                </div>
+                <button onClick={() => setIsCreateBatchModalOpen(false)} className="text-[#666] hover:text-white text-lg">✕</button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.65rem] text-[#777] uppercase font-bold tracking-wider">Batch Name</label>
+                  <input
+                    type="text"
+                    value={batchForm.name}
+                    onChange={(e) => setBatchForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Batch 01 — October Run"
+                    className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[0.6rem] text-[#777] uppercase font-bold">Opens At</label>
+                    <input
+                      type="datetime-local"
+                      value={batchForm.opens_at}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, opens_at: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[0.6rem] text-[#777] uppercase font-bold">Closes At</label>
+                    <input
+                      type="datetime-local"
+                      value={batchForm.closes_at}
+                      onChange={(e) => {
+                        const newClose = e.target.value;
+                        const closeMs = Date.parse(newClose);
+                        setBatchForm(prev => ({
+                          ...prev,
+                          closes_at: newClose,
+                          production_starts_at: !isNaN(closeMs) ? new Date(closeMs + 48 * 3600000).toISOString().slice(0, 16) : prev.production_starts_at,
+                        }));
+                      }}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[0.6rem] text-[#777] uppercase font-bold">
+                      Production Start (≥ Close + 48h)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={batchForm.production_starts_at}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, production_starts_at: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[0.6rem] text-[#777] uppercase font-bold">Release / Pickup Date</label>
+                    <input
+                      type="datetime-local"
+                      value={batchForm.release_at}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, release_at: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-white/30 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Pickup Location fields */}
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  <span className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888]">Primary Pickup Station</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Station Name (e.g. Atelier HQ)"
+                      value={batchForm.pickup_name}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, pickup_name: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Address"
+                      value={batchForm.pickup_address}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, pickup_address: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="City (e.g. Lagos)"
+                      value={batchForm.pickup_city}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, pickup_city: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Country (e.g. Nigeria)"
+                      value={batchForm.pickup_country}
+                      onChange={(e) => setBatchForm(prev => ({ ...prev, pickup_country: e.target.value }))}
+                      className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Pickup instructions for buyers..."
+                    value={batchForm.pickup_instructions}
+                    onChange={(e) => setBatchForm(prev => ({ ...prev, pickup_instructions: e.target.value }))}
+                    className="w-full bg-[#0d0d0d] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 text-[#888]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateBatchModalOpen(false)}
+                  className="btn-outline-circuit py-2.5 px-5 text-xs border-white/10 text-[#888]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateBatch}
+                  disabled={isCreatingBatch}
+                  className="btn-circuit py-2.5 px-6 text-xs font-bold uppercase tracking-wider"
+                >
+                  <span>{isCreatingBatch ? 'Creating Draft...' : 'Create Batch Draft'}</span>
+                </button>
               </div>
             </div>
           </div>

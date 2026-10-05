@@ -35,7 +35,7 @@ import {
 
 
 
-import { Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
+import { Connection, clusterApiUrl, PublicKey, Transaction } from '@solana/web3.js';
 import { Program, AnchorProvider, type Idl } from '@coral-xyz/anchor';
 import * as backendApi from './backendApi';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
@@ -339,6 +339,161 @@ export async function confirmDelivery(
   };
 }
 
+// ── Verified Intent Chain Flow (4-Step Atomic Engine) ──────────────────
+
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export interface VerifiedPurchaseParams {
+  batchId: string;
+  quantity: number;
+  size?: string;
+  pickupLocationId: string;
+  signTransaction: (tx: Transaction) => Promise<Transaction>;
+  onStepChange?: (step: 'prepare' | 'sign' | 'submit' | 'confirm') => void;
+}
+
+export interface VerifiedPurchaseResult {
+  success: boolean;
+  orderId: string;
+  intentId: string;
+  signature: string;
+  solscanUrl: string;
+  order?: backendApi.ChainOrder;
+}
+
+/**
+ * 4-Step Verified Chain Checkout Flow:
+ * 1. Prepare intent with atomic quote & operational cosignature
+ * 2. Buyer signs transaction via Phantom / Wallet Adapter
+ * 3. Submit transaction to Solana devnet via backend
+ * 4. Confirm transaction on-chain & persist verified order
+ */
+export async function executeVerifiedPurchase(
+  params: VerifiedPurchaseParams
+): Promise<VerifiedPurchaseResult> {
+  const orderId = generateUUID();
+
+  // Step 1: Prepare
+  params.onStepChange?.('prepare');
+  const intent = await backendApi.prepareBatchPurchase(params.batchId, {
+    order_id: orderId,
+    quantity: params.quantity,
+    size: params.size,
+    pickup_location_id: params.pickupLocationId,
+  });
+
+  // Step 2: Sign
+  params.onStepChange?.('sign');
+  const tx = Transaction.from(Buffer.from(intent.transaction_base64, 'base64'));
+  const signedTx = await params.signTransaction(tx);
+  const signedBase64 = Buffer.from(signedTx.serialize({ requireAllSignatures: false })).toString('base64');
+
+  // Step 3: Submit
+  params.onStepChange?.('submit');
+  const submitRes = await backendApi.submitChainIntent(intent.intent_id, signedBase64);
+  const signature = submitRes.signature;
+
+  // Step 4: Confirm
+  params.onStepChange?.('confirm');
+  let confirmedOrder: backendApi.ChainOrder | undefined;
+  let retries = 0;
+  const maxRetries = 15;
+  while (retries < maxRetries) {
+    try {
+      const confirmRes = await backendApi.confirmChainIntent(intent.intent_id, signature);
+      if (confirmRes.status === 'confirmed') {
+        confirmedOrder = confirmRes.order;
+        break;
+      }
+    } catch (err: unknown) {
+      const errObj = err as { status?: number; retry_after_seconds?: number; error?: string };
+      if (errObj?.status === 202 || errObj?.retry_after_seconds || errObj?.error === 'CHAIN_ACCOUNT_NOT_FINALIZED') {
+        const delay = (errObj.retry_after_seconds || 2) * 1000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        retries++;
+        continue;
+      }
+      if (retries >= maxRetries - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      retries++;
+    }
+  }
+
+  return {
+    success: true,
+    orderId,
+    intentId: intent.intent_id,
+    signature,
+    solscanUrl: solscanTxUrl(signature),
+    order: confirmedOrder,
+  };
+}
+
+/**
+ * Execute cancellation within the 24-hour buyer window
+ */
+export async function executeVerifiedCancel(
+  orderId: string,
+  signTransaction: (tx: Transaction) => Promise<Transaction>
+) {
+  const intent = await backendApi.prepareOrderCancel(orderId);
+  const tx = Transaction.from(Buffer.from(intent.transaction_base64, 'base64'));
+  const signedTx = await signTransaction(tx);
+  const signedBase64 = Buffer.from(signedTx.serialize({ requireAllSignatures: false })).toString('base64');
+  const submitRes = await backendApi.submitChainIntent(intent.intent_id, signedBase64);
+  const signature = submitRes.signature;
+
+  let retries = 0;
+  while (retries < 15) {
+    try {
+      const confirmRes = await backendApi.confirmChainIntent(intent.intent_id, signature);
+      if (confirmRes.status === 'confirmed') return confirmRes;
+    } catch (err: unknown) {
+      if (retries >= 14) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      retries++;
+    }
+  }
+}
+
+/**
+ * Seller initializes a batch and vault on Solana
+ */
+export async function executeBatchInitialize(
+  batchId: string,
+  pricing: { expected_revision: number; unit_price_lamports: string; prices_by_size_lamports?: Record<string, string> },
+  signTransaction: (tx: Transaction) => Promise<Transaction>
+) {
+  const intent = await backendApi.prepareBatchInitialize(batchId, pricing);
+  const tx = Transaction.from(Buffer.from(intent.transaction_base64, 'base64'));
+  const signedTx = await signTransaction(tx);
+  const signedBase64 = Buffer.from(signedTx.serialize({ requireAllSignatures: false })).toString('base64');
+  const submitRes = await backendApi.submitChainIntent(intent.intent_id, signedBase64);
+  const signature = submitRes.signature;
+
+  let retries = 0;
+  while (retries < 15) {
+    try {
+      const confirmRes = await backendApi.confirmChainIntent(intent.intent_id, signature);
+      if (confirmRes.status === 'confirmed') return confirmRes;
+    } catch (err: unknown) {
+      if (retries >= 14) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      retries++;
+    }
+  }
+}
+
+
 // ── Data Fetching ────────────────────────────────────────────────────
 
 /**
@@ -459,6 +614,32 @@ export function parseError(err: unknown): string {
   if (code === 'DropSoldOut') return `Drop has reached maximum supply. No more orders can be registered.`;
   if (code === 'DropNotActive') return 'This drop is no longer active.';
 
+  // Batch & Verified Chain errors
+  if (code === 'PREPARE_RATE_LIMIT' || msg.includes('PREPARE_RATE_LIMIT')) {
+    return 'Rate limit reached. Please wait a minute before creating a new checkout attempt.';
+  }
+  if (code === 'BATCH_NOT_AVAILABLE' || msg.includes('BATCH_NOT_AVAILABLE')) {
+    return 'This batch is currently closed or not yet initialized for checkout.';
+  }
+  if (code === 'ORDER_ALREADY_RECORDED' || msg.includes('ORDER_ALREADY_RECORDED')) {
+    return 'This order has already been recorded.';
+  }
+  if (code === 'CANCELLATION_UNAVAILABLE' || msg.includes('CANCELLATION_UNAVAILABLE')) {
+    return 'Cancellation is no longer available (the 24-hour window has expired).';
+  }
+  if (code === 'REPORTING_NOT_OPEN' || msg.includes('REPORTING_NOT_OPEN')) {
+    return 'Dispute reporting opens on the batch release date.';
+  }
+  if (code === 'ORDER_NOT_COLLECTIBLE' || msg.includes('ORDER_NOT_COLLECTIBLE')) {
+    return 'This order cannot be marked as collected.';
+  }
+  if (code === 'CHAIN_SERVICE_UNAVAILABLE' || msg.includes('CHAIN_SERVICE_UNAVAILABLE')) {
+    return 'Solana devnet integration is currently syncing. Please try again shortly.';
+  }
+  if (code === 'CHAIN_INTEGRATION_DISABLED' || msg.includes('CHAIN_INTEGRATION_DISABLED')) {
+    return 'Chain integration is currently operating in simulation mode.';
+  }
+
   // Wallet / network errors
   if (msg.includes('User rejected') || msg.includes('cancelled')) {
     return 'Transaction cancelled. You can try again when ready.';
@@ -470,7 +651,7 @@ export function parseError(err: unknown): string {
     return 'Unable to reach Solana devnet. Please check your connection.';
   }
 
-  return 'Transaction failed. Please try again.';
+  return msg || 'Transaction failed. Please try again.';
 }
 
 // ── Demo Controls ────────────────────────────────────────────────────

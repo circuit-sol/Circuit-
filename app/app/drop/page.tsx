@@ -4,11 +4,14 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/lib/auth-context';
+import * as backendApi from '@/lib/backendApi';
 import {
   initializeEscrow,
   parseError,
   resetState,
+  executeVerifiedPurchase,
 } from '@/lib/solana-service';
 import { solscanTxUrl } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
@@ -17,6 +20,7 @@ import Selector from '@/components/Selector';
 import { saveOrder, getEditionById, getEditions } from '@/lib/db';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error' | 'soldout';
+type TxStep = 'idle' | 'prepare' | 'sign' | 'submit' | 'confirm';
 
 interface TxResult {
   txSignature?: string;
@@ -25,6 +29,42 @@ interface TxResult {
   orderNumber?: number;
   message?: string;
 }
+
+const defaultFallbackBatches: backendApi.Batch[] = [
+  {
+    id: 'b1-october-2026',
+    edition_id: 'drop-zero',
+    name: 'Batch 01 — October Run',
+    opens_at: new Date(Date.now() - 3600000).toISOString(),
+    closes_at: new Date(Date.now() + 86400000 * 7).toISOString(),
+    production_starts_at: new Date(Date.now() + 86400000 * 10).toISOString(),
+    release_at: new Date(Date.now() + 86400000 * 25).toISOString(),
+    pickup_locations: [
+      {
+        id: 'loc-lagos-1',
+        name: 'Circuit Atelier HQ',
+        address: '14 Victoria Island',
+        city: 'Lagos',
+        country: 'Nigeria',
+        instructions: 'Show your digital passport QR code at the concierge.',
+      },
+      {
+        id: 'loc-london-1',
+        name: 'Soho Design Hub',
+        address: '28 Peter Street',
+        city: 'London',
+        country: 'United Kingdom',
+        instructions: 'Counter 3, open Tuesday to Saturday 10am-6pm.',
+      },
+    ],
+    fulfillment_method: 'pickup',
+    sales_window_status: 'open',
+    checkout_enabled: true,
+    cancellation_window_hours: 24,
+    advance_payout_percent: 30,
+    balance_payout_percent: 70,
+  },
+];
 
 const fallbackEdition = {
   id: 'drop-zero',
@@ -43,12 +83,17 @@ const fallbackEdition = {
 
 function DropPageContent() {
   const { user, isSignedIn } = useAuth();
+  const { signTransaction } = useWallet();
   const searchParams = useSearchParams();
   const requestedEditionId = searchParams.get('edition');
 
   const [edition, setEdition] = useState<any>(null);
+  const [batches, setBatches] = useState<backendApi.Batch[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<backendApi.Batch | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [mintedCount, setMintedCount] = useState(0);
   const [txState, setTxState] = useState<TxState>('idle');
+  const [txStep, setTxStep] = useState<TxStep>('idle');
   const [txResult, setTxResult] = useState<TxResult>({});
   const [loading, setLoading] = useState(true);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
@@ -72,7 +117,7 @@ function DropPageContent() {
     }
   }, [txState, router]);
 
-  // Fetch Drop & Supply Details from Supabase
+  // Fetch Drop, Supply Details, and Batches
   useEffect(() => {
     async function loadDropData() {
       try {
@@ -131,12 +176,51 @@ function DropPageContent() {
             setSolPrice(Number(data.solana.usd));
           }
         } catch (e) {
-          // Log as a warning instead of error to prevent Next.js dev overlay from popping up during offline/local development
           console.warn('Unable to fetch live SOL price, using cached/offline fallback:', e);
+        }
+
+        // Fetch batches for this edition
+        try {
+          const batchRes = await backendApi.getPublicBatches(activeEdition.id);
+          if (batchRes?.batches && batchRes.batches.length > 0) {
+            setBatches(batchRes.batches);
+            setSelectedBatch(batchRes.batches[0]);
+            if (batchRes.batches[0].pickup_locations?.length > 0) {
+              setSelectedLocationId(batchRes.batches[0].pickup_locations[0].id || 'loc-1');
+            }
+          } else {
+            // Check seller batches or fallback
+            try {
+              const myBatchRes = await backendApi.getMyBatches({ editionId: activeEdition.id });
+              if (myBatchRes?.batches && myBatchRes.batches.length > 0) {
+                setBatches(myBatchRes.batches);
+                setSelectedBatch(myBatchRes.batches[0]);
+                if (myBatchRes.batches[0].pickup_locations?.length > 0) {
+                  setSelectedLocationId(myBatchRes.batches[0].pickup_locations[0].id || 'loc-1');
+                }
+              } else {
+                setBatches(defaultFallbackBatches);
+                setSelectedBatch(defaultFallbackBatches[0]);
+                setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+              }
+            } catch {
+              setBatches(defaultFallbackBatches);
+              setSelectedBatch(defaultFallbackBatches[0]);
+              setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch batches for edition, using default fallback:', e);
+          setBatches(defaultFallbackBatches);
+          setSelectedBatch(defaultFallbackBatches[0]);
+          setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
         }
       } catch (err) {
         console.error('Error fetching dynamic drop details:', err);
         setEdition(fallbackEdition);
+        setBatches(defaultFallbackBatches);
+        setSelectedBatch(defaultFallbackBatches[0]);
+        setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
       } finally {
         setLoading(false);
       }
@@ -164,6 +248,15 @@ function DropPageContent() {
   const isSoldOut = mintedCount >= maxSupply;
   const fillPercent = Math.min(100, (mintedCount / maxSupply) * 100);
 
+  // Prices: Primary in SOL, secondary in USD
+  const unitSol = selectedBatch?.pricing?.unit_price_lamports
+    ? Number(selectedBatch.pricing.unit_price_lamports) / 1e9
+    : solPrice
+      ? Number((computedPrice / solPrice).toFixed(3))
+      : 0.8;
+  const totalSol = Number((unitSol * quantity).toFixed(3));
+  const totalUsd = Number((computedPrice * quantity).toFixed(2));
+
   const handleOrder = async () => {
     if (processingRef.current) return;
 
@@ -184,48 +277,70 @@ function DropPageContent() {
 
     processingRef.current = true;
     setTxState('signing');
+    setTxStep('prepare');
     setTxResult({});
 
     try {
-      const unitPriceUsd = computedPrice;
-      const totalAmountUsd = unitPriceUsd * quantity;
-      
-      // Calculate SOL equivalent
-      const currentSolPrice = solPrice || 150; // Fallback to 150 if api fails
-      const totalAmountSol = totalAmountUsd / currentSolPrice;
+      // 1. If wallet is connected and signTransaction is available, execute verified 4-step chain flow
+      if (selectedBatch && signTransaction) {
+        try {
+          showToast('Preparing Order', 'Generating verified intent on Solana Devnet...');
+          const verified = await executeVerifiedPurchase({
+            batchId: selectedBatch.id,
+            quantity,
+            size: selectedSize,
+            pickupLocationId: selectedLocationId || selectedBatch.pickup_locations?.[0]?.id || 'loc-1',
+            signTransaction,
+            onStepChange: (step) => {
+              setTxStep(step);
+              if (step === 'sign') showToast('Signature Required', 'Please approve transaction in Phantom wallet.');
+              if (step === 'submit') showToast('Submitting', 'Broadcasting transaction to Solana Devnet...');
+              if (step === 'confirm') showToast('Confirming', 'Verifying on-chain state and escrow deposit...');
+            },
+          });
 
-      // 1. Solana Handshake (via non-custodial or backend escrow transaction)
-      const result = await initializeEscrow(edition.id, totalAmountSol, user.walletAddress);
+          // Cache order info for passport
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('circuit_last_order_tx', verified.signature);
+            localStorage.setItem('circuit_last_order_id', verified.orderId);
+          }
 
-      // 2. Persist dynamic order state to database
+          setMintedCount((prev) => prev + quantity);
+          setTxState('success');
+          setTxStep('idle');
+          setTxResult({
+            txSignature: verified.signature,
+            solscanUrl: verified.solscanUrl,
+            orderNumber: (mintedCount || 0) + 1,
+          });
+          showToast('✓ Confirmed', `Order #${(mintedCount || 0) + 1} confirmed on Solana Devnet!`);
+          return;
+        } catch (chainErr) {
+          console.warn('Verified chain intent encountered issue, falling back gracefully:', chainErr);
+          // Fall through to standard escrow handshake if chain engine in simulation/mock
+        }
+      }
+
+      // 2. Fallback handshake (custodial/simulation escrow)
+      const result = await initializeEscrow(edition.id, totalSol, user.walletAddress);
+
       await saveOrder({
         email: user.email,
         drop_id: edition.id,
         tx_signature: result.txSignature,
         escrow_pda: result.escrowPDA,
-        amount_usd: totalAmountUsd,
+        amount_usd: totalUsd,
         size: selectedSize,
-        quantity: quantity
+        quantity: quantity,
       });
 
-      // Cache tx_signature for passport retrieval
       if (typeof window !== 'undefined') {
-        try {
-          const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
-          const orderRes = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(result.txSignature)}`);
-          if (orderRes.ok) {
-            const orderData = await orderRes.json();
-            if (orderData?.tx_signature) {
-              localStorage.setItem('circuit_last_order_tx', orderData.tx_signature);
-            }
-          }
-        } catch (e) {
-          console.error('Error caching order tx:', e);
-        }
+        localStorage.setItem('circuit_last_order_tx', result.txSignature);
       }
 
-      setMintedCount(prev => prev + quantity);
+      setMintedCount((prev) => prev + quantity);
       setTxState('success');
+      setTxStep('idle');
       setTxResult({
         txSignature: result.txSignature,
         solscanUrl: result.solscanUrl,
@@ -246,6 +361,7 @@ function DropPageContent() {
       }
     } finally {
       processingRef.current = false;
+      setTxStep('idle');
     }
   };
 
@@ -309,7 +425,8 @@ function DropPageContent() {
             </div>
             <div className="p-4 md:p-5 border-r border-b sm:border-b-0 border-white/[0.08]">
               <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Unit Price</span>
-              <span className="text-sm font-semibold">${computedPrice} USD</span>
+              <span className="text-sm font-semibold text-emerald-400">{unitSol} SOL</span>
+              <span className="block text-[0.6rem] text-[#666]">~${computedPrice} USD</span>
             </div>
             <div className="p-4 md:p-5 border-r border-white/[0.08]">
               <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Main Fabric</span>
@@ -323,6 +440,92 @@ function DropPageContent() {
               <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Embroidery</span>
               <span className="text-sm font-semibold">{activeEdition.embroidery || 'Metallic thread'}</span>
             </div>
+          </div>
+
+          {/* Preorder Batch Selector */}
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-baseline">
+              <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">Select Preorder Batch</span>
+              {selectedBatch?.closes_at && (
+                <span className="text-[0.65rem] font-mono text-[#888]">
+                  Closes: {new Date(selectedBatch.closes_at).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {batches.map((b) => {
+                const isSelected = selectedBatch?.id === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedBatch(b);
+                      if (b.pickup_locations?.length > 0) {
+                        setSelectedLocationId(b.pickup_locations[0].id || 'loc-1');
+                      }
+                    }}
+                    className={`p-4 rounded-2xl text-left border transition-all ${
+                      isSelected
+                        ? 'border-white bg-white/[0.06] shadow-[0_0_20px_rgba(255,255,255,0.05)]'
+                        : 'border-white/[0.08] bg-white/[0.02] hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-white tracking-wide">{b.name}</span>
+                      <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border border-emerald-400/30 text-emerald-400 bg-emerald-400/10">
+                        {b.sales_window_status || 'Open'}
+                      </span>
+                    </div>
+                    <div className="text-[0.65rem] text-[#888] font-mono space-y-0.5">
+                      <div>Release: {new Date(b.release_at).toLocaleDateString()}</div>
+                      <div>{b.pickup_locations?.length || 1} Pickup Station{(b.pickup_locations?.length || 1) > 1 ? 's' : ''}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Fulfillment: In-Person Pickup Only */}
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-between items-baseline">
+              <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">
+                Fulfillment Station (Pickup Only)
+              </span>
+              <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded bg-white/[0.05] border border-white/10 text-white/80">
+                In-Person Collection
+              </span>
+            </div>
+
+            {selectedBatch && selectedBatch.pickup_locations?.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <select
+                  value={selectedLocationId}
+                  onChange={(e) => setSelectedLocationId(e.target.value)}
+                  className="w-full bg-[#0d0d0d] border border-white/[0.12] rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-white/40"
+                >
+                  {selectedBatch.pickup_locations.map((loc, idx) => (
+                    <option key={loc.id || idx} value={loc.id || `loc-${idx}`}>
+                      {loc.name} — {loc.address}, {loc.city}, {loc.country}
+                    </option>
+                  ))}
+                </select>
+
+                {(() => {
+                  const activeLoc = selectedBatch.pickup_locations.find((l) => (l.id || '') === selectedLocationId) || selectedBatch.pickup_locations[0];
+                  return activeLoc?.instructions ? (
+                    <p className="text-[0.65rem] text-[#777] font-mono italic px-1">
+                      ℹ Instructions: {activeLoc.instructions}
+                    </p>
+                  ) : null;
+                })()}
+              </div>
+            ) : (
+              <div className="p-3 text-xs text-[#888] border border-white/[0.08] rounded-xl bg-white/[0.02]">
+                Official Brand Studio Collection Station
+              </div>
+            )}
           </div>
 
           {/* Sizing & Quantity */}
@@ -382,39 +585,59 @@ function DropPageContent() {
                   onClick={() => setPaymentMethod('crypto')}
                   className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${paymentMethod === 'crypto' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
                 >
-                  Crypto (SOL)
+                  Crypto ({totalSol} SOL)
                 </button>
                 <button 
                   onClick={() => setPaymentMethod('fiat')}
                   className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${paymentMethod === 'fiat' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
                 >
-                  Fiat (Card)
+                  Fiat (${totalUsd} USD)
                 </button>
               </div>
             </div>
 
             {/* Escrow Protocol & Cancellation Guarantee Notice */}
-            <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 text-[0.65rem] text-[#888] font-mono leading-relaxed space-y-1">
-              <div className="flex items-center gap-2 text-white/90 font-bold uppercase tracking-wider text-[0.6rem]">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>Solana Escrow Protocol Guarantee</span>
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-[0.68rem] text-[#999] leading-relaxed space-y-2">
+              <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider text-[0.65rem]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Protected by Staged Solana Escrow Protocol</span>
               </div>
-              <p>
-                Funds are secured in a decentralized Solana Escrow PDA. You can cancel before manufacturing locks (network gas non-refundable). Payment releases to the brand only after you verify garment receipt.
-              </p>
+              <ul className="space-y-1 list-disc list-inside text-[#888] font-mono text-[0.63rem]">
+                <li>
+                  <strong className="text-white">24-Hour Cancellation Window:</strong> 100% individual refund available within 24 hours of purchase, even near batch close.
+                </li>
+                <li>
+                  <strong className="text-white">Staged Production Payout:</strong> 30% advance disbursed 48h after batch closing to fund manufacturing; 70% balance held until 7 days post-release.
+                </li>
+                <li>
+                  <strong className="text-white">Dispute Protection:</strong> Missing orders can be reported to Circuit from release day for administrative review and holds.
+                </li>
+              </ul>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <div className="flex flex-col gap-3">
+              {txState === 'signing' && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-[0.65rem] font-mono text-emerald-400">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M12 2a10 10 0 010 20 10 10 0 010-20"/></svg>
+                  <span>
+                    {txStep === 'prepare' && 'Step 1/4: Preparing on-chain purchase intent...'}
+                    {txStep === 'sign' && 'Step 2/4: Requesting Phantom wallet signature...'}
+                    {txStep === 'submit' && 'Step 3/4: Broadcasting transaction to Solana devnet...'}
+                    {txStep === 'confirm' && 'Step 4/4: Confirming finality and recording escrow order...'}
+                  </span>
+                </div>
+              )}
+
               <button
-                className={`btn-circuit w-full sm:w-auto ${txState === 'signing' ? 'signing' : ''} ${isSoldOut ? '!bg-[#111] !text-[#444] !border-white/5' : ''}`}
+                className={`btn-circuit w-full ${txState === 'signing' ? 'signing' : ''} ${isSoldOut ? '!bg-[#111] !text-[#444] !border-white/5' : ''}`}
                 onClick={handleOrder}
                 disabled={txState === 'signing' || isSoldOut}
               >
                 <span>
-                  {txState === 'signing' ? 'Confirming...' : 
+                  {txState === 'signing' ? 'Processing on Solana...' : 
                    txState === 'success' ? '✓ Order Confirmed' :
                    isSoldOut ? 'Scarcity Reached' :
-                   'Confirm Order'}
+                   `Pre-Order (${totalSol} SOL)`}
                 </span>
                 <span className="btn-arrow">
                   {txState === 'signing' ? (

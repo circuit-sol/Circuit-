@@ -9,10 +9,10 @@ export const SIMULATION_MODE = process.env.NEXT_PUBLIC_SIMULATION_MODE !== 'fals
 
 // ── Program IDs (from INTEGRATION.md & .env) ─────────────────────────
 export const ESCROW_PROGRAM_ID = 
-  process.env.NEXT_PUBLIC_ESCROW_PROGRAM_ID || '8b866KXrU94jAEuZYNr8WTkuXJELPvu6eW1v89pSAUrN';
+  process.env.NEXT_PUBLIC_ESCROW_PROGRAM_ID || 'AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9';
 
 export const DROPS_PROGRAM_ID = 
-  process.env.NEXT_PUBLIC_DROPS_PROGRAM_ID || '3i1KUa7S1FjRx34SzqRAKAYsp3S8AJkCB3x7odjua7kL';
+  process.env.NEXT_PUBLIC_DROPS_PROGRAM_ID || 'G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj';
 
 export const GARMENT_MINT = 
   process.env.NEXT_PUBLIC_GARMENT_MINT || 'G17eNpsCn4S2Xtr4f9t9fmgyf6ZVFEpdXnpqJBiBCFEo';

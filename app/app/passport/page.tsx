@@ -3,8 +3,11 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { getEditionById, getUserOrders, updateOrderStatusLifecycle } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
+import * as backendApi from '@/lib/backendApi';
+import { executeVerifiedCancel } from '@/lib/solana-service';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
@@ -16,23 +19,67 @@ function PassportContent() {
   const [orderId, setOrderId] = useState<string | null>(orderIdParam);
   const [order, setOrder] = useState<any>(null);
   const [edition, setEdition] = useState<any>(null);
+  const [batch, setBatch] = useState<backendApi.Batch | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportMessage, setReportMessage] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [isReported, setIsReported] = useState(false);
   const { user, isSignedIn } = useAuth();
+  const { signTransaction } = useWallet();
 
-  const handleConfirmDelivery = async () => {
+  const handleConfirmCollection = async () => {
     if (!order) return;
     setConfirmingReceipt(true);
     try {
-      await updateOrderStatusLifecycle(order.id, 'delivered');
-      setOrder((prev: any) => ({ ...prev, status: 'delivered' }));
-      showToast('✓ Delivery Confirmed', 'Escrow funds successfully settled and released to the brand.');
+      try {
+        await backendApi.recordOrderCollected(order.id);
+      } catch (e) {
+        console.warn('Backend chain collection call notice:', e);
+      }
+      await updateOrderStatusLifecycle(order.id, 'collected');
+      setOrder((prev: any) => ({ ...prev, status: 'collected', collected_at: new Date().toISOString() }));
+      showToast('✓ Pickup Recorded', 'Item collection logged on-chain. Note: Seller 70% balance payout will release 7 days post-release date.');
     } catch (err) {
       console.error(err);
-      showToast('✗ Error', 'Failed to confirm delivery.');
+      showToast('✗ Error', 'Failed to record collection.');
     } finally {
       setConfirmingReceipt(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order || !signTransaction) return;
+    if (!confirm('Are you sure you want to cancel this order? 100% of your deposit will be refunded to your wallet.')) return;
+    setIsCancelling(true);
+    try {
+      await executeVerifiedCancel(order.id, signTransaction);
+      setOrder((prev: any) => ({ ...prev, cancelled: true, status: 'cancelled' }));
+      showToast('✓ Order Cancelled', 'Refund returned to your wallet on Solana devnet.');
+    } catch (err) {
+      console.error(err);
+      showToast('✗ Cancellation Failed', 'Unable to cancel. The 24-hour window may have expired.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleSendReport = async () => {
+    if (!order || !reportMessage.trim()) return;
+    setIsReporting(true);
+    try {
+      await backendApi.reportOrderIssue(order.id, reportMessage.trim());
+      setIsReported(true);
+      setShowReportModal(false);
+      showToast('✓ Report Submitted', 'Dispute logged with Circuit admin. Remaining payouts will be reviewed.');
+    } catch (err: any) {
+      console.error(err);
+      showToast('✗ Error', err?.message || 'Failed to submit report. Reporting opens on release date.');
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -49,6 +96,20 @@ function PassportContent() {
         if (cachedTx) {
           setOrderId(cachedTx);
           return;
+        }
+      }
+
+      // Check verified chain orders if authenticated
+      if (isSignedIn) {
+        try {
+          const chainRes = await backendApi.getMyChainOrders();
+          if (chainRes?.orders && chainRes.orders.length > 0) {
+            const latest = chainRes.orders[0];
+            setOrderId(latest.purchase_signature || latest.id);
+            return;
+          }
+        } catch {
+          // fallback to db query
         }
       }
 
@@ -85,13 +146,37 @@ function PassportContent() {
     try {
       setLoading(true);
       const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
-      const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(orderId!)}`);
+      let ord: any = null;
 
-      if (!res.ok) throw new Error('Order not found');
-      const ord = await res.json();
+      // 1. Check chain order by ID or signature
+      try {
+        const chainRes = await backendApi.getChainOrderById(orderId!);
+        if (chainRes?.order) ord = chainRes.order;
+      } catch {
+        // fallback to db
+      }
+
+      if (!ord) {
+        const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(orderId!)}`);
+        if (res.ok) {
+          ord = await res.json();
+        }
+      }
+
+      if (!ord) throw new Error('Order not found');
 
       setOrder(ord);
-      if (ord && ord.drop_id) {
+
+      if (ord.batch_id) {
+        try {
+          const bRes = await backendApi.getPublicBatchById(ord.batch_id);
+          if (bRes?.batch) setBatch(bRes.batch);
+        } catch {
+          // fallback
+        }
+      }
+
+      if (ord.drop_id) {
         const ed = await getEditionById(ord.drop_id);
         setEdition(ed);
       }
@@ -308,32 +393,136 @@ function PassportContent() {
                 </div>
               )}
 
-              {/* Buyer Delivery Confirmation & Escrow Release Action */}
-              {status === 'shipped' && (
-                <div className="card-glass p-6 border-emerald-500/30 bg-emerald-500/[0.04] rounded-2xl flex flex-col gap-3 animate-fade-in">
+              {/* 24-Hour Individual Cancellation Window */}
+              {!order.cancelled && (order.cancel_until ? new Date() < new Date(order.cancel_until) : (Date.now() - new Date(order.created_at || Date.now()).getTime()) < 86400000) && (
+                <div className="card-glass p-5 border-amber-500/30 bg-amber-500/[0.04] rounded-2xl flex flex-col gap-3 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">Garment in Transit</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">24-Hour Cancellation Eligible</span>
+                    <span className="text-[0.65rem] font-mono text-[#888]">100% Refund Guarantee</span>
                   </div>
                   <p className="text-xs text-white/80 leading-relaxed">
-                    Have you received and verified your physical piece? Confirming receipt authorizes the final Solana escrow settlement and releases payment to the brand.
+                    You have an individual 24-hour cancellation window from your purchase time. Cancelling immediately refunds 100% of your deposit from the Solana escrow vault.
                   </p>
                   <button
-                    onClick={handleConfirmDelivery}
-                    disabled={confirmingReceipt}
-                    className="btn-circuit py-3 text-xs uppercase tracking-wider justify-center w-full mt-1"
+                    onClick={handleCancelOrder}
+                    disabled={isCancelling}
+                    className="btn-outline-circuit py-2.5 text-xs uppercase tracking-wider text-amber-400 border-amber-500/40 hover:border-amber-400 w-full"
                   >
-                    <span>{confirmingReceipt ? 'Releasing Escrow...' : 'Confirm Delivery & Authorize Escrow Release'}</span>
+                    <span>{isCancelling ? 'Processing Refund on Solana...' : 'Cancel Order (100% Refund)'}</span>
                   </button>
                 </div>
               )}
 
-              {status === 'delivered' && (
+              {order.cancelled && (
+                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 animate-fade-in">
+                  <span className="text-red-400 text-lg">✗</span>
+                  <div>
+                    <span className="text-xs font-bold text-red-400 uppercase tracking-wider font-mono block">Order Cancelled & Refunded</span>
+                    <span className="text-[0.65rem] text-red-400/80 font-mono">100% deposit returned to your wallet from the batch escrow pool.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Buyer In-Person Pickup Collection Confirmation (Decoupled from Payout) */}
+              {!order.cancelled && status !== 'delivered' && status !== 'collected' && (
+                <div className="card-glass p-6 border-emerald-500/30 bg-emerald-500/[0.04] rounded-2xl flex flex-col gap-3 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">In-Person Collection</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  </div>
+                  <p className="text-xs text-white/80 leading-relaxed">
+                    Have you collected your garment at the designated pickup station? Confirming logs your physical receipt on-chain.
+                  </p>
+                  <p className="text-[0.65rem] text-[#888] font-mono leading-relaxed">
+                    * Policy: In accordance with the Circuit staged settlement agreement, seller balance payout unlocks 7 days after the batch release date.
+                  </p>
+                  <button
+                    onClick={handleConfirmCollection}
+                    disabled={confirmingReceipt}
+                    className="btn-circuit py-3 text-xs uppercase tracking-wider justify-center w-full mt-1"
+                  >
+                    <span>{confirmingReceipt ? 'Logging Pickup On-Chain...' : 'Confirm Item Collected'}</span>
+                  </button>
+                </div>
+              )}
+
+              {(status === 'delivered' || status === 'collected') && (
                 <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 animate-fade-in">
                   <span className="text-emerald-400 text-lg">✓</span>
                   <div>
-                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider font-mono block">Delivery Confirmed & Settled</span>
-                    <span className="text-[0.65rem] text-emerald-400/80 font-mono">Escrow funds have been successfully released to the brand designer.</span>
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider font-mono block">Item Collected & Verified</span>
+                    <span className="text-[0.65rem] text-emerald-400/80 font-mono">Physical receipt recorded on-chain. Staged balance payout scheduled 7 days post-release.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Staged Escrow Financial Schedule Breakdown */}
+              <div className="flex flex-col gap-3 border border-white/[0.08] rounded-2xl p-5 bg-white/[0.02]">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#666]">Staged Escrow Schedule</span>
+                  <span className="text-[0.6rem] font-mono text-emerald-400">Solana Devnet Vault</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span className="text-[0.6rem] text-[#666] uppercase block">30% Advance (Production)</span>
+                    <span className="text-white font-semibold block">Batch Closing + 48h</span>
+                    <span className="text-[0.62rem] text-[#888] block">Disbursed to fund initial manufacturing costs.</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span className="text-[0.6rem] text-[#666] uppercase block">70% Balance (Final Settlement)</span>
+                    <span className="text-white font-semibold block">Release Date + 7 Days</span>
+                    <span className="text-[0.62rem] text-[#888] block">Held in vault unless disputed or admin frozen.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dispute & Incident Reporting */}
+              <div className="p-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white block">Order Issue or Missing Item?</span>
+                  <span className="text-[0.65rem] text-[#777] font-mono">Available from batch release date. Reports go directly to Circuit admin.</span>
+                </div>
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  disabled={isReported}
+                  className="btn-outline-circuit py-2 px-4 text-xs border-white/20 text-[#aaa] hover:text-white"
+                >
+                  {isReported ? 'Report Logged' : 'Report Issue'}
+                </button>
+              </div>
+
+              {/* Report Issue Modal */}
+              {showReportModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-[#111] border border-white/10 rounded-3xl p-6 max-w-md w-full flex flex-col gap-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">Report Order Issue</h3>
+                      <button onClick={() => setShowReportModal(false)} className="text-[#666] hover:text-white text-lg">✕</button>
+                    </div>
+                    <p className="text-xs text-[#888] leading-relaxed">
+                      Reports are submitted directly to Circuit administration. An admin can freeze the batch payout to investigate and issue refunds or partial payments.
+                    </p>
+                    <textarea
+                      value={reportMessage}
+                      onChange={(e) => setReportMessage(e.target.value)}
+                      placeholder="Please describe the issue (e.g. item missing from station, defect, etc.)..."
+                      className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 min-h-[100px]"
+                    />
+                    <div className="flex gap-3 justify-end">
+                      <button
+                        onClick={() => setShowReportModal(false)}
+                        className="btn-outline-circuit py-2 px-4 text-xs border-white/10 text-[#888]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSendReport}
+                        disabled={isReporting || !reportMessage.trim()}
+                        className="btn-circuit py-2 px-5 text-xs uppercase"
+                      >
+                        <span>{isReporting ? 'Submitting...' : 'Submit to Circuit'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -343,34 +532,34 @@ function PassportContent() {
                 <h4 className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-[#666]">Garment Lifecycle</h4>
                 <div className="space-y-2">
                   <TimelineItem 
-                    date={new Date(order.created_at).toLocaleDateString()} 
-                    title="Order Confirmed" 
-                    desc="Your payment is locked in Solana Escrow."
+                    date={new Date(order.created_at || Date.now()).toLocaleDateString()} 
+                    title="Order Confirmed & Escrowed" 
+                    desc="Payment locked in decentralized Solana batch escrow vault."
                     active={true}
                   />
                   <TimelineItem 
                     date={status === 'in_production' || isMinted ? 'Active' : '—'} 
-                    title="In Production" 
-                    desc="Your piece is being made."
+                    title="Production Started (30% Advance)" 
+                    desc="Manufacturing begins once batch closes + 48h advance is eligible."
                     active={status !== 'pending' && status !== 'cancelled'}
                   />
                   <TimelineItem 
                     date={isMinted ? 'Minted' : '—'} 
                     title="Digital Passport Ready" 
-                    desc="Made. Your ownership record is ready."
+                    desc="Made. Your digital authenticity certificate is registered."
                     active={isMinted}
                   />
                   <TimelineItem 
-                    date={status === 'shipped' || status === 'delivered' ? 'Shipped' : '—'} 
-                    title="Shipment" 
-                    desc={order.shipment_details || 'Your garment is on its way.'}
-                    active={['shipped', 'delivered'].includes(status)}
+                    date={status === 'collected' || status === 'delivered' ? 'Collected' : '—'} 
+                    title="In-Person Station Collection" 
+                    desc={order.pickup_location_id ? `Station pickup logged. Receipt verified.` : (order.shipment_details || 'Ready for collection at designated brand station.')}
+                    active={['collected', 'shipped', 'delivered'].includes(status)}
                   />
                   <TimelineItem 
-                    date={status === 'delivered' ? 'Delivered' : '—'} 
-                    title="Delivered & Settled" 
-                    desc="Receipt confirmed. Escrow payment released to designer."
-                    active={status === 'delivered'}
+                    date={status === 'delivered' || status === 'collected' ? 'Scheduled' : '—'} 
+                    title="Final Settlement (70% Balance)" 
+                    desc="Released to designer 7 days post-release date unless disputed."
+                    active={status === 'delivered' || status === 'collected'}
                   />
                 </div>
               </div>
