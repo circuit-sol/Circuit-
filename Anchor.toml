@@ -1,23 +1,68 @@
+[toolchain]
+anchor_version = "0.30.1"
+solana_version = "1.18.17"
+
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-circuit_escrow = "8b866KXrU94jAEuZYNr8WTkuXJELPvu6eW1v89pSAUrN"
-circuit_drops = "3i1KUa7S1FjRx34SzqRAKAYsp3S8AJkCB3x7odjua7kL"
+circuit_drops = "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+circuit_escrow = "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"
 
 [programs.devnet]
-circuit_escrow = "8b866KXrU94jAEuZYNr8WTkuXJELPvu6eW1v89pSAUrN"
-circuit_drops = "3i1KUa7S1FjRx34SzqRAKAYsp3S8AJkCB3x7odjua7kL"
+circuit_drops = "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+circuit_escrow = "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
-wallet = "~/.config/solana/id.json"
+cluster = "Localnet"
+wallet = "~/.config/solana/circuit-v2/local-test-provider.json"
+
+[test]
+upgradeable = true
 
 [scripts]
-test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-# IDL generation requires nightly: `rustup default nightly && anchor build`
-# On stable Rust 1.80+, use: `anchor build --no-idl`
+test = "node scripts/test-batch-initialization.cjs"
+
+# Compile programs separately using cargo-build-sbf 4.2.0:
+# cargo build-sbf --manifest-path programs/circuit-drops/Cargo.toml --tools-version v1.56 --arch v0 -- --locked
+# cargo build-sbf --manifest-path programs/circuit-escrow/Cargo.toml --tools-version v1.56 --arch v0 -- --locked
+
+# Generate IDLs separately using the patched Anchor 0.30.1 dependency:
+# RUSTUP_TOOLCHAIN=nightly-2026-10-01 anchor idl build --program-name circuit_drops --out target/idl/circuit_drops.json
+# RUSTUP_TOOLCHAIN=nightly-2026-10-01 anchor idl build --program-name circuit_escrow --out target/idl/circuit_escrow.json
+
+# After both builds and IDL generation succeed:
+# anchor test --skip-build --provider.cluster localnet
+
+
+# [toolchain]
+# anchor_version = "0.30.1"
+# solana_version = "1.18.17"
+
+# [features]
+# resolution = true
+# skip-lint = false
+
+# [programs.localnet]
+# circuit_drops = "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+# circuit_escrow = "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"
+
+# [programs.devnet]
+# circuit_drops = "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+# circuit_escrow = "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"
+
+# [registry]
+# url = "https://api.apr.dev"
+
+# [provider]
+# cluster = "Devnet"
+# wallet = "~/.config/solana/id.json"
+
+# [scripts]
+# test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+# # IDL generation requires nightly: `rustup default nightly && anchor build`
+# # On stable Rust 1.80+, use: `anchor build --no-idl`
