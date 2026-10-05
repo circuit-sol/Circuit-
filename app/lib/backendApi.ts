@@ -488,19 +488,67 @@ export function getMyBatchById(batchId: string) {
   }, true);
 }
 
+function sanitizePickupLocations(locations: PickupLocation[]) {
+  return (locations || []).map((loc) => {
+    let address = (loc.address || '').trim();
+    if (loc.city && !address.toLowerCase().includes(loc.city.toLowerCase().trim())) {
+      address = `${address}, ${loc.city.trim()}`;
+    }
+    if (loc.country && !address.toLowerCase().includes(loc.country.toLowerCase().trim())) {
+      address = `${address}, ${loc.country.trim()}`;
+    }
+    const clean: { name: string; address: string; instructions?: string } = {
+      name: (loc.name || '').trim().slice(0, 120),
+      address: address.trim().slice(0, 1000),
+    };
+    if (loc.instructions && loc.instructions.trim()) {
+      clean.instructions = loc.instructions.trim().slice(0, 2000);
+    }
+    return clean;
+  });
+}
+
+function ensureIsoUtc(dateStr: string): string {
+  const parsed = new Date(dateStr);
+  if (isNaN(parsed.getTime())) {
+    throw new Error('INVALID_BATCH_DATE');
+  }
+  return parsed.toISOString();
+}
+
 /** Create a new preorder batch draft */
 export function createBatchDraft(payload: CreateBatchPayload) {
+  const cleanPayload = {
+    edition_id: String(payload.edition_id).trim(),
+    name: String(payload.name).trim().slice(0, 120),
+    opens_at: ensureIsoUtc(payload.opens_at),
+    closes_at: ensureIsoUtc(payload.closes_at),
+    production_starts_at: ensureIsoUtc(payload.production_starts_at),
+    release_at: ensureIsoUtc(payload.release_at),
+    pickup_locations: sanitizePickupLocations(payload.pickup_locations),
+  };
+
   return request<{ batch: Batch }>('/api/batches', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(cleanPayload),
   }, true);
 }
 
 /** Update an uninitialized batch draft */
 export function updateBatchDraft(batchId: string, payload: UpdateBatchPayload, expectedRevision: number) {
+  const cleanChanges: Record<string, unknown> = {
+    expected_revision: expectedRevision,
+  };
+  if (payload.name !== undefined) cleanChanges.name = String(payload.name).trim().slice(0, 120);
+  if (payload.opens_at !== undefined) cleanChanges.opens_at = ensureIsoUtc(payload.opens_at);
+  if (payload.closes_at !== undefined) cleanChanges.closes_at = ensureIsoUtc(payload.closes_at);
+  if (payload.production_starts_at !== undefined) cleanChanges.production_starts_at = ensureIsoUtc(payload.production_starts_at);
+  if (payload.release_at !== undefined) cleanChanges.release_at = ensureIsoUtc(payload.release_at);
+  if (payload.pickup_locations !== undefined) cleanChanges.pickup_locations = sanitizePickupLocations(payload.pickup_locations);
+
   return request<{ batch: Batch }>(`/api/batches/${encodeURIComponent(batchId)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ ...payload, expected_revision: expectedRevision }),
+    body: JSON.stringify(cleanChanges),
   }, true);
 }
 
@@ -530,9 +578,16 @@ export function prepareBatchInitialize(batchId: string, payload: {
   unit_price_lamports: string;
   prices_by_size_lamports?: Record<string, string>;
 }) {
+  const cleanPayload: Record<string, unknown> = {
+    expected_revision: Number(payload.expected_revision),
+    unit_price_lamports: String(payload.unit_price_lamports).trim(),
+  };
+  if (payload.prices_by_size_lamports && typeof payload.prices_by_size_lamports === 'object') {
+    cleanPayload.prices_by_size_lamports = payload.prices_by_size_lamports;
+  }
   return request<ChainIntent>(`/api/chain/batches/${encodeURIComponent(batchId)}/initialize/prepare`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(cleanPayload),
   }, true);
 }
 
@@ -546,9 +601,17 @@ export function prepareBatchPurchase(batchId: string, payload: {
   size?: string;
   pickup_location_id: string;
 }) {
+  const cleanPayload: Record<string, unknown> = {
+    order_id: String(payload.order_id).toLowerCase().trim(),
+    quantity: Math.floor(Number(payload.quantity)),
+    pickup_location_id: String(payload.pickup_location_id).toLowerCase().trim(),
+  };
+  if (payload.size) {
+    cleanPayload.size = String(payload.size).trim();
+  }
   return request<ChainIntent>(`/api/chain/batches/${encodeURIComponent(batchId)}/purchase/prepare`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(cleanPayload),
   }, true);
 }
 
@@ -578,11 +641,15 @@ export function submitChainIntent(intentId: string, signedTransactionBase64: str
  * Step 3 (Confirm): Finalize transaction confirmation on-chain and record order.
  */
 export function confirmChainIntent(intentId: string, signature?: string) {
+  const cleanPayload: Record<string, string> = {};
+  if (signature && typeof signature === 'string' && signature.trim()) {
+    cleanPayload.signature = signature.trim();
+  }
   return request<{ status: string; intent_id: string; signature: string; order?: ChainOrder }>(
     `/api/chain/intents/${encodeURIComponent(intentId)}/confirm`,
     {
       method: 'POST',
-      body: JSON.stringify({ signature }),
+      body: JSON.stringify(cleanPayload),
     },
     true
   );
@@ -634,7 +701,7 @@ export function reportOrderIssue(orderId: string, message: string) {
     `/api/chain/orders/${encodeURIComponent(orderId)}/report`,
     {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message: message.trim().slice(0, 2000) }),
     },
     true
   );
@@ -662,9 +729,17 @@ export function prepareBatchAction(batchId: string, payload: {
   reason?: string;
   order_id?: string;
 }) {
+  const cleanPayload: Record<string, unknown> = {
+    action: payload.action,
+  };
+  if (payload.amount_lamports) cleanPayload.amount_lamports = String(payload.amount_lamports).trim();
+  if (payload.recipient) cleanPayload.recipient = String(payload.recipient).trim();
+  if (payload.reason) cleanPayload.reason = String(payload.reason).trim();
+  if (payload.order_id) cleanPayload.order_id = String(payload.order_id).toLowerCase().trim();
+
   return request<ChainIntent>(`/api/chain/batches/${encodeURIComponent(batchId)}/actions/prepare`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(cleanPayload),
   }, true);
 }
 

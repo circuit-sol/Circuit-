@@ -69,6 +69,10 @@ function PassportContent() {
 
   const handleSendReport = async () => {
     if (!order || !reportMessage.trim()) return;
+    if (batch?.release_at && Date.now() < new Date(batch.release_at).getTime()) {
+      showToast('Notice', `Dispute reporting opens on the batch release date (${new Date(batch.release_at).toLocaleDateString()}).`);
+      return;
+    }
     setIsReporting(true);
     try {
       await backendApi.reportOrderIssue(order.id, reportMessage.trim());
@@ -77,7 +81,10 @@ function PassportContent() {
       showToast('✓ Report Submitted', 'Dispute logged with Circuit admin. Remaining payouts will be reviewed.');
     } catch (err: any) {
       console.error(err);
-      showToast('✗ Error', err?.message || 'Failed to submit report. Reporting opens on release date.');
+      const msg = err?.error === 'REPORTING_NOT_OPEN'
+        ? `Dispute reporting only opens on the batch release date (${batch?.release_at ? new Date(batch.release_at).toLocaleDateString() : 'scheduled'}).`
+        : (err?.message || 'Failed to submit report.');
+      showToast('✗ Error', msg);
     } finally {
       setIsReporting(false);
     }
@@ -161,6 +168,12 @@ function PassportContent() {
         if (res.ok) {
           ord = await res.json();
         }
+      }
+
+      // Check local storage fallback if legacy endpoint is 410 or order not yet synced
+      if (!ord && typeof window !== 'undefined') {
+        const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+        ord = localOrders.find((o: any) => o.tx_signature === orderId || o.id === orderId);
       }
 
       if (!ord) throw new Error('Order not found');
@@ -502,6 +515,11 @@ function PassportContent() {
                     <p className="text-xs text-[#888] leading-relaxed">
                       Reports are submitted directly to Circuit administration. An admin can freeze the batch payout to investigate and issue refunds or partial payments.
                     </p>
+                    {batch?.release_at && Date.now() < new Date(batch.release_at).getTime() && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-mono">
+                        Notice: Dispute reporting formally opens on the batch release date ({new Date(batch.release_at).toLocaleDateString()}).
+                      </div>
+                    )}
                     <textarea
                       value={reportMessage}
                       onChange={(e) => setReportMessage(e.target.value)}

@@ -32,7 +32,7 @@ interface TxResult {
 
 const defaultFallbackBatches: backendApi.Batch[] = [
   {
-    id: 'b1-october-2026',
+    id: 'b1000000-0000-4000-8000-000000000001',
     edition_id: 'drop-zero',
     name: 'Batch 01 — October Run',
     opens_at: new Date(Date.now() - 3600000).toISOString(),
@@ -41,7 +41,7 @@ const defaultFallbackBatches: backendApi.Batch[] = [
     release_at: new Date(Date.now() + 86400000 * 25).toISOString(),
     pickup_locations: [
       {
-        id: 'loc-lagos-1',
+        id: 'c4b12345-6789-4abc-def0-123456789ab1',
         name: 'Circuit Atelier HQ',
         address: '14 Victoria Island',
         city: 'Lagos',
@@ -49,7 +49,7 @@ const defaultFallbackBatches: backendApi.Batch[] = [
         instructions: 'Show your digital passport QR code at the concierge.',
       },
       {
-        id: 'loc-london-1',
+        id: 'c4b12345-6789-4abc-def0-123456789ab2',
         name: 'Soho Design Hub',
         address: '28 Peter Street',
         city: 'London',
@@ -283,13 +283,14 @@ function DropPageContent() {
     try {
       // 1. If wallet is connected and signTransaction is available, execute verified 4-step chain flow
       if (selectedBatch && signTransaction) {
+        const pickupLocId = selectedLocationId || selectedBatch.pickup_locations?.[0]?.id || 'c4b12345-6789-4abc-def0-123456789ab1';
         try {
           showToast('Preparing Order', 'Generating verified intent on Solana Devnet...');
           const verified = await executeVerifiedPurchase({
             batchId: selectedBatch.id,
             quantity,
             size: selectedSize,
-            pickupLocationId: selectedLocationId || selectedBatch.pickup_locations?.[0]?.id || 'loc-1',
+            pickupLocationId: pickupLocId,
             signTransaction,
             onStepChange: (step) => {
               setTxStep(step);
