@@ -1,0 +1,19 @@
+// This is a helper function for gets an image_url($imageUrl) and converts to base64 for db test upload, ensure to update fields as needed
+
+$imageUrl = "https://www.circuit.fashion/_next/image?url=%2Fyellow-gown.jpg&w=1920&q=75"
+$tempImage = [System.IO.Path]::GetTempFileName()
+
+try {
+    Invoke-WebRequest -Uri $imageUrl -OutFile $tempImage
+
+    @{
+        id = "circuit-demo-drop-001"
+        tag = "Front view"
+        base64Data = [Convert]::ToBase64String(
+            [System.IO.File]::ReadAllBytes($tempImage)
+        )
+    } | ConvertTo-Json -Compress | Set-Clipboard
+}
+finally {
+    Remove-Item $tempImage -ErrorAction SilentlyContinue
+}

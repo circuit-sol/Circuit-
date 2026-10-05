@@ -1,0 +1,1954 @@
+{
+  "address": "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9",
+  "metadata": {
+    "name": "circuit_escrow",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Circuit escrow program"
+  },
+  "instructions": [
+    {
+      "name": "admin_pay_seller",
+      "discriminator": [
+        192,
+        0,
+        28,
+        64,
+        94,
+        145,
+        45,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "expected_sequence",
+          "type": "u64"
+        },
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin_redirect",
+      "discriminator": [
+        193,
+        52,
+        193,
+        223,
+        211,
+        178,
+        175,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "expected_sequence",
+          "type": "u64"
+        },
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin_refund",
+      "discriminator": [
+        130,
+        120,
+        82,
+        192,
+        147,
+        208,
+        173,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          },
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "OrderReceipt"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "expected_sequence",
+          "type": "u64"
+        },
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel_order",
+      "discriminator": [
+        95,
+        129,
+        237,
+        240,
+        8,
+        49,
+        223,
+        132
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          },
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "OrderReceipt"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_advance",
+      "discriminator": [
+        225,
+        108,
+        86,
+        138,
+        99,
+        172,
+        89,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_balance",
+      "discriminator": [
+        71,
+        105,
+        155,
+        27,
+        190,
+        232,
+        224,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_vault",
+      "discriminator": [
+        48,
+        191,
+        163,
+        44,
+        71,
+        129,
+        63,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          },
+          "relations": [
+            "batch"
+          ]
+        },
+        {
+          "name": "batch",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "batch.batch_id",
+                "account": "BatchAccount"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "batch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "purchase",
+      "discriminator": [
+        21,
+        93,
+        113,
+        154,
+        193,
+        160,
+        242,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "platform_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "args.order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PurchaseArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_frozen",
+      "discriminator": [
+        62,
+        87,
+        99,
+        96,
+        206,
+        47,
+        204,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                223,
+                183,
+                162,
+                169,
+                12,
+                103,
+                50,
+                100,
+                113,
+                148,
+                221,
+                215,
+                43,
+                141,
+                68,
+                186,
+                215,
+                36,
+                103,
+                233,
+                69,
+                58,
+                11,
+                90,
+                126,
+                188,
+                38,
+                197,
+                222,
+                97,
+                158,
+                136
+              ]
+            }
+          },
+          "relations": [
+            "vault"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "frozen",
+          "type": "bool"
+        },
+        {
+          "name": "expected_sequence",
+          "type": "u64"
+        },
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "sync_surplus",
+      "discriminator": [
+        43,
+        232,
+        166,
+        196,
+        253,
+        5,
+        6,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "top_up",
+      "discriminator": [
+        236,
+        225,
+        96,
+        9,
+        60,
+        106,
+        77,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "contributor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  45,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.batch",
+                "account": "BatchVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BatchAccount",
+      "discriminator": [
+        129,
+        131,
+        54,
+        99,
+        180,
+        237,
+        101,
+        67
+      ]
+    },
+    {
+      "name": "BatchVault",
+      "discriminator": [
+        172,
+        73,
+        124,
+        34,
+        179,
+        163,
+        59,
+        73
+      ]
+    },
+    {
+      "name": "CircuitConfig",
+      "discriminator": [
+        153,
+        10,
+        225,
+        157,
+        192,
+        135,
+        192,
+        6
+      ]
+    },
+    {
+      "name": "OrderReceipt",
+      "discriminator": [
+        133,
+        4,
+        37,
+        85,
+        200,
+        201,
+        93,
+        70
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "FreezeChanged",
+      "discriminator": [
+        244,
+        217,
+        48,
+        229,
+        16,
+        141,
+        88,
+        133
+      ]
+    },
+    {
+      "name": "FundsMoved",
+      "discriminator": [
+        45,
+        213,
+        142,
+        27,
+        233,
+        76,
+        210,
+        8
+      ]
+    },
+    {
+      "name": "OrderPurchased",
+      "discriminator": [
+        62,
+        118,
+        46,
+        178,
+        21,
+        240,
+        168,
+        121
+      ]
+    },
+    {
+      "name": "PoolFunded",
+      "discriminator": [
+        164,
+        221,
+        242,
+        68,
+        164,
+        64,
+        24,
+        214
+      ]
+    },
+    {
+      "name": "VaultInitialized",
+      "discriminator": [
+        180,
+        43,
+        207,
+        2,
+        18,
+        71,
+        3,
+        75
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnsupportedPolicy",
+      "msg": "Unsupported policy version"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidSchedule",
+      "msg": "Invalid stored batch schedule"
+    },
+    {
+      "code": 6002,
+      "name": "WrongConfig",
+      "msg": "Wrong Circuit configuration"
+    },
+    {
+      "code": 6003,
+      "name": "WrongVault",
+      "msg": "Wrong order vault"
+    },
+    {
+      "code": 6004,
+      "name": "UnauthorizedPlatform",
+      "msg": "Circuit platform signature required"
+    },
+    {
+      "code": 6005,
+      "name": "UnauthorizedAdmin",
+      "msg": "Circuit admin signature required"
+    },
+    {
+      "code": 6006,
+      "name": "UnauthorizedBuyer",
+      "msg": "Only the original buyer may cancel"
+    },
+    {
+      "code": 6007,
+      "name": "VaultFrozen",
+      "msg": "The batch is frozen"
+    },
+    {
+      "code": 6008,
+      "name": "SalesClosed",
+      "msg": "The batch is outside its purchase window"
+    },
+    {
+      "code": 6009,
+      "name": "QuoteExpired",
+      "msg": "The signed price quote has expired or exceeds closing time"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidAmount",
+      "msg": "Amount and quantity must be positive"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidIdentity",
+      "msg": "Order and pickup UUIDs must be nonzero"
+    },
+    {
+      "code": 6012,
+      "name": "AlreadyCancelled",
+      "msg": "Order already cancelled"
+    },
+    {
+      "code": 6013,
+      "name": "CancellationExpired",
+      "msg": "The buyer's 24-hour cancellation window has ended"
+    },
+    {
+      "code": 6014,
+      "name": "NothingToPay",
+      "msg": "There is no amount available for this operation"
+    },
+    {
+      "code": 6015,
+      "name": "PayoutTooEarly",
+      "msg": "Payout deadline has not arrived"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyPaid",
+      "msg": "This scheduled payout was already claimed"
+    },
+    {
+      "code": 6017,
+      "name": "ManualSettlementRequired",
+      "msg": "Circuit must complete settlement after fund reallocation"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidRecipient",
+      "msg": "Recipient is invalid for this operation"
+    },
+    {
+      "code": 6019,
+      "name": "FreezeRequired",
+      "msg": "Freeze the batch before an admin fund movement"
+    },
+    {
+      "code": 6020,
+      "name": "CancellationProtection",
+      "msg": "Admin fund movements must wait until closing plus 48 hours"
+    },
+    {
+      "code": 6021,
+      "name": "RefundExceedsPurchase",
+      "msg": "Recorded refunds cannot exceed this purchase's original SOL amount"
+    },
+    {
+      "code": 6022,
+      "name": "InsufficientPool",
+      "msg": "The batch has insufficient spendable funds"
+    },
+    {
+      "code": 6023,
+      "name": "AdminSequenceConflict",
+      "msg": "Admin sequence changed; reconcile and refresh before acting"
+    },
+    {
+      "code": 6024,
+      "name": "ReasonRequired",
+      "msg": "Provide a nonzero hash referencing the admin decision"
+    },
+    {
+      "code": 6025,
+      "name": "Arithmetic",
+      "msg": "Arithmetic overflow or inconsistent pool accounting"
+    }
+  ],
+  "types": [
+    {
+      "name": "BatchAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "batch_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "brand_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "edition_id",
+            "type": "string"
+          },
+          {
+            "name": "seller_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller_payment_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "authorized_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_revision",
+            "type": "u32"
+          },
+          {
+            "name": "pickup_terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "opens_at",
+            "type": "i64"
+          },
+          {
+            "name": "closes_at",
+            "type": "i64"
+          },
+          {
+            "name": "production_starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "release_at",
+            "type": "i64"
+          },
+          {
+            "name": "advance_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "balance_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "cancellation_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "advance_bps",
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BatchVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "batch",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller_payment_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "opens_at",
+            "type": "i64"
+          },
+          {
+            "name": "closes_at",
+            "type": "i64"
+          },
+          {
+            "name": "advance_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "balance_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          },
+          {
+            "name": "total_cancelled",
+            "type": "u64"
+          },
+          {
+            "name": "total_topups",
+            "type": "u64"
+          },
+          {
+            "name": "total_admin_refunded",
+            "type": "u64"
+          },
+          {
+            "name": "total_seller_paid",
+            "type": "u64"
+          },
+          {
+            "name": "total_redirected",
+            "type": "u64"
+          },
+          {
+            "name": "frozen",
+            "type": "bool"
+          },
+          {
+            "name": "manual_settlement",
+            "type": "bool"
+          },
+          {
+            "name": "advance_claimed",
+            "type": "bool"
+          },
+          {
+            "name": "balance_claimed",
+            "type": "bool"
+          },
+          {
+            "name": "admin_sequence",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircuitConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "platform_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FreezeChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "frozen",
+            "type": "bool"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "reason_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FundsMoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "actor",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin_sequence",
+            "type": "u64"
+          },
+          {
+            "name": "reason_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderPurchased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "cancel_until",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "pickup_location_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "quantity",
+            "type": "u32"
+          },
+          {
+            "name": "amount_paid",
+            "type": "u64"
+          },
+          {
+            "name": "refunded_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "purchased_at",
+            "type": "i64"
+          },
+          {
+            "name": "cancel_until",
+            "type": "i64"
+          },
+          {
+            "name": "cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolFunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "contributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "direct_transfer_surplus",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PurchaseArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "pickup_location_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "amount_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "quantity",
+            "type": "u32"
+          },
+          {
+            "name": "quote_expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "batch",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}

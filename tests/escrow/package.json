@@ -1,0 +1,12 @@
+{
+  "name": "circuit-escrow-contract-tests",
+  "private": true,
+  "scripts": {
+    "test": "node escrow-litesvm.cjs",
+    "test:runtime": "node escrow-litesvm.cjs --runtime-smoke"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.30.1",
+    "litesvm": "0.8.0"
+  }
+}

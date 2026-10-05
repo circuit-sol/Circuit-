@@ -1,0 +1,707 @@
+{
+  "address": "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj",
+  "metadata": {
+    "name": "circuit_drops",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Circuit drops program"
+  },
+  "instructions": [
+    {
+      "name": "initialize_batch",
+      "discriminator": [
+        126,
+        44,
+        205,
+        90,
+        220,
+        105,
+        105,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "seller_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "platform_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "batch",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "args.batch_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeBatchArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "upgrade_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "platform_authority",
+          "signer": true
+        },
+        {
+          "name": "admin_authority",
+          "signer": true
+        },
+        {
+          "name": "program",
+          "address": "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_platform_authority",
+      "discriminator": [
+        203,
+        176,
+        189,
+        228,
+        130,
+        7,
+        12,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "new_platform_authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "transfer_admin_authority",
+      "discriminator": [
+        198,
+        11,
+        182,
+        207,
+        145,
+        11,
+        135,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "new_admin_authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  105,
+                  114,
+                  99,
+                  117,
+                  105,
+                  116,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BatchAccount",
+      "discriminator": [
+        129,
+        131,
+        54,
+        99,
+        180,
+        237,
+        101,
+        67
+      ]
+    },
+    {
+      "name": "CircuitConfig",
+      "discriminator": [
+        153,
+        10,
+        225,
+        157,
+        192,
+        135,
+        192,
+        6
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AuthorityChanged",
+      "discriminator": [
+        31,
+        19,
+        174,
+        152,
+        4,
+        82,
+        215,
+        226
+      ]
+    },
+    {
+      "name": "BatchInitialized",
+      "discriminator": [
+        58,
+        92,
+        144,
+        243,
+        88,
+        74,
+        49,
+        144
+      ]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [
+        181,
+        49,
+        200,
+        156,
+        19,
+        167,
+        178,
+        91
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnauthorizedUpgradeAuthority",
+      "msg": "Only this program's upgrade authority may initialize configuration"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidProgramData",
+      "msg": "ProgramData does not belong to this program"
+    },
+    {
+      "code": 6002,
+      "name": "UnauthorizedPlatform",
+      "msg": "Circuit platform signature does not match configuration"
+    },
+    {
+      "code": 6003,
+      "name": "UnauthorizedAdmin",
+      "msg": "Circuit admin signature does not match configuration"
+    },
+    {
+      "code": 6004,
+      "name": "UnsupportedPolicy",
+      "msg": "Unsupported policy version"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidIdentity",
+      "msg": "Batch and brand UUIDs must be nonzero"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidEditionId",
+      "msg": "Edition ID must be a lowercase slug of at most 32 bytes"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidRevision",
+      "msg": "Source batch revision must be positive"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidPickupTerms",
+      "msg": "Pickup terms hash must be nonzero"
+    },
+    {
+      "code": 6009,
+      "name": "OpeningMustBeFuture",
+      "msg": "Batch opening must be in the future"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidSchedule",
+      "msg": "Closing must follow opening; release must follow production"
+    },
+    {
+      "code": 6011,
+      "name": "ProductionTooEarly",
+      "msg": "Production must start at least 48 hours after closing"
+    },
+    {
+      "code": 6012,
+      "name": "TimestampOverflow",
+      "msg": "Timestamp arithmetic overflow"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidPaymentWallet",
+      "msg": "Invalid seller payment wallet"
+    }
+  ],
+  "types": [
+    {
+      "name": "AuthorityChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "previous",
+            "type": "pubkey"
+          },
+          {
+            "name": "next",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BatchAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "batch_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "brand_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "edition_id",
+            "type": "string"
+          },
+          {
+            "name": "seller_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller_payment_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "authorized_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_revision",
+            "type": "u32"
+          },
+          {
+            "name": "pickup_terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "opens_at",
+            "type": "i64"
+          },
+          {
+            "name": "closes_at",
+            "type": "i64"
+          },
+          {
+            "name": "production_starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "release_at",
+            "type": "i64"
+          },
+          {
+            "name": "advance_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "balance_eligible_at",
+            "type": "i64"
+          },
+          {
+            "name": "cancellation_seconds",
+            "type": "i64"
+          },
+          {
+            "name": "advance_bps",
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BatchInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "batch",
+            "type": "pubkey"
+          },
+          {
+            "name": "batch_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "brand_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "seller_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller_payment_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "authorized_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_revision",
+            "type": "u32"
+          },
+          {
+            "name": "pickup_terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircuitConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "platform_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin_authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeBatchArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "batch_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "brand_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "edition_id",
+            "type": "string"
+          },
+          {
+            "name": "seller_payment_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "source_revision",
+            "type": "u32"
+          },
+          {
+            "name": "pickup_terms_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "opens_at",
+            "type": "i64"
+          },
+          {
+            "name": "closes_at",
+            "type": "i64"
+          },
+          {
+            "name": "production_starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "release_at",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

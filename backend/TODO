@@ -15,3 +15,4 @@ Next: seller/brand permissions, then drop creation.
    - Frontend obtains the buyer’s Phantom signature.
    - Backend verifies the transaction and persists the order.
    - Fix the Anchor payment/supply rules alongside this.
+5. System architecture design for Circuit

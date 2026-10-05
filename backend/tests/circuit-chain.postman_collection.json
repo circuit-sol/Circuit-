@@ -1,0 +1,590 @@
+{
+  "info": {
+    "name": "Circuit verified Devnet checkout",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Set base_url WITHOUT /api and token to the active seller/buyer/admin JWT. Requests do not sign wallet transactions. Use the frontend wallet to sign each prepared transaction; preserve existing signatures. Submit+confirm after EVERY prepare. Variables intent_id/signature refer to the current action; save previous IDs for recovery. Do not run all requests automatically. Never put secret keys into this collection."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "edition_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "batch_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "revision",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "pickup_location_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "intent_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "signature",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaction_base64",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "signed_transaction_base64",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Chain readiness",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/status",
+        "auth": {
+          "type": "noauth"
+        }
+      }
+    },
+    {
+      "name": "02 Seller brands",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/brands/me"
+      }
+    },
+    {
+      "name": "03 Create draft batch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/batches",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"edition_id\": \"{{edition_id}}\",\n  \"name\": \"Team E2E batch\",\n  \"opens_at\": \"{{opens_at}}\",\n  \"closes_at\": \"{{closes_at}}\",\n  \"production_starts_at\": \"{{production_starts_at}}\",\n  \"release_at\": \"{{release_at}}\",\n  \"pickup_locations\": [\n    {\n      \"name\": \"Team test pickup\",\n      \"address\": \"Test location, Lagos\",\n      \"instructions\": \"Bring order reference\"\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const base=Math.floor(Date.now()/1000)*1000;",
+              "for(const [k,s] of Object.entries({opens_at:300,closes_at:900,production_starts_at:900+172800,release_at:900+259200})) pm.variables.set(k,new Date(base+s*1000).toISOString());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){const b=pm.response.json().batch; pm.collectionVariables.set('batch_id',b.id);pm.collectionVariables.set('revision',b.revision);pm.collectionVariables.set('pickup_location_id',b.pickup_locations[0].id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Prepare initialization (seller JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/initialize/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expected_revision\": {{revision}},\n  \"unit_price_lamports\": \"1000000\",\n  \"prices_by_size_lamports\": {}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Submit WALLET-SIGNED transaction",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/intents/{{intent_id}}/submit",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"signed_transaction_base64\": \"{{signed_transaction_base64}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===202){const r=pm.response.json();if(r.signature)pm.collectionVariables.set('signature',r.signature);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Confirm until 200 (202 means wait)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/intents/{{intent_id}}/confirm",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"signature\": \"{{signature}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "07 Public initialized batch",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/batches/{{batch_id}}",
+        "auth": {
+          "type": "noauth"
+        }
+      }
+    },
+    {
+      "name": "08 Prepare purchase (switch to BUYER JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/purchase/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"order_id\": \"{{order_id}}\",\n  \"quantity\": 1,\n  \"size\": null,\n  \"pickup_location_id\": \"{{pickup_location_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(!pm.collectionVariables.get('order_id'))pm.collectionVariables.set('order_id',pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Buyer orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/orders/mine"
+      }
+    },
+    {
+      "name": "10 Refresh buyer order",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/orders/{{order_id}}"
+      }
+    },
+    {
+      "name": "11 Prepare cancellation (buyer JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/orders/{{order_id}}/cancel/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Live escrow state",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/escrow"
+      }
+    },
+    {
+      "name": "13 Seller batch orders (seller JWT)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/orders"
+      }
+    },
+    {
+      "name": "14 Prepare advance claim (deadline applies)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/actions/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"advance\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Prepare balance claim (deadline applies)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/actions/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"balance\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Freeze (ADMIN JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/actions/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"freeze\",\n  \"reason\": \"Team test: review pickup issue\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Unfreeze (ADMIN JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/batches/{{batch_id}}/actions/prepare",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"unfreeze\",\n  \"reason\": \"Team test resolved without financial action\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) { const r=pm.response.json(); if(r.intent_id) pm.collectionVariables.set('intent_id',r.intent_id); if(r.transaction_base64) pm.collectionVariables.set('transaction_base64',r.transaction_base64); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Record collection (buyer JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/orders/{{order_id}}/collected",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "19 Report (release date applies)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/orders/{{order_id}}/report",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"My order was not available at pickup.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "20 Admin reports",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/admin/reports"
+      }
+    },
+    {
+      "name": "21 Recover lost signature (own intent)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/chain/intents/{{intent_id}}/confirm",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 const allowedOrigins = [
+  ...(process.env.FRONTEND_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean),
   "http://localhost:3000",
   "https://circuit-sol.vercel.app",
   "https://circuit-production-9fdc.up.railway.app",

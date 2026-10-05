@@ -20,3 +20,109 @@
 
 => New Routes
     "/api/auth/authRoutes"
+    "/api/brands/me"
+
+
+=> Anchor findings
+
+Current behavior	                                                What needs changing
+Any signer can call create_drop; there is no brand authorization	Require an initialization authorization tied to Circuit’s brand permissions
+Drop addresses depend only on the edition slug	                    Prevent another wallet from claiming the same drop address first
+New drops immediately become active = true	                        Separate initialization from activation
+Any signer can call register_order repeatedly without payment	    Restrict supply increments to verified purchases through escrow
+Escrow accepts the caller’s amount and recipient without checking a drop	Bind checkout to the intended drop, recipient and authorized price
+Escrow creation and supply registration are separate	            Make payment and supply accounting atomic
+Escrow address uses only drop ID and buyer	                        Introduce order identity if a buyer can purchase the same drop more than once
+There’s a concrete ID-length bug: both programs permit 64-byte drop IDs while using the ID directly as a PDA seed. Solana permits 32 bytes per seed, which is why our database/API already enforce that limit.
+
+
+=====ANCHOR===========
+cargo +stable test -p circuit-escrow --lib --locked
+
+
+cargo build-sbf \
+  --manifest-path programs/circuit-drops/Cargo.toml \
+  --tools-version v1.56 \
+  --arch v0 \
+  -- --locked
+
+then, 
+cargo build-sbf \
+  --manifest-path programs/circuit-escrow/Cargo.toml \
+  --tools-version v1.56 \
+  --arch v0 \
+  -- --locked
+
+
+cargo +stable update -p anchor-syn --offline
+
+timeout 90s npm test
+
+
+mkdir -p "$HOME/.config/solana/circuit-v2"
+solana-keygen new --no-bip39-passphrase --silent \
+  --outfile "$HOME/.config/solana/circuit-v2/circuit-drops-keypair.json"
+
+solana-keygen new --no-bip39-passphrase --silent \
+  --outfile "$HOME/.config/solana/circuit-v2/circuit-escrow-keypair.json"
+
+solana-keygen pubkey "$HOME/.config/solana/circuit-v2/circuit-drops-keypair.json"
+solana-keygen pubkey "$HOME/.config/solana/circuit-v2/circuit-escrow-keypair.json"
+
+keys rotation
+programs/circuit-drops/src/lib.rs
+declare_id!("G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"); <--- replace this
+
+programs/circuit-escrow/src/lib.rs
+declare_id!("AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"); <--- replace this
+
+Anchor.toml
+[programs.localnet]
+circuit_drops = "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+circuit_escrow = "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"
+
+[programs.devnet]
+circuit_drops = "G4JKqCUDcfFSyQ6t2EpuCUoNtN9JwZGW3vMySnnWaFtj"
+circuit_escrow = "AWraC1ZQVWzjfRfzYB87U9nvEHYnowXrYTjZrdLVuDg9"
+
+old keypair backup
+mkdir -p "$HOME/.config/solana/circuit-v2/previous"
+
+cp -n target/deploy/circuit_drops-keypair.json \
+  "$HOME/.config/solana/circuit-v2/previous/"
+
+cp -n target/deploy/circuit_escrow-keypair.json \
+  "$HOME/.config/solana/circuit-v2/previous/"
+
+then,
+
+cp "$HOME/.config/solana/circuit-v2/circuit-drops-keypair.json" \
+  target/deploy/circuit_drops-keypair.json
+
+cp "$HOME/.config/solana/circuit-v2/circuit-escrow-keypair.json" \
+  target/deploy/circuit_escrow-keypair.json
+
+
+cargo build-sbf \
+  --manifest-path programs/circuit-drops/Cargo.toml \
+  --tools-version v1.56 --arch v0 -- --locked
+
+
+cargo build-sbf \
+  --manifest-path programs/circuit-escrow/Cargo.toml \
+  --tools-version v1.56 --arch v0 -- --locked
+
+RUSTUP_TOOLCHAIN=nightly-2026-10-01 anchor idl build \
+  --program-name circuit_drops \
+  --out target/idl/circuit_drops.json
+
+
+RUSTUP_TOOLCHAIN=nightly-2026-10-01 anchor idl build \
+  --program-name circuit_escrow \
+  --out target/idl/circuit_escrow.json
+
+
+#Deployer
+solana-keygen new --no-bip39-passphrase --silent \
+  --outfile "$HOME/.config/solana/circuit-v2/local-test-provider.json"
+
