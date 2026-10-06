@@ -152,7 +152,7 @@ function PassportContent() {
   async function fetchOrderAndEdition() {
     try {
       setLoading(true);
-      const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+      const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
       let ord: any = null;
 
       // 1. Check chain order by ID or signature

@@ -254,7 +254,7 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+      const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
       // 1. Fetch Brands for Drop creation
       try {

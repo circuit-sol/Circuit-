@@ -1,6 +1,6 @@
 import * as backendApi from './backendApi';
 
-const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
 // ── Admin Authentication ────────────────────────────────────────────
 

@@ -158,7 +158,7 @@ function DropPageContent() {
 
         // Fetch exact supply count from backend
         try {
-          const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+          const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
           const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
           if (countRes.ok) {
             const { count } = await countRes.json();
