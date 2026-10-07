@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
-import { getUserOrders, getEditions } from '@/lib/db';
+import { getUserOrders, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
 import SignInModal from '@/components/SignInModal';
 import { showToast } from '@/components/Toast';
@@ -17,13 +17,7 @@ interface ShipmentModalProps {
 
 function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
   const status = order.status || 'pending';
-  const activeEdition = edition || {
-    name: '3 Piece Agbada',
-    fabric: 'Duchess satin',
-    headpiece: 'Velvet',
-    embroidery: 'Metallic thread',
-    max_supply: 40,
-  };
+  const activeEdition = edition || DEFAULT_CIRCUIT_EDITION;
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -232,11 +226,7 @@ export default function HistoryPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {orders.map((order, index) => {
                 const ed = editionsMap[order.drop_id];
-                const activeEdition = ed || {
-                  name: '3 Piece Agbada',
-                  images: [{ url: '/satin.png', tag: 'Front' }],
-                  fabric: 'Duchess satin'
-                };
+                const activeEdition = ed || DEFAULT_CIRCUIT_EDITION;
                 const status = order.status || 'pending';
 
                 return (

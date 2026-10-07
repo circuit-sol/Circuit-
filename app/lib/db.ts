@@ -144,33 +144,97 @@ export async function getUserOrders(email: string) {
 }
 
 // ── Editions / Collections ───────────────────────────────────────────
-// Supabase storage removed — editions use static fallback until backend
-// endpoints for edition management are added.
+
+export const DEFAULT_CIRCUIT_EDITION = {
+  id: 'circuit-demo-drop-001',
+  brand_id: '5d916a05-e74c-4261-8734-3e04c0a66c28',
+  name: 'Circuit Demo — Yellow Gown',
+  images: [
+    { url: '/yellow-gown.jpg', tag: 'Front View' },
+    { url: '/yellow-gown2.jpg', tag: 'Full Silhouette' },
+    { url: '/yellow.jpg', tag: 'Editorial Close-up' },
+  ],
+  description: 'An exclusive demand-driven atelier runway piece. Precision-crafted in Duchess satin and structured mesh bodice with hand-finished feather trim. Produced strictly upon confirmed on-chain commitment.',
+  price_usd: 30,
+  has_variable_prices: false,
+  prices_by_size: { 'Small': 30, 'Medium': 30, 'Large': 30, 'Extra Large': 30 },
+  max_supply: 50,
+  fabric: 'Duchess satin & structured mesh',
+  headpiece: 'Velvet flower accent',
+  embroidery: 'Hand-sewn feather trim',
+  is_active: true,
+  published: false,
+};
 
 export async function getEditions(activeOnly = true) {
-  try {
-    // If administrative/inactive editions are requested, use the authenticated /mine endpoint
-    if (!activeOnly) {
-      try {
-        const mine = await backendApi.getMyEditions();
-        if (mine && Array.isArray(mine)) {
-          return mine.map(formatEditionImages);
-        }
-      } catch (err) {
-        console.warn('Could not fetch /api/editions/mine (unauthenticated or error):', err);
-        return [];
-      }
-    }
+  let editions: any[] = [];
 
+  // 1. If administrative/inactive editions are explicitly requested, prioritize authenticated /mine endpoint
+  if (!activeOnly) {
+    try {
+      const mine = await backendApi.getMyEditions();
+      if (mine && Array.isArray(mine) && mine.length > 0) {
+        editions = mine.map(formatEditionImages);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('circuit_cached_editions', JSON.stringify(editions));
+          } catch (_) {}
+        }
+        return editions;
+      }
+    } catch (err) {
+      console.warn('Could not fetch /api/editions/mine:', err);
+    }
+  }
+
+  // 2. Try public editions endpoint (published collections)
+  try {
     const res = await fetch(`${BASE}/api/editions`);
     if (res.ok) {
       const data = await res.json();
-      return (data || []).map(formatEditionImages);
+      if (Array.isArray(data) && data.length > 0) {
+        editions = data.map(formatEditionImages);
+      }
     }
   } catch (err) {
-    console.error('getEditions Fetch Error:', err);
+    console.error('getEditions public Fetch Error:', err);
   }
-  return [];
+
+  // 3. If public list is empty (e.g. editions are in draft before Solana batch init),
+  // check if authenticated seller has managed collections available.
+  if (editions.length === 0) {
+    try {
+      const mine = await backendApi.getMyEditions();
+      if (mine && Array.isArray(mine) && mine.length > 0) {
+        editions = mine.map(formatEditionImages);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('circuit_cached_editions', JSON.stringify(editions));
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 4. If still empty, check browser cache from recent admin session
+  if (editions.length === 0 && typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('circuit_cached_editions');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          editions = parsed;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 5. If still empty, fallback to the inaugural Circuit edition
+  if (editions.length === 0) {
+    editions = [DEFAULT_CIRCUIT_EDITION];
+  }
+
+  return editions;
 }
 
 function formatEditionImages(ed: any) {
@@ -190,15 +254,51 @@ function formatEditionImages(ed: any) {
 }
 
 export async function getEditionById(id: string) {
+  if (!id) return DEFAULT_CIRCUIT_EDITION;
+
+  // 1. Try public endpoint
   try {
     const res = await fetch(`${BASE}/api/editions/${encodeURIComponent(id)}`);
     if (res.ok) {
       const data = await res.json();
-      return formatEditionImages(data);
+      if (data && data.id) {
+        return formatEditionImages(data);
+      }
     }
   } catch (err) {
     console.error('getEditionById Fetch Error:', err);
   }
+
+  // 2. Try authenticated seller endpoint for drafts
+  try {
+    const mine = await backendApi.getMyEditions();
+    if (mine && Array.isArray(mine)) {
+      const match = mine.find((e: any) => e.id === id);
+      if (match) {
+        return formatEditionImages(match);
+      }
+    }
+  } catch (_) {}
+
+  // 3. Try cached editions
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('circuit_cached_editions');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          const match = parsed.find((e: any) => e.id === id);
+          if (match) return match;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 4. If matching circuit-demo-drop-001 or drop-zero
+  if (id === 'circuit-demo-drop-001' || id === 'drop-zero' || id === DEFAULT_CIRCUIT_EDITION.id) {
+    return DEFAULT_CIRCUIT_EDITION;
+  }
+
   return null;
 }
 

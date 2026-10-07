@@ -17,7 +17,7 @@ import { solscanTxUrl } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
-import { saveOrder, getEditionById, getEditions } from '@/lib/db';
+import { saveOrder, getEditionById, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error' | 'soldout';
 type TxStep = 'idle' | 'prepare' | 'sign' | 'submit' | 'confirm';
@@ -33,8 +33,8 @@ interface TxResult {
 const defaultFallbackBatches: backendApi.Batch[] = [
   {
     id: 'b1000000-0000-4000-8000-000000000001',
-    edition_id: 'drop-zero',
-    name: 'Batch 01 — October Run',
+    edition_id: 'circuit-demo-drop-001',
+    name: 'Batch 01 — Circuit Inaugural Run',
     opens_at: new Date(Date.now() - 3600000).toISOString(),
     closes_at: new Date(Date.now() + 86400000 * 7).toISOString(),
     production_starts_at: new Date(Date.now() + 86400000 * 10).toISOString(),
@@ -43,7 +43,7 @@ const defaultFallbackBatches: backendApi.Batch[] = [
       {
         id: 'c4b12345-6789-4abc-def0-123456789ab1',
         name: 'Circuit Atelier HQ',
-        address: '14 Victoria Island',
+        address: '14 Adeola Odeku Street, Victoria Island',
         city: 'Lagos',
         country: 'Nigeria',
         instructions: 'Show your digital passport QR code at the concierge.',
@@ -66,20 +66,7 @@ const defaultFallbackBatches: backendApi.Batch[] = [
   },
 ];
 
-const fallbackEdition = {
-  id: 'drop-zero',
-  name: '3 Piece Agbada',
-  images: [{ url: '/satin.png', tag: 'Front View' }],
-  description: 'Fashion sold before it’s made. Circuit reverses the order of production by making manufacturing conditional on confirmed demand.',
-  price_usd: 0.8,
-  has_variable_prices: false,
-  prices_by_size: { 'Small': 0.8, 'Medium': 0.8, 'Large': 0.8, 'Extra Large': 0.8 },
-  max_supply: 40,
-  fabric: 'Duchess satin',
-  headpiece: 'Velvet',
-  embroidery: 'Metallic thread',
-  is_active: true
-};
+const fallbackEdition = DEFAULT_CIRCUIT_EDITION;
 
 function DropPageContent() {
   const { user, isSignedIn } = useAuth();
@@ -253,7 +240,7 @@ function DropPageContent() {
     ? Number(selectedBatch.pricing.unit_price_lamports) / 1e9
     : solPrice
       ? Number((computedPrice / solPrice).toFixed(3))
-      : 0.8;
+      : Number((computedPrice / 150).toFixed(3));
   const totalSol = Number((unitSol * quantity).toFixed(3));
   const totalUsd = Number((computedPrice * quantity).toFixed(2));
 
@@ -389,13 +376,19 @@ function DropPageContent() {
         {/* Left: Checkout Specifications */}
         <div className="flex flex-col gap-8 order-2 lg:order-1" style={{ animation: 'fadeIn 0.6s ease-out' }}>
           {/* Tags */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             <span className="px-3 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-[0.08em] border border-white/20 text-[#A3A3A3]">
               Limited Drop
             </span>
             <span className="px-3 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-[0.08em] bg-white/[0.04] border border-white/[0.08] text-[#666]">
               On-Chain Gated Escrow
             </span>
+            {!activeEdition.published && (
+              <span className="px-3 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-[0.08em] bg-amber-500/10 border border-amber-500/25 text-amber-300 font-mono flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Atelier Preview Mode
+              </span>
+            )}
           </div>
 
           <div className="w-full flex justify-between items-center z-10 pt-4">
@@ -698,7 +691,7 @@ function DropPageContent() {
             {/* Main Frame */}
             <div className="relative rounded-[32px] overflow-hidden border border-white/[0.12] bg-[#0D0D0D] shadow-[0_30px_100px_rgba(0,0,0,.6)] aspect-[4/5]">
               <Image
-                src={activeEdition.images?.[activeImageIndex]?.url || '/satin.png'}
+                src={activeEdition.images?.[activeImageIndex]?.url || '/yellow-gown.jpg'}
                 alt={`${activeEdition.name} - ${activeEdition.images?.[activeImageIndex]?.tag || 'View'}`}
                 fill
                 className="w-full h-full object-cover scale-[1.01] transition-all duration-700 ease-in-out"

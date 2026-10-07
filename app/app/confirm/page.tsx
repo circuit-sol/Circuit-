@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { confirmDelivery, parseError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
-import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById } from '@/lib/db';
+import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 import { formatSerialNumber } from '@/lib/utils';
 
 type TxState = 'idle' | 'loading' | 'signing' | 'success' | 'error';
@@ -133,10 +133,7 @@ export default function ConfirmPage() {
     }
   };
 
-  const ed = activeEdition || {
-    name: '3 Piece Agbada',
-    images: [{ url: '/satin.png', tag: 'Front' }],
-  };
+  const ed = activeEdition || DEFAULT_CIRCUIT_EDITION;
 
   return (
     <section className="min-h-screen flex items-center justify-center px-6 pt-[72px] pb-12" aria-label="Confirm Delivery">

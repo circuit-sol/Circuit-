@@ -1076,7 +1076,7 @@ export default function AdminDashboard() {
                       type="text"
                       value={editionForm.name}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="e.g. 3 Piece Agbada"
+                      placeholder="e.g. Circuit Demo — Yellow Gown"
                       className="w-full bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30"
                     />
                   </div>
@@ -1257,7 +1257,7 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Storefront Publishing Status Info */}
-                  <div className="py-3 px-4 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col gap-1.5">
+                  <div className="py-3 px-4 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[0.65rem] text-[#888] font-bold uppercase tracking-wider font-mono">Storefront Status</span>
                       <span className={`text-[0.6rem] font-bold uppercase font-mono px-2 py-0.5 rounded ${
@@ -1273,6 +1273,19 @@ export default function AdminDashboard() {
                         ? 'This collection is published and visible on the public storefront catalog.'
                         : 'Storefront visibility is gated by on-chain escrow. To publish, create a preorder batch with future dates and click "Init on Solana" in the directory.'}
                     </p>
+                    {selectedEdition && (
+                      <div className="pt-1 border-t border-white/5 flex items-center justify-between">
+                        <a
+                          href={`/drop?edition=${encodeURIComponent(selectedEdition.id)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[0.65rem] font-bold text-white/90 hover:text-white font-mono flex items-center gap-1.5 hover:underline"
+                        >
+                          <span>Preview on Storefront</span>
+                          <span>↗</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Toggle size pricing */}

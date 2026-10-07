@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getEditionById, getUserOrders, updateOrderStatusLifecycle } from '@/lib/db';
+import { getEditionById, getUserOrders, updateOrderStatusLifecycle, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
 import * as backendApi from '@/lib/backendApi';
 import { executeVerifiedCancel } from '@/lib/solana-service';
@@ -231,14 +231,7 @@ function PassportContent() {
   const status = order.status || 'pending';
   const isMinted = ['produced', 'shipped', 'delivered'].includes(status);
   const passportUrl = typeof window !== 'undefined' ? `${window.location.origin}/passport?order=${orderId}` : '';
-  const activeEdition = edition || {
-    name: '3 Piece Agbada',
-    fabric: 'Duchess satin',
-    headpiece: 'Velvet',
-    embroidery: 'Metallic thread',
-    max_supply: 40,
-    images: [{ url: '/satin.png', tag: 'Front' }]
-  };
+  const activeEdition = edition || DEFAULT_CIRCUIT_EDITION;
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white selection:bg-white selection:text-black overflow-x-hidden">

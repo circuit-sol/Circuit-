@@ -107,7 +107,7 @@ export default function LandingPage() {
                 <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
                 <span className="text-xs font-mono text-[#555]">Checking availability. One moment...</span>
               </div>
-            ) : (
+            ) : editions.length > 0 ? (
               <div className="flex flex-col">
                 {/* Edition Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -119,7 +119,7 @@ export default function LandingPage() {
                     >
                       <div className="aspect-[4/5] relative overflow-hidden">
                         <Image
-                          src={edition.images?.[0]?.url || '/satin.png'}
+                          src={edition.images?.[0]?.url || '/yellow-gown.jpg'}
                           alt={edition.name}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -127,14 +127,24 @@ export default function LandingPage() {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-opacity duration-500" />
 
                         <div className="absolute bottom-6 left-6 right-6">
-                          <span className="text-[0.6rem] font-bold tracking-[0.15em] text-white/50 uppercase block mb-2">
-                            Limited to {edition.max_supply} pieces
-                          </span>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[0.6rem] font-bold tracking-[0.15em] text-white/50 uppercase block">
+                              Limited to {edition.max_supply} pieces
+                            </span>
+                            {!edition.published && (
+                              <span className="text-[0.55rem] font-bold font-mono tracking-wider uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                Preview
+                              </span>
+                            )}
+                          </div>
                           <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-400 transition-colors">{edition.name}</h3>
 
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-white/90">
                               {edition.has_variable_prices ? 'Variable Pricing' : `${edition.price_usd} USD`}
+                            </span>
+                            <span className="text-xs text-white/60 group-hover:text-white transition-colors">
+                              View Drop ➔
                             </span>
                           </div>
                         </div>
@@ -142,6 +152,19 @@ export default function LandingPage() {
                     </Link>
                   ))}
                 </div>
+              </div>
+            ) : (
+              <div className="card-glass max-w-xl mx-auto p-12 text-center flex flex-col items-center gap-4 border-white/10 rounded-3xl">
+                <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-amber-400 font-mono">
+                  Atelier Curation In Progress
+                </span>
+                <h3 className="text-2xl font-bold">Inaugural Collection Preparing</h3>
+                <p className="text-sm text-[#888] leading-relaxed max-w-md">
+                  New on-chain escrow drops are currently being initialized. Visit the drop chamber to preview upcoming atelier pieces.
+                </p>
+                <Link href="/drop" className="btn-circuit mt-2 py-3 px-8 text-xs">
+                  <span>Enter Drop Chamber</span>
+                </Link>
               </div>
             )}
           </div>
