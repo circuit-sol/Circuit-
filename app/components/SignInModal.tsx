@@ -9,7 +9,7 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const { triggerConnect, isAuthenticating, isSignedIn, needsEmail, saveEmail } = useAuth();
+  const { triggerConnect, isAuthenticating, authStatusText, isMobileDevice, isSignedIn, needsEmail, saveEmail } = useAuth();
 
   // Email capture state (post-login prompt)
   const [email, setEmail]           = useState('');
@@ -98,7 +98,9 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             <div className="text-center">
               <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">Sign in to Circuit</h2>
               <p className="text-sm text-[#A3A3A3]">
-                Connect with Phantom to continue. Your wallet is your identity — no password needed.
+                {isMobileDevice
+                  ? 'Tap below to open Circuit directly in Phantom Mobile.'
+                  : 'Connect with Phantom to continue. Your wallet is your identity.'}
               </p>
             </div>
 
@@ -109,7 +111,11 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               className="btn-circuit w-full justify-center"
             >
               <span>
-                {isAuthenticating ? 'Verifying wallet...' : 'Connect with Phantom'}
+                {authStatusText || (
+                  isAuthenticating
+                    ? 'Verifying wallet...'
+                    : (isMobileDevice ? 'Open in Phantom App' : 'Connect with Phantom')
+                )}
               </span>
               <span className="btn-arrow" aria-hidden="true">
                 {isAuthenticating ? (
@@ -125,7 +131,9 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             </button>
 
             <p className="text-center text-[0.65rem] text-[#555]">
-              No seed phrases. No extensions. Just a quick 1-tap confirmation.
+              {isMobileDevice
+                ? 'Direct Universal Link into Phantom Web3 browser.'
+                : '1-tap confirmation. No seed phrases needed.'}
             </p>
           </>
         )}

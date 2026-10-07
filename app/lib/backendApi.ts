@@ -200,7 +200,7 @@ export function setSessionToken(token: string | null) {
 export function getSessionToken(): string | null {
   if (_sessionToken) return _sessionToken;
   if (typeof window !== 'undefined') {
-    return sessionStorage.getItem('circuit_token');
+    return localStorage.getItem('circuit_token') || sessionStorage.getItem('circuit_token');
   }
   return null;
 }
