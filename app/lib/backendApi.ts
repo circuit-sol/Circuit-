@@ -63,6 +63,7 @@ export interface Edition {
   embroidery?: string;
   images?: EditionImage[];
   is_active?: boolean;
+  published?: boolean;
   chain_status?: string;
   created_at?: string;
   updated_at?: string;

@@ -43,6 +43,7 @@ interface Edition {
   headpiece: string;
   embroidery: string;
   is_active: boolean;
+  published?: boolean;
   chain_status?: string;
 }
 
@@ -1255,18 +1256,23 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Toggle Storefront Active Status */}
-                  <div className="flex items-center gap-3 py-2 border-y border-white/5">
-                    <input
-                      type="checkbox"
-                      id="is_active"
-                      checked={editionForm.is_active}
-                      onChange={(e) => setEditionForm(prev => ({ ...prev, is_active: e.target.checked }))}
-                      className="w-4 h-4 accent-white cursor-pointer bg-black border border-white/15 rounded focus:ring-0 focus:ring-offset-0"
-                    />
-                    <label htmlFor="is_active" className="text-xs text-[#A3A3A3] font-bold select-none cursor-pointer">
-                      Show in storefront catalog (Active status)
-                    </label>
+                  {/* Storefront Publishing Status Info */}
+                  <div className="py-3 px-4 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[0.65rem] text-[#888] font-bold uppercase tracking-wider font-mono">Storefront Status</span>
+                      <span className={`text-[0.6rem] font-bold uppercase font-mono px-2 py-0.5 rounded ${
+                        selectedEdition?.published
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}>
+                        {selectedEdition?.published ? '● Live on Storefront' : '○ Unpublished Draft'}
+                      </span>
+                    </div>
+                    <p className="text-[0.65rem] text-[#666] leading-relaxed">
+                      {selectedEdition?.published
+                        ? 'This collection is published and visible on the public storefront catalog.'
+                        : 'Storefront visibility is gated by on-chain escrow. To publish, create a preorder batch with future dates and click "Init on Solana" in the directory.'}
+                    </p>
                   </div>
 
                   {/* Toggle size pricing */}
@@ -1360,12 +1366,12 @@ export default function AdminDashboard() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
                               <h4 className="font-bold text-white truncate text-md">{ed.name}</h4>
-                              <span className={`text-[0.55rem] font-mono px-2 py-0.2 rounded font-bold uppercase shrink-0 ${
-                                ed.is_active 
+                              <span className={`text-[0.55rem] font-mono px-2 py-0.5 rounded font-bold uppercase shrink-0 ${
+                                ed.published 
                                   ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
-                                  : 'text-white/30 bg-white/5 border border-white/5'
+                                  : 'text-amber-400/90 bg-amber-500/10 border border-amber-500/20'
                               }`}>
-                                {ed.is_active ? 'Active' : 'Inactive'}
+                                {ed.published ? 'Live' : 'Draft'}
                               </span>
                             </div>
                             <span className="text-[0.6rem] font-mono text-white/40 block mt-0.5">Slug ID: {ed.id}</span>
