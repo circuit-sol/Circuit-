@@ -80,17 +80,27 @@ function setStoredSession(token: string, wallet: string, email?: string | null) 
   } catch (_) {}
 }
 
+function isExplicitlyLoggedOut(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('circuit_user_disconnected') === 'true';
+}
+
 function removeStoredSession() {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem('circuit_token');
     localStorage.removeItem('circuit_wallet');
     localStorage.removeItem('circuit_email');
+    localStorage.removeItem('walletName');
+    localStorage.removeItem('circuit_last_order_tx');
+    localStorage.removeItem('circuit_last_order_id');
   } catch (_) {}
   try {
     sessionStorage.removeItem('circuit_token');
     sessionStorage.removeItem('circuit_wallet');
     sessionStorage.removeItem('circuit_email');
+    sessionStorage.removeItem('circuit_last_order_tx');
+    sessionStorage.removeItem('circuit_last_order_id');
   } catch (_) {}
 }
 
@@ -119,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Restore persistent session on mount ─────────────────────────────
   useEffect(() => {
+    // If user explicitly signed out in a previous session, do not restore
+    if (isExplicitlyLoggedOut()) {
+      setIsInitializing(false);
+      return;
+    }
+
     const { token, wallet: savedWallet, email: savedEmail } = getStoredSession();
 
     if (token && savedWallet) {
@@ -160,12 +176,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsInitializing(false);
   }, []);
 
-  // ── SIWS: sign & verify once wallet connects ─────────────────────────
+  // ── SIWS: sign & verify once wallet connects or changes ───────────────
   useEffect(() => {
-    if (!connected || !publicKey || !signMessage || user) return;
+    if (!connected || !publicKey || !signMessage) return;
 
     const address = publicKey.toBase58();
 
+    // If user explicitly signed out, do not auto-authenticate on phantom autoConnect
+    if (isExplicitlyLoggedOut()) {
+      return;
+    }
+
+    // Case 1: Already authenticated with this EXACT wallet address
+    if (user && user.walletAddress === address) {
+      return;
+    }
+
+    // Case 2: User switched to a DIFFERENT account in Phantom
+    if (user && user.walletAddress !== address) {
+      console.log(`⚡ Circuit: Active Phantom account changed from ${user.walletAddress} to ${address}`);
+      backendApi.setSessionToken(null);
+      removeStoredSession();
+      setUser(null);
+    }
+
+    // Case 3: Check if we have a valid stored token matching this exact address
+    const stored = getStoredSession();
+    if (stored.token && stored.wallet === address) {
+      backendApi.setSessionToken(stored.token);
+      setUser({
+        walletAddress: address,
+        email: stored.email,
+        isSignedIn: true,
+      });
+      return;
+    }
+
+    // Case 4: Authenticate with backend via SIWS
     async function authenticate() {
       setAuthenticating(true);
       try {
@@ -185,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Step 4: Verify on backend → receive JWT & user profile
         const authData = await backendApi.verifySignature(address, signatureBs58, challenge.nonce);
 
-        // Step 5: Store persistent session in both localStorage and sessionStorage
+        // Step 5: Store persistent session
         backendApi.setSessionToken(authData.token);
         setStoredSession(authData.token, address, authData.user.email);
 
@@ -216,11 +263,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     authenticate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, publicKey]);
+  }, [connected, publicKey, signMessage, user, disconnect]);
 
   // ── Trigger wallet modal or mobile deep link ─────────────────────────
   const triggerConnect = useCallback(async () => {
+    // Explicit user action to connect: clear disconnected flag
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('circuit_user_disconnected');
+      } catch (_) {}
+    }
+
     const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const hasInjected = typeof window !== 'undefined' && Boolean(
       (window as any).phantom?.solana?.isPhantom || (window as any).solana?.isPhantom
@@ -271,6 +324,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Sign out ─────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
+    // Set explicit disconnect flag to prevent automatic re-login on refresh
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('circuit_user_disconnected', 'true');
+      } catch (_) {}
+    }
     await disconnect();
     backendApi.setSessionToken(null);
     removeStoredSession();

@@ -199,6 +199,9 @@ export function setSessionToken(token: string | null) {
 }
 
 export function getSessionToken(): string | null {
+  if (typeof window !== 'undefined' && localStorage.getItem('circuit_user_disconnected') === 'true') {
+    return null;
+  }
   if (_sessionToken) return _sessionToken;
   if (typeof window !== 'undefined') {
     return localStorage.getItem('circuit_token') || sessionStorage.getItem('circuit_token');

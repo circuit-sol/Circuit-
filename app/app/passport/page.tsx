@@ -91,7 +91,7 @@ function PassportContent() {
     }
   };
 
-  // Sync orderId parameter, retrieve cached order ID from localStorage, or query most recent order
+  // Sync orderId parameter, retrieve active authenticated orders, or fallback to cached order
   useEffect(() => {
     async function resolveOrderId() {
       if (orderIdParam) {
@@ -99,15 +99,7 @@ function PassportContent() {
         return;
       }
 
-      if (typeof window !== 'undefined') {
-        const cachedTx = localStorage.getItem('circuit_last_order_tx');
-        if (cachedTx) {
-          setOrderId(cachedTx);
-          return;
-        }
-      }
-
-      // Check verified chain orders if authenticated
+      // 1. Check verified chain orders if authenticated with active wallet
       if (isSignedIn) {
         try {
           const chainRes = await backendApi.getMyChainOrders();
@@ -121,16 +113,13 @@ function PassportContent() {
         }
       }
 
-      // Fallback: Query the database for the user's most recent order if signed in
+      // 2. Query database for user's email if available
       if (isSignedIn && user?.email) {
         try {
           const orders = await getUserOrders(user.email);
           if (orders && orders.length > 0) {
             const latestOrder = orders[0];
             setOrderId(latestOrder.tx_signature);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('circuit_last_order_tx', latestOrder.tx_signature);
-            }
             return;
           }
         } catch (err) {
@@ -138,11 +127,20 @@ function PassportContent() {
         }
       }
 
+      // 3. Fallback: only check localStorage cache if not signed in or as last resort
+      if (typeof window !== 'undefined') {
+        const cachedTx = localStorage.getItem('circuit_last_order_tx');
+        if (cachedTx) {
+          setOrderId(cachedTx);
+          return;
+        }
+      }
+
       setLoading(false);
     }
 
     resolveOrderId();
-  }, [orderIdParam, isSignedIn, user]);
+  }, [orderIdParam, isSignedIn, user?.walletAddress, user?.email]);
 
   useEffect(() => {
     if (orderId) {

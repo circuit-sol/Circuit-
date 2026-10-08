@@ -140,7 +140,7 @@ export default function CreatorStudioPage() {
     }
 
     loadCreatorData();
-  }, [isSignedIn, selectedBrand?.id]);
+  }, [isSignedIn, user?.walletAddress, selectedBrand?.id]);
 
   // Handle Image Upload for Edition Draft
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
