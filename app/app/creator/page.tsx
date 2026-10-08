@@ -48,6 +48,13 @@ export default function CreatorStudioPage() {
   // Claim actions state
   const [claimingBatchId, setClaimingBatchId] = useState<string | null>(null);
 
+  // Draft editing state
+  const [isEditingExisting, setIsEditingExisting] = useState(false);
+  const [editingEditionId, setEditingEditionId] = useState('');
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [editingBatchRevision, setEditingBatchRevision] = useState<number>(1);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
   // Step 1: Edition Design Form
   const [editionForm, setEditionForm] = useState({
     id: '',
@@ -90,35 +97,41 @@ export default function CreatorStudioPage() {
         const userBrands = brandsRes.brands || [];
         setBrands(userBrands);
 
-        if (userBrands.length > 0) {
-          const currentBrand = selectedBrand || userBrands[0];
-          setSelectedBrand(currentBrand);
+        const currentBrand: backendApi.Brand = userBrands.length > 0
+          ? (selectedBrand || userBrands[0])
+          : {
+              id: 'circuit-atelier-brand',
+              name: 'Circuit Atelier Design Studio',
+              slug: 'circuit-atelier',
+              payment_wallet_address: user?.walletAddress || '',
+              role: 'owner',
+            };
+        setSelectedBrand(currentBrand);
 
-          // Fetch managed editions
-          const managedList = await getEditions(false);
-          setEditions(managedList);
+        // Fetch managed editions
+        const managedList = await getEditions(false);
+        setEditions(managedList);
 
-          // Fetch batches for each edition
-          const batchMap: Record<string, backendApi.Batch[]> = {};
-          for (const ed of managedList) {
-            try {
-              const res = await backendApi.getMyBatches({ editionId: ed.id });
-              if (res?.batches) {
-                batchMap[ed.id] = res.batches;
-                // Fetch orders for active batches
-                for (const b of res.batches) {
-                  try {
-                    const oRes = await backendApi.getBatchOrders(b.id);
-                    if (oRes?.orders) {
-                      setOrdersByBatch(prev => ({ ...prev, [b.id]: oRes.orders }));
-                    }
-                  } catch (_) {}
-                }
+        // Fetch batches for each edition
+        const batchMap: Record<string, backendApi.Batch[]> = {};
+        for (const ed of managedList) {
+          try {
+            const res = await backendApi.getMyBatches({ editionId: ed.id });
+            if (res?.batches) {
+              batchMap[ed.id] = res.batches;
+              // Fetch orders for active batches
+              for (const b of res.batches) {
+                try {
+                  const oRes = await backendApi.getBatchOrders(b.id);
+                  if (oRes?.orders) {
+                    setOrdersByBatch(prev => ({ ...prev, [b.id]: oRes.orders }));
+                  }
+                } catch (_) {}
               }
-            } catch (_) {}
-          }
-          setBatchesByEdition(batchMap);
+            }
+          } catch (_) {}
         }
+        setBatchesByEdition(batchMap);
       } catch (err) {
         console.error('Error loading creator studio data:', err);
       } finally {
@@ -149,17 +162,213 @@ export default function CreatorStudioPage() {
     }));
   };
 
-  const removeImage = (index: number) => {
-    setEditionForm(prev => {
-      const img = prev.images[index];
-      if (img.file && img.url.startsWith('blob:')) {
-        URL.revokeObjectURL(img.url);
+  const removeImage = async (index: number) => {
+    const img = editionForm.images[index];
+    if (img.path && editingEditionId) {
+      try {
+        await deleteEditionImage(editingEditionId, img.path);
+        showToast('Image Removed', 'Lookbook photo removed from storage.');
+      } catch (err) {
+        console.warn('Image deletion error:', err);
       }
-      return {
-        ...prev,
-        images: prev.images.filter((_, i) => i !== index),
-      };
+    } else if (img.file && img.url.startsWith('blob:')) {
+      URL.revokeObjectURL(img.url);
+    }
+    setEditionForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleResetToNew = () => {
+    setIsEditingExisting(false);
+    setEditingEditionId('');
+    setEditingBatchId(null);
+    setEditingBatchRevision(1);
+    setEditionForm({
+      id: '',
+      name: '',
+      description: '',
+      price_usd: 30,
+      max_supply: 50,
+      fabric: 'Duchess satin & structured mesh',
+      headpiece: 'Velvet flower accent',
+      embroidery: 'Hand-sewn feather trim',
+      images: [],
     });
+    setDeployResult(null);
+    setWizardStep(1);
+    showToast('Reset Complete', 'Ready to design a new collection drop.');
+  };
+
+  const handleEditEdition = (ed: any) => {
+    setIsEditingExisting(true);
+    setEditingEditionId(ed.id);
+
+    setEditionForm({
+      id: ed.id,
+      name: ed.name || '',
+      description: ed.description || '',
+      price_usd: Number(ed.price_usd || 30),
+      max_supply: Number(ed.max_supply || 50),
+      fabric: ed.fabric || '',
+      headpiece: ed.headpiece || '',
+      embroidery: ed.embroidery || '',
+      images: (ed.images || []).map((img: any) => ({
+        url: img.url,
+        tag: img.tag || 'Look',
+        path: img.path,
+      })),
+    });
+
+    const edBatches = batchesByEdition[ed.id] || [];
+    if (edBatches.length > 0) {
+      const b = edBatches[0];
+      setEditingBatchId(b.id);
+      setEditingBatchRevision(b.revision || 1);
+      const primaryLoc = b.pickup_locations?.[0];
+      setBatchForm({
+        name: b.name || 'Batch 01',
+        opens_at: b.opens_at ? new Date(b.opens_at).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+        closes_at: b.closes_at ? new Date(b.closes_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
+        production_starts_at: b.production_starts_at ? new Date(b.production_starts_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 16),
+        release_at: b.release_at ? new Date(b.release_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 25).toISOString().slice(0, 16),
+        pickup_name: primaryLoc?.name || 'Circuit Atelier Hub',
+        pickup_address: primaryLoc?.address?.split(',')[0]?.trim() || '14 Adeola Odeku Street, Victoria Island',
+        pickup_city: primaryLoc?.city || 'Lagos',
+        pickup_country: primaryLoc?.country || 'Nigeria',
+        pickup_instructions: primaryLoc?.instructions || 'Please present your digital passport reference upon collection.',
+      });
+    } else {
+      setEditingBatchId(null);
+    }
+
+    setDeployResult(null);
+    setActiveTab('wizard');
+    setWizardStep(1);
+    showToast('✓ Loaded Draft', `Loaded "${ed.name || ed.id}" for editing.`);
+  };
+
+  const handleSaveDraft = async () => {
+    if (!selectedBrand) {
+      showToast('Brand Required', 'Please select or register a brand before saving.');
+      return;
+    }
+    if (!editionForm.name.trim()) {
+      showToast('Name Required', 'Please enter a name for this collection.');
+      return;
+    }
+
+    const slugId = (isEditingExisting && editingEditionId)
+      ? editingEditionId
+      : (editionForm.id.trim() || editionForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')).slice(0, 32);
+
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slugId)) {
+      showToast('Invalid ID', 'Collection ID must be lowercase alphanumeric words separated by hyphens (max 32 chars).');
+      return;
+    }
+
+    setIsSavingDraft(true);
+    try {
+      if (isEditingExisting && editingEditionId) {
+        await backendApi.updateEditionDraft(editingEditionId, {
+          name: editionForm.name.trim(),
+          description: editionForm.description.trim(),
+          price_usd: Number(editionForm.price_usd),
+          max_supply: Number(editionForm.max_supply),
+          fabric: editionForm.fabric.trim(),
+          headpiece: editionForm.headpiece.trim(),
+          embroidery: editionForm.embroidery.trim(),
+        });
+      } else {
+        await backendApi.createEdition({
+          id: slugId,
+          brand_id: selectedBrand.id,
+          name: editionForm.name.trim(),
+          description: editionForm.description.trim(),
+          price_usd: Number(editionForm.price_usd),
+          max_supply: Number(editionForm.max_supply),
+          fabric: editionForm.fabric.trim(),
+          headpiece: editionForm.headpiece.trim(),
+          embroidery: editionForm.embroidery.trim(),
+        });
+        setIsEditingExisting(true);
+        setEditingEditionId(slugId);
+        setEditionForm(prev => ({ ...prev, id: slugId }));
+      }
+
+      // Upload new images
+      for (let i = 0; i < editionForm.images.length; i++) {
+        const img = editionForm.images[i];
+        if (img.file) {
+          const uploaded = await uploadEditionImage(img.file, slugId, img.tag);
+          if (uploaded) {
+            editionForm.images[i] = {
+              url: uploaded.url,
+              tag: img.tag,
+              path: uploaded.path,
+            };
+          }
+        }
+      }
+
+      // Save or update batch draft if filled
+      if (batchForm.name.trim()) {
+        const opensMs = new Date(batchForm.opens_at).getTime();
+        const closesMs = new Date(batchForm.closes_at).getTime();
+        const prodMs = new Date(batchForm.production_starts_at).getTime();
+        const relMs = new Date(batchForm.release_at).getTime();
+
+        const fullAddress = `${batchForm.pickup_address}, ${batchForm.pickup_city}, ${batchForm.pickup_country}`.slice(0, 500);
+        const batchPayload = {
+          name: batchForm.name.trim(),
+          opens_at: new Date(opensMs).toISOString(),
+          closes_at: new Date(closesMs).toISOString(),
+          production_starts_at: new Date(prodMs).toISOString(),
+          release_at: new Date(relMs).toISOString(),
+          pickup_locations: [
+            {
+              name: batchForm.pickup_name.trim() || 'Circuit Atelier Station',
+              address: fullAddress,
+              city: batchForm.pickup_city.trim() || 'Lagos',
+              country: batchForm.pickup_country.trim() || 'Nigeria',
+              instructions: batchForm.pickup_instructions.trim(),
+            },
+          ],
+        };
+
+        if (editingBatchId) {
+          try {
+            const res = await backendApi.updateBatchDraft(editingBatchId, batchPayload, editingBatchRevision);
+            if (res?.batch?.revision) setEditingBatchRevision(res.batch.revision);
+          } catch (bErr) {
+            console.warn('Batch draft update note:', bErr);
+          }
+        } else if (closesMs > opensMs) {
+          try {
+            const res = await backendApi.createBatchDraft({
+              edition_id: slugId,
+              ...batchPayload,
+            });
+            if (res?.batch) {
+              setEditingBatchId(res.batch.id);
+              setEditingBatchRevision(res.batch.revision || 1);
+            }
+          } catch (bErr) {
+            console.warn('Batch draft create note:', bErr);
+          }
+        }
+      }
+
+      const updated = await getEditions(false);
+      setEditions(updated);
+      showToast('✓ Draft Saved', 'Collection draft saved to database successfully.');
+    } catch (err: any) {
+      console.error('Save draft error:', err);
+      showToast('✗ Save Failed', err?.message || 'Failed to save draft changes.');
+    } finally {
+      setIsSavingDraft(false);
+    }
   };
 
   // 3-Step Wizard Execution: Deploy Preorder Vault to Solana
@@ -175,7 +384,10 @@ export default function CreatorStudioPage() {
     }
 
     // Slug validation
-    const slugId = (editionForm.id.trim() || editionForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')).slice(0, 32);
+    const slugId = (isEditingExisting && editingEditionId)
+      ? editingEditionId
+      : (editionForm.id.trim() || editionForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')).slice(0, 32);
+
     if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slugId)) {
       showToast('Invalid ID', 'Collection ID must be lowercase alphanumeric words separated by hyphens (max 32 chars).');
       return;
@@ -204,19 +416,31 @@ export default function CreatorStudioPage() {
     setDeployResult(null);
 
     try {
-      // Step A: Save Edition Draft
+      // Step A: Save or Update Edition Draft
       setDeployStepText('1/4 Saving collection design metadata...');
-      await backendApi.createEdition({
-        id: slugId,
-        brand_id: selectedBrand.id,
-        name: editionForm.name.trim(),
-        description: editionForm.description.trim(),
-        price_usd: Number(editionForm.price_usd),
-        max_supply: Number(editionForm.max_supply),
-        fabric: editionForm.fabric.trim(),
-        headpiece: editionForm.headpiece.trim(),
-        embroidery: editionForm.embroidery.trim(),
-      });
+      if (isEditingExisting && editingEditionId) {
+        await backendApi.updateEditionDraft(editingEditionId, {
+          name: editionForm.name.trim(),
+          description: editionForm.description.trim(),
+          price_usd: Number(editionForm.price_usd),
+          max_supply: Number(editionForm.max_supply),
+          fabric: editionForm.fabric.trim(),
+          headpiece: editionForm.headpiece.trim(),
+          embroidery: editionForm.embroidery.trim(),
+        });
+      } else {
+        await backendApi.createEdition({
+          id: slugId,
+          brand_id: selectedBrand.id,
+          name: editionForm.name.trim(),
+          description: editionForm.description.trim(),
+          price_usd: Number(editionForm.price_usd),
+          max_supply: Number(editionForm.max_supply),
+          fabric: editionForm.fabric.trim(),
+          headpiece: editionForm.headpiece.trim(),
+          embroidery: editionForm.embroidery.trim(),
+        });
+      }
 
       // Step B: Upload Media
       setDeployStepText('2/4 Synchronizing lookbook photography...');
@@ -226,11 +450,10 @@ export default function CreatorStudioPage() {
         }
       }
 
-      // Step C: Create Preorder Batch Draft
+      // Step C: Create or Update Preorder Batch Draft
       setDeployStepText('3/4 Creating preorder batch terms...');
       const fullAddress = `${batchForm.pickup_address}, ${batchForm.pickup_city}, ${batchForm.pickup_country}`.slice(0, 500);
-      const batchRes = await backendApi.createBatchDraft({
-        edition_id: slugId,
+      const batchPayload = {
         name: batchForm.name.trim(),
         opens_at: new Date(opensMs).toISOString(),
         closes_at: new Date(closesMs).toISOString(),
@@ -245,9 +468,32 @@ export default function CreatorStudioPage() {
             instructions: batchForm.pickup_instructions.trim(),
           },
         ],
-      });
+      };
 
-      const createdBatchId = batchRes.batch.id;
+      let targetBatchId = editingBatchId;
+      let targetBatchRevision = editingBatchRevision;
+
+      if (editingBatchId) {
+        try {
+          const updatedBatchRes = await backendApi.updateBatchDraft(editingBatchId, batchPayload, editingBatchRevision);
+          if (updatedBatchRes?.batch) {
+            targetBatchRevision = updatedBatchRes.batch.revision || targetBatchRevision + 1;
+          }
+        } catch (bErr) {
+          console.warn('Batch update note during deploy:', bErr);
+        }
+      } else {
+        const batchRes = await backendApi.createBatchDraft({
+          edition_id: slugId,
+          ...batchPayload,
+        });
+        targetBatchId = batchRes.batch.id;
+        targetBatchRevision = batchRes.batch.revision || 1;
+      }
+
+      if (!targetBatchId) {
+        throw new Error('Failed to resolve batch for deployment.');
+      }
 
       // Step D: On-Chain Vault Deployment
       setDeployStepText('4/4 Please approve vault initialization in Phantom...');
@@ -257,9 +503,9 @@ export default function CreatorStudioPage() {
       const unitLamports = String(Math.floor((editionForm.price_usd / 150) * 1e9));
 
       const initResult = await executeBatchInitialize(
-        createdBatchId,
+        targetBatchId,
         {
-          expected_revision: batchRes.batch.revision || 1,
+          expected_revision: targetBatchRevision,
           unit_price_lamports: unitLamports,
         },
         signTransaction
@@ -267,7 +513,7 @@ export default function CreatorStudioPage() {
 
       setDeployResult({
         editionId: slugId,
-        batchId: createdBatchId,
+        batchId: targetBatchId,
         signature: initResult?.signature || '',
         solscanUrl: initResult?.solscanUrl || (initResult?.signature ? solscanTxUrl(initResult.signature) : ''),
       });
@@ -382,8 +628,9 @@ export default function CreatorStudioPage() {
                 </select>
               </div>
             ) : (
-              <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full font-mono">
-                No Registered Brands Found
+              <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-1.5 px-3">
+                <span className="text-[0.65rem] uppercase font-bold text-[#666] font-mono">Workspace:</span>
+                <span className="text-xs font-mono text-white font-bold">{selectedBrand?.name || 'Circuit Atelier Studio'}</span>
               </div>
             )}
 
@@ -450,6 +697,25 @@ export default function CreatorStudioPage() {
               ))}
             </div>
 
+            {/* Editing Existing Collection Banner */}
+            {isEditingExisting && (
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs font-mono text-amber-300 animate-fade-in">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <span>
+                    Editing Collection: <strong className="text-white">{editingEditionId}</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetToNew}
+                  className="text-[0.65rem] underline uppercase tracking-wider text-amber-400/80 hover:text-white transition-colors"
+                >
+                  Cancel & Start Fresh Drop
+                </button>
+              </div>
+            )}
+
             {/* STEP 1: GARMENT DESIGN */}
             {wizardStep === 1 && (
               <div className="card-glass p-8 border-white/10 rounded-3xl flex flex-col gap-6 animate-fade-in">
@@ -474,11 +740,17 @@ export default function CreatorStudioPage() {
                     <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Collection Slug ID</label>
                     <input
                       type="text"
+                      disabled={isEditingExisting}
                       value={editionForm.id}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
                       placeholder="e.g. circuit-demo-drop-001"
-                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                      className={`bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30 ${
+                        isEditingExisting ? 'opacity-60 cursor-not-allowed' : ''
+                      }`}
                     />
+                    {isEditingExisting && (
+                      <span className="text-[0.6rem] font-mono text-[#666]">Slug ID is immutable once created.</span>
+                    )}
                   </div>
                 </div>
 
@@ -589,7 +861,16 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={isSavingDraft}
+                    className="btn-outline-circuit py-3 px-6 text-xs uppercase tracking-wider text-white/80 hover:text-white border-white/20 hover:border-white/40"
+                  >
+                    <span>{isSavingDraft ? 'Saving Draft...' : '💾 Save Draft'}</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       if (!editionForm.name.trim()) {
@@ -725,13 +1006,23 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center pt-4 border-t border-white/10">
-                  <button
-                    onClick={() => setWizardStep(1)}
-                    className="text-xs text-[#888] hover:text-white font-mono uppercase tracking-wider"
-                  >
-                    ← Back to Design
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/10">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setWizardStep(1)}
+                      className="text-xs text-[#888] hover:text-white font-mono uppercase tracking-wider"
+                    >
+                      ← Back to Design
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={isSavingDraft}
+                      className="btn-outline-circuit py-2.5 px-5 text-xs uppercase tracking-wider text-white/80 hover:text-white border-white/20 hover:border-white/40"
+                    >
+                      <span>{isSavingDraft ? 'Saving Draft...' : '💾 Save Draft'}</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => setWizardStep(3)}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
@@ -847,7 +1138,7 @@ export default function CreatorStudioPage() {
                 <p className="text-xs text-[#888] mt-1">All design editions and preorder batches associated with {selectedBrand?.name || 'your atelier'}.</p>
               </div>
               <button
-                onClick={() => { setActiveTab('wizard'); setWizardStep(1); }}
+                onClick={handleResetToNew}
                 className="btn-circuit px-5 py-2.5 text-xs font-bold uppercase tracking-wider"
               >
                 <span>+ Create New Drop</span>
@@ -895,14 +1186,29 @@ export default function CreatorStudioPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                      <Link
-                        href={`/drop?edition=${encodeURIComponent(ed.id)}`}
-                        target="_blank"
-                        className="text-xs font-mono font-bold text-white hover:text-white/80 hover:underline flex items-center gap-1"
-                      >
-                        <span>{isPublished ? 'View Storefront ➔' : 'Preview Draft ↗'}</span>
-                      </Link>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-white/5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditEdition(ed)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 ${
+                            isPublished
+                              ? 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+                              : 'bg-white text-black hover:bg-neutral-200'
+                          }`}
+                        >
+                          <span>✏️</span>
+                          <span>{isPublished ? 'Edit Details' : 'Edit Draft'}</span>
+                        </button>
+
+                        <Link
+                          href={`/drop?edition=${encodeURIComponent(ed.id)}`}
+                          target="_blank"
+                          className="text-xs font-mono text-[#888] hover:text-white hover:underline flex items-center gap-1 px-2 py-1"
+                        >
+                          <span>{isPublished ? 'Storefront ➔' : 'Preview ↗'}</span>
+                        </Link>
+                      </div>
 
                       {edBatches.length > 0 && (
                         <span className="text-[0.65rem] font-mono text-[#777]">
