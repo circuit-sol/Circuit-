@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: '/drop', label: 'Drop', page: 'drop' },
   { href: '/confirm', label: 'Confirm', page: 'confirm' },
   { href: '/passport', label: 'Passport', page: 'passport' },
+  { href: '/creator', label: 'Creator Studio', page: 'creator' },
 ];
 
 export default function Navbar({ customEditions }: { customEditions?: any[] }) {
@@ -61,7 +62,9 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
 
   const activePage = pathname.startsWith('/passport') ? 'passport' :
     pathname.startsWith('/landing') || pathname === '/' ? 'landing' :
-    pathname.startsWith('/confirm') ? 'confirm' : 'drop';
+    pathname.startsWith('/confirm') ? 'confirm' :
+    pathname.startsWith('/creator') ? 'creator' :
+    pathname.startsWith('/drop') ? 'drop' : '';
 
 
 
@@ -156,6 +159,15 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                       >
                         <span className="text-base group-hover:scale-110 transition-transform">📜</span>
                         Purchase History
+                      </Link>
+
+                      <Link 
+                        href="/creator"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="w-full text-left px-4 py-3 text-[0.75rem] font-semibold text-[#D1D1D1] hover:text-white hover:bg-white/[0.08] rounded-xl transition-all flex items-center gap-3.5 group"
+                      >
+                        <span className="text-base group-hover:scale-110 transition-transform">✨</span>
+                        Creator Studio
                       </Link>
 
                       <button 
@@ -268,6 +280,14 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                     className="text-[0.75rem] font-bold text-white underline flex items-center gap-1.5"
                   >
                     📜 Purchase History
+                  </Link>
+
+                  <Link 
+                    href="/creator" 
+                    onClick={() => setDrawerOpen(false)}
+                    className="text-[0.75rem] font-bold text-white underline flex items-center gap-1.5"
+                  >
+                    ✨ Creator Studio
                   </Link>
 
                   <button onClick={() => { signOut(); setDrawerOpen(false); }} className="text-[0.75rem] font-bold text-[#ff5050] underline">Sign Out</button>

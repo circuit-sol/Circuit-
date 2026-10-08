@@ -744,3 +744,21 @@ export function prepareBatchAction(batchId: string, payload: {
   }, true);
 }
 
+/** Retrieve all submitted reports for Circuit admin review */
+export function getAdminReports() {
+  return request<{ reports: Array<{ order_id: string; user_id: string; message: string; created_at: string }> }>(
+    '/api/chain/admin/reports',
+    { method: 'GET' },
+    true
+  );
+}
+
+/** Retrieve detailed chain order inspection for Circuit admin */
+export function getAdminOrderById(orderId: string) {
+  return request<{ order: ChainOrder }>(
+    `/api/chain/admin/orders/${encodeURIComponent(orderId)}`,
+    { method: 'GET' },
+    true
+  );
+}
+

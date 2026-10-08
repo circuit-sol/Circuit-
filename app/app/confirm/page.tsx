@@ -156,9 +156,9 @@ export default function ConfirmPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Finalize Delivery</h1>
-          <p className="text-sm text-[#A3A3A3] leading-relaxed max-w-[340px]">
-            Your payment will be released to the designer once you confirm receipt of your customized piece.
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Confirm Garment Receipt</h1>
+          <p className="text-sm text-[#A3A3A3] leading-relaxed max-w-[360px]">
+            Confirming collection verifies that your customized piece has arrived and activates your permanent Digital Product Passport.
           </p>
         </div>
 
@@ -186,7 +186,7 @@ export default function ConfirmPage() {
             {/* Item Preview */}
             <div className="w-full flex items-center gap-4 bg-white/[0.03] border border-white/[0.08] p-4 rounded-2xl">
               <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-white/10 relative">
-                <Image src={ed.images?.[0]?.url || '/satin.png'} alt={ed.name} fill className="object-cover" />
+                <Image src={ed.images?.[0]?.url || '/yellow-gown.jpg'} alt={ed.name} fill className="object-cover" />
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-wider">Active Order</span>
@@ -238,8 +238,8 @@ export default function ConfirmPage() {
             >
               <span>
                 {txState === 'signing' ? 'Processing...' :
-                 txState === 'success' ? '✓ Payment Released' :
-                 'Confirm Receipt'}
+                 txState === 'success' ? '✓ Receipt Recorded' :
+                 'Confirm Garment Receipt'}
               </span>
               {txState !== 'success' && txState !== 'signing' && (
                 <span className="btn-arrow">
@@ -253,8 +253,11 @@ export default function ConfirmPage() {
         {/* Results */}
         {txState === 'success' && latestOrder && (
           <div className="tx-msg ok flex flex-col gap-3 w-full animate-fade-in">
-            <p className="font-bold text-xs uppercase tracking-wider">✓ Escrow Released Successfully</p>
-            <div className="flex gap-6 justify-center text-[0.65rem] font-bold uppercase tracking-widest font-mono">
+            <p className="font-bold text-xs uppercase tracking-wider text-emerald-400">✓ Garment Receipt Recorded & Passport Activated</p>
+            <p className="text-[0.65rem] text-[#888] font-mono leading-relaxed">
+              Your collection has been verified. Atelier balance settlement unlocks per the batch schedule.
+            </p>
+            <div className="flex gap-6 justify-center text-[0.65rem] font-bold uppercase tracking-widest font-mono pt-1">
               <a href={txResult.solscanUrl} target="_blank" rel="noopener" className="text-[#666] hover:text-white transition-colors">Explorer Proof ↗</a>
               <Link href={`/passport?order=${latestOrder.id}`} className="text-white underline underline-offset-4">Digital Passport →</Link>
             </div>

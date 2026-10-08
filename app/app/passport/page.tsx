@@ -28,6 +28,7 @@ function PassportContent() {
   const [reportMessage, setReportMessage] = useState('');
   const [isReporting, setIsReporting] = useState(false);
   const [isReported, setIsReported] = useState(false);
+  const [cancelCountdown, setCancelCountdown] = useState<{ hours: number; minutes: number; seconds: number; isExpired: boolean } | null>(null);
   const { user, isSignedIn } = useAuth();
   const { signTransaction } = useWallet();
 
@@ -199,6 +200,29 @@ function PassportContent() {
       setLoading(false);
     }
   }
+
+  // Active 24-hour individual cancellation countdown ticker
+  useEffect(() => {
+    if (!order || order.cancelled) return;
+    const calculateRemaining = () => {
+      const cancelUntil = order.cancel_until
+        ? new Date(order.cancel_until).getTime()
+        : new Date(order.created_at || Date.now()).getTime() + 86400000;
+      const diff = cancelUntil - Date.now();
+      if (diff <= 0) {
+        setCancelCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setCancelCountdown({ hours, minutes, seconds, isExpired: false });
+    };
+
+    calculateRemaining();
+    const interval = setInterval(calculateRemaining, 1000);
+    return () => clearInterval(interval);
+  }, [order]);
 
   if (loading) {
     return (
@@ -400,22 +424,48 @@ function PassportContent() {
               )}
 
               {/* 24-Hour Individual Cancellation Window */}
-              {!order.cancelled && (order.cancel_until ? new Date() < new Date(order.cancel_until) : (Date.now() - new Date(order.created_at || Date.now()).getTime()) < 86400000) && (
+              {!order.cancelled && cancelCountdown && !cancelCountdown.isExpired && (
                 <div className="card-glass p-5 border-amber-500/30 bg-amber-500/[0.04] rounded-2xl flex flex-col gap-3 animate-fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">24-Hour Cancellation Eligible</span>
-                    <span className="text-[0.65rem] font-mono text-[#888]">100% Refund Guarantee</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono">24-Hour Cancellation Window</span>
+                      <span className="text-[0.65rem] font-mono text-white/50 bg-white/5 border border-white/10 px-2 py-0.5 rounded">100% Refund</span>
+                    </div>
+                    {/* Live countdown pill */}
+                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full font-mono text-amber-300 text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      <span className="font-bold">
+                        {String(cancelCountdown.hours).padStart(2, '0')}:{String(cancelCountdown.minutes).padStart(2, '0')}:{String(cancelCountdown.seconds).padStart(2, '0')}
+                      </span>
+                      <span className="text-[0.6rem] text-amber-400/70 uppercase tracking-wider">Remaining</span>
+                    </div>
                   </div>
                   <p className="text-xs text-white/80 leading-relaxed">
-                    You have an individual 24-hour cancellation window from your purchase time. Cancelling immediately refunds 100% of your deposit from the Solana escrow vault.
+                    You have an unconditional 24-hour window from purchase time to change your mind. Cancelling immediately returns 100% of your deposit from the Solana batch escrow vault to your wallet.
                   </p>
                   <button
                     onClick={handleCancelOrder}
                     disabled={isCancelling}
-                    className="btn-outline-circuit py-2.5 text-xs uppercase tracking-wider text-amber-400 border-amber-500/40 hover:border-amber-400 w-full"
+                    className="btn-outline-circuit py-2.5 text-xs uppercase tracking-wider text-amber-400 border-amber-500/40 hover:border-amber-400 hover:bg-amber-500/10 transition-all w-full mt-1"
                   >
-                    <span>{isCancelling ? 'Processing Refund on Solana...' : 'Cancel Order (100% Refund)'}</span>
+                    <span>{isCancelling ? 'Processing Instant Solana Refund...' : 'Cancel Order (100% Refund)'}</span>
                   </button>
+                </div>
+              )}
+
+              {/* Window Expired Indicator */}
+              {!order.cancelled && cancelCountdown?.isExpired && status === 'pending' && (
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 flex items-center justify-between gap-3 animate-fade-in text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-400" />
+                    <div>
+                      <span className="font-bold text-white uppercase tracking-wider font-mono text-[0.7rem] block">Cancellation Period Concluded</span>
+                      <span className="text-[0.65rem] text-[#888] font-mono">Order is now committed to the manufacturer's production sheet.</span>
+                    </div>
+                  </div>
+                  <span className="text-[0.6rem] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full shrink-0">
+                    Production Locked
+                  </span>
                 </div>
               )}
 

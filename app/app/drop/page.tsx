@@ -623,20 +623,21 @@ function DropPageContent() {
               )}
 
               <button
-                className={`btn-circuit w-full ${txState === 'signing' ? 'signing' : ''} ${isSoldOut ? '!bg-[#111] !text-[#444] !border-white/5' : ''}`}
-                onClick={handleOrder}
-                disabled={txState === 'signing' || isSoldOut}
+                className={`btn-circuit w-full ${txState === 'signing' ? 'signing' : ''} ${isSoldOut || activeEdition.published === false ? '!bg-[#111] !text-[#555] !border-white/10' : ''}`}
+                onClick={activeEdition.published !== false ? handleOrder : undefined}
+                disabled={txState === 'signing' || isSoldOut || activeEdition.published === false}
               >
                 <span>
                   {txState === 'signing' ? 'Processing on Solana...' : 
                    txState === 'success' ? '✓ Order Confirmed' :
+                   activeEdition.published === false ? 'Preview Mode (Unpublished)' :
                    isSoldOut ? 'Scarcity Reached' :
                    `Pre-Order (${totalSol} SOL)`}
                 </span>
                 <span className="btn-arrow">
                   {txState === 'signing' ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M12 2a10 10 0 010 20 10 10 0 010-20"/></svg>
-                  ) : isSoldOut ? (
+                  ) : isSoldOut || activeEdition.published === false ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-20"><path d="M18 6L6 18M6 6l12 12"/></svg>
                   ) : (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>

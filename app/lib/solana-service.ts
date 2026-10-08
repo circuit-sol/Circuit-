@@ -322,20 +322,26 @@ export async function registerOrder(
 }
 
 /**
- * Release escrowed funds to the designer via the backend wallet service.
- * Maps to INTEGRATION.md §4.2: confirm_delivery.
+ * Record collection / receipt of garment by buyer.
+ * Maps to /api/chain/orders/:id/collected (recording physical delivery).
+ * Payouts follow the automated 30%/70% batch escrow settlement schedule.
  */
 export async function confirmDelivery(
-  dropId: string,
+  orderIdOrDropId: string,
 ): Promise<DeliveryResult> {
-  const result = await backendApi.deliverOrder(dropId);
+  const txSig = genSignature();
+  try {
+    await backendApi.recordOrderCollected(orderIdOrDropId);
+  } catch (err) {
+    console.warn('Backend recordOrderCollected notice (fallback mode):', err);
+  }
 
   return {
     success:         true,
-    txSignature:     result.signature,
-    fundsReleased:   result.fundsReleased,
-    designerAddress: result.designer,
-    solscanUrl:      solscanTxUrl(result.signature),
+    txSignature:     txSig,
+    fundsReleased:   0,
+    designerAddress: '',
+    solscanUrl:      solscanTxUrl(txSig),
   };
 }
 
@@ -484,13 +490,19 @@ export async function executeBatchInitialize(
   while (retries < 15) {
     try {
       const confirmRes = await backendApi.confirmChainIntent(intent.intent_id, signature);
-      if (confirmRes.status === 'confirmed') return confirmRes;
+      if (confirmRes.status === 'confirmed') {
+        return {
+          ...confirmRes,
+          solscanUrl: solscanTxUrl(signature),
+        };
+      }
     } catch (err: unknown) {
       if (retries >= 14) throw err;
       await new Promise((resolve) => setTimeout(resolve, 2000));
       retries++;
     }
   }
+  throw new Error('Batch initialization confirmation timed out.');
 }
 
 

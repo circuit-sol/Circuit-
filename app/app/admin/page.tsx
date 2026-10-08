@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { getEditions, saveEdition, updateOrderStatusLifecycle, updateOrderShipmentDetails, uploadEditionImage, deleteEditionImage } from '@/lib/db';
@@ -609,6 +610,30 @@ export default function AdminDashboard() {
       
       <main className="section-container pt-32 pb-20 print:p-0 print:pt-0">
         
+        {/* Creator Studio Cross-Link Banner */}
+        <div className="mb-8 p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-neutral-900 to-black border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg shrink-0">
+              ✨
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white tracking-wide">Brand & Designer Studio</span>
+                <span className="text-[0.6rem] font-mono uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">Dedicated Workspace</span>
+              </div>
+              <p className="text-xs text-white/60 mt-0.5">
+                Designers and brands can use the dedicated Creator Studio to publish drops to Solana, view size cutting sheets, and claim milestone escrow payouts.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/creator"
+            className="shrink-0 px-4 py-2 rounded-xl bg-white text-black text-xs font-bold hover:bg-neutral-200 transition-all text-center self-start sm:self-auto"
+          >
+            Open Creator Studio &rarr;
+          </Link>
+        </div>
+
         {/* Navigation Tabs */}
         <div className="flex gap-4 border-b border-white/10 pb-4 mb-10 print:hidden">
           <button 
