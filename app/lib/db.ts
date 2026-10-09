@@ -244,8 +244,37 @@ export async function getEditions(activeOnly = true) {
   return editions;
 }
 
+export function saveEditionSocialLinks(editionId: string, socialLinks: {
+  instagram?: string;
+  twitter?: string;
+  whatsapp?: string;
+  support_email?: string;
+}) {
+  if (typeof window === 'undefined' || !editionId) return;
+  try {
+    localStorage.setItem(`circuit_social_links_${editionId}`, JSON.stringify(socialLinks));
+  } catch (_) {}
+}
+
+export function getEditionSocialLinks(editionId?: string, brandId?: string) {
+  if (typeof window !== 'undefined') {
+    try {
+      if (editionId) {
+        const stored = localStorage.getItem(`circuit_social_links_${editionId}`);
+        if (stored) return JSON.parse(stored);
+      }
+      if (brandId) {
+        const storedBrand = localStorage.getItem(`circuit_social_links_${brandId}`);
+        if (storedBrand) return JSON.parse(storedBrand);
+      }
+    } catch (_) {}
+  }
+  return DEFAULT_CIRCUIT_EDITION.social_links;
+}
+
 function formatEditionImages(ed: any) {
-  if (ed && ed.images) {
+  if (!ed) return ed;
+  if (ed.images) {
     ed.images = ed.images.map((img: any) => {
       let finalUrl = img.url;
       if (finalUrl && finalUrl.includes('supabase') && !finalUrl.startsWith('/api/proxy-image')) {
@@ -257,6 +286,12 @@ function formatEditionImages(ed: any) {
       };
     });
   }
+
+  // Ensure social_links is never missing on any edition
+  if (!ed.social_links || Object.keys(ed.social_links).length === 0) {
+    ed.social_links = getEditionSocialLinks(ed.id, ed.brand_id);
+  }
+
   return ed;
 }
 
@@ -295,7 +330,7 @@ export async function getEditionById(id: string) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
           const match = parsed.find((e: any) => e.id === id);
-          if (match) return match;
+          if (match) return formatEditionImages(match);
         }
       }
     } catch (_) {}

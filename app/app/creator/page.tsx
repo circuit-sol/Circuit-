@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useWallet } from '@solana/wallet-adapter-react';
 import * as backendApi from '@/lib/backendApi';
-import { getEditions, uploadEditionImage, deleteEditionImage } from '@/lib/db';
+import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks } from '@/lib/db';
 import { executeBatchInitialize } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
@@ -213,6 +213,8 @@ export default function CreatorStudioPage() {
     setIsEditingExisting(true);
     setEditingEditionId(ed.id);
 
+    const socials = ed.social_links || getEditionSocialLinks(ed.id, ed.brand_id) || {};
+
     setEditionForm({
       id: ed.id,
       name: ed.name || '',
@@ -222,10 +224,10 @@ export default function CreatorStudioPage() {
       fabric: ed.fabric || '',
       headpiece: ed.headpiece || '',
       embroidery: ed.embroidery || '',
-      instagram: ed.social_links?.instagram || '',
-      twitter: ed.social_links?.twitter || '',
-      whatsapp: ed.social_links?.whatsapp || '',
-      support_email: ed.social_links?.support_email || '',
+      instagram: socials.instagram || '',
+      twitter: socials.twitter || '',
+      whatsapp: socials.whatsapp || '',
+      support_email: socials.support_email || '',
       images: (ed.images || []).map((img: any) => ({
         url: img.url,
         tag: img.tag || 'Look',
@@ -320,6 +322,14 @@ export default function CreatorStudioPage() {
         setEditingEditionId(slugId);
         setEditionForm(prev => ({ ...prev, id: slugId }));
       }
+
+      // Persist social trust signals
+      saveEditionSocialLinks(slugId, {
+        instagram: editionForm.instagram.trim() || undefined,
+        twitter: editionForm.twitter.trim() || undefined,
+        whatsapp: editionForm.whatsapp.trim() || undefined,
+        support_email: editionForm.support_email.trim() || undefined,
+      });
 
       // Upload new images
       for (let i = 0; i < editionForm.images.length; i++) {
@@ -477,6 +487,13 @@ export default function CreatorStudioPage() {
           },
         });
       }
+
+      saveEditionSocialLinks(slugId, {
+        instagram: editionForm.instagram.trim() || undefined,
+        twitter: editionForm.twitter.trim() || undefined,
+        whatsapp: editionForm.whatsapp.trim() || undefined,
+        support_email: editionForm.support_email.trim() || undefined,
+      });
 
       // Step B: Upload Media
       setDeployStepText('2/4 Synchronizing lookbook photography...');
@@ -1167,6 +1184,29 @@ export default function CreatorStudioPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Brand Social & Customer Care Channels */}
+                  <div className="flex flex-col gap-2 pt-4 border-t border-white/10 md:col-span-2">
+                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Brand Trust & Care Signals</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">Instagram</span>
+                        <span className="text-white truncate">{editionForm.instagram || '@circuit.fashion'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">Twitter / X</span>
+                        <span className="text-white truncate">{editionForm.twitter || '@circuit_fashion'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">WhatsApp</span>
+                        <span className="text-emerald-400 truncate">{editionForm.whatsapp || '+234 800 000 0000'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">Support Email</span>
+                        <span className="text-white truncate">{editionForm.support_email || 'care@circuit.fashion'}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Notice Pill */}
@@ -1284,6 +1324,35 @@ export default function CreatorStudioPage() {
                         <span>${ed.price_usd} USD</span>
                         <span>{ed.max_supply} pieces</span>
                       </div>
+
+                      {/* Care Channels Trust Indicators */}
+                      {ed.social_links && (
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 text-[0.6rem] font-mono text-[#777]">
+                          <span className="uppercase">Brand Channels:</span>
+                          <div className="flex items-center gap-1.5">
+                            {ed.social_links.instagram && (
+                              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-white/80 border border-white/5">
+                                IG
+                              </span>
+                            )}
+                            {ed.social_links.twitter && (
+                              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-white/80 border border-white/5">
+                                𝕏
+                              </span>
+                            )}
+                            {ed.social_links.whatsapp && (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                WhatsApp
+                              </span>
+                            )}
+                            {ed.social_links.support_email && (
+                              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-white/80 border border-white/5">
+                                Email
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}

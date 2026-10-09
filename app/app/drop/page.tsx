@@ -459,7 +459,7 @@ function DropPageContent() {
                 <div className="flex items-center gap-2">
                   {activeEdition.social_links.instagram && (
                     <a
-                      href={activeEdition.social_links.instagram}
+                      href={activeEdition.social_links.instagram.startsWith('http') ? activeEdition.social_links.instagram : `https://instagram.com/${activeEdition.social_links.instagram.replace(/^@/, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Brand Instagram"
@@ -470,7 +470,7 @@ function DropPageContent() {
                   )}
                   {activeEdition.social_links.twitter && (
                     <a
-                      href={activeEdition.social_links.twitter}
+                      href={activeEdition.social_links.twitter.startsWith('http') ? activeEdition.social_links.twitter : `https://x.com/${activeEdition.social_links.twitter.replace(/^@/, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Brand X / Twitter"
@@ -481,7 +481,7 @@ function DropPageContent() {
                   )}
                   {activeEdition.social_links.whatsapp && (
                     <a
-                      href={activeEdition.social_links.whatsapp}
+                      href={activeEdition.social_links.whatsapp.startsWith('http') ? activeEdition.social_links.whatsapp : `https://wa.me/${activeEdition.social_links.whatsapp.replace(/[^0-9]/g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Customer Care / WhatsApp"
@@ -492,7 +492,7 @@ function DropPageContent() {
                   )}
                   {activeEdition.social_links.support_email && (
                     <a
-                      href={`mailto:${activeEdition.social_links.support_email}`}
+                      href={activeEdition.social_links.support_email.startsWith('mailto:') ? activeEdition.social_links.support_email : `mailto:${activeEdition.social_links.support_email}`}
                       title="Support Email"
                       className="w-7 h-7 rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/10 flex items-center justify-center text-xs text-[#A3A3A3] hover:text-white transition-all"
                     >
