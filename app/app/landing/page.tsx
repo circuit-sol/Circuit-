@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import NewsletterForm from '@/components/NewsletterForm';
-import { getEditions } from '@/lib/db';
+import { getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 
 interface FAQItemProps {
   question: string;
@@ -34,16 +34,16 @@ function FAQItem({ question, answer }: FAQItemProps) {
 }
 
 export default function LandingPage() {
-  const [editions, setEditions] = useState<any[]>([]);
-  const [selectedEdition, setSelectedEdition] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [editions, setEditions] = useState<any[]>([DEFAULT_CIRCUIT_EDITION]);
+  const [selectedEdition, setSelectedEdition] = useState<any>(DEFAULT_CIRCUIT_EDITION);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadEditions() {
       try {
         const data = await getEditions();
-        setEditions(data);
         if (data && data.length > 0) {
+          setEditions(data);
           setSelectedEdition(data[0]);
         }
       } catch (err) {
@@ -108,7 +108,7 @@ export default function LandingPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-                <span className="text-xs font-mono text-[#555]">Checking availability. One moment...</span>
+                <span className="text-xs font-mono text-[#555]">Loading collections...</span>
               </div>
             ) : editions.length > 0 ? (
               <div className="flex flex-col">

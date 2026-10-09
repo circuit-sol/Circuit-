@@ -74,15 +74,16 @@ function DropPageContent() {
   const searchParams = useSearchParams();
   const requestedEditionId = searchParams.get('edition');
 
-  const [edition, setEdition] = useState<any>(null);
-  const [batches, setBatches] = useState<backendApi.Batch[]>([]);
-  const [selectedBatch, setSelectedBatch] = useState<backendApi.Batch | null>(null);
-  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [edition, setEdition] = useState<any>(fallbackEdition);
+  const [batches, setBatches] = useState<backendApi.Batch[]>(defaultFallbackBatches);
+  const [selectedBatch, setSelectedBatch] = useState<backendApi.Batch | null>(defaultFallbackBatches[0]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
   const [mintedCount, setMintedCount] = useState(0);
   const [txState, setTxState] = useState<TxState>('idle');
   const [txStep, setTxStep] = useState<TxStep>('idle');
   const [txResult, setTxResult] = useState<TxResult>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isVerifyingStock, setIsVerifyingStock] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState('Medium');
   const [quantity, setQuantity] = useState(1);
@@ -106,9 +107,13 @@ function DropPageContent() {
 
   // Fetch Drop, Supply Details, and Batches
   useEffect(() => {
+    let isMounted = true;
+
     async function loadDropData() {
       try {
-        setLoading(true);
+        if (requestedEditionId && requestedEditionId !== fallbackEdition.id) {
+          setLoading(true);
+        }
         let activeEdition = null;
 
         if (requestedEditionId) {
@@ -133,6 +138,7 @@ function DropPageContent() {
           }
         }
 
+        if (!isMounted) return;
         setEdition(activeEdition);
 
         // Calculate dynamic price based on size
@@ -143,11 +149,11 @@ function DropPageContent() {
           setComputedPrice(Number(activeEdition.price_usd));
         }
 
-        // Fetch exact supply count from backend
+        // Fetch exact supply count from backend silently
         try {
           const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
           const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
-          if (countRes.ok) {
+          if (countRes.ok && isMounted) {
             const { count } = await countRes.json();
             setMintedCount(count);
           }
@@ -155,11 +161,11 @@ function DropPageContent() {
           console.error('Error fetching supply count:', e);
         }
 
-        // Fetch Live SOL Price
+        // Fetch Live SOL Price silently
         try {
           const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
           const data = await res.json();
-          if (data?.solana?.usd) {
+          if (data?.solana?.usd && isMounted) {
             setSolPrice(Number(data.solana.usd));
           }
         } catch (e) {
@@ -169,6 +175,7 @@ function DropPageContent() {
         // Fetch batches for this edition
         try {
           const batchRes = await backendApi.getPublicBatches(activeEdition.id);
+          if (!isMounted) return;
           if (batchRes?.batches && batchRes.batches.length > 0) {
             setBatches(batchRes.batches);
             setSelectedBatch(batchRes.batches[0]);
@@ -179,6 +186,7 @@ function DropPageContent() {
             // Check seller batches or fallback
             try {
               const myBatchRes = await backendApi.getMyBatches({ editionId: activeEdition.id });
+              if (!isMounted) return;
               if (myBatchRes?.batches && myBatchRes.batches.length > 0) {
                 setBatches(myBatchRes.batches);
                 setSelectedBatch(myBatchRes.batches[0]);
@@ -209,14 +217,33 @@ function DropPageContent() {
         setSelectedBatch(defaultFallbackBatches[0]);
         setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
     loadDropData();
-    const interval = setInterval(loadDropData, 20000);
-    return () => clearInterval(interval);
-  }, [requestedEditionId, selectedSize]);
+
+    // ── Silent background stock sync: polls count only, NEVER reloads page ──
+    const interval = setInterval(async () => {
+      const currentId = requestedEditionId || edition?.id || fallbackEdition.id;
+      if (!currentId) return;
+      try {
+        const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+        const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(currentId)}`);
+        if (countRes.ok && isMounted) {
+          const { count } = await countRes.json();
+          setMintedCount(count);
+        }
+      } catch {
+        // Silent error
+      }
+    }, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [requestedEditionId]);
 
   // Recalculate price when size updates
   useEffect(() => {
@@ -263,11 +290,32 @@ function DropPageContent() {
     }
 
     processingRef.current = true;
+    setIsVerifyingStock(true);
     setTxState('signing');
     setTxStep('prepare');
     setTxResult({});
 
     try {
+      // 0. JIT Stock Availability Check right when buyer clicks Preorder
+      try {
+        const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+        const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
+        if (countRes.ok) {
+          const { count } = await countRes.json();
+          setMintedCount(count);
+          if (count >= activeEdition.max_supply) {
+            showToast('Sold Out', 'Sorry! This drop reached maximum capacity a moment ago.');
+            setTxState('soldout');
+            setIsVerifyingStock(false);
+            processingRef.current = false;
+            return;
+          }
+        }
+      } catch {
+        // Non-blocking fallback
+      }
+      setIsVerifyingStock(false);
+
       // 1. If wallet is connected and signTransaction is available, execute verified 4-step chain flow
       if (selectedBatch && signTransaction) {
         const pickupLocId = selectedLocationId || selectedBatch.pickup_locations?.[0]?.id || 'c4b12345-6789-4abc-def0-123456789ab1';
@@ -357,7 +405,7 @@ function DropPageContent() {
     return (
       <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center pt-[72px] bg-black text-white">
         <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-        <span className="text-xs font-mono text-[#555] mt-4">Checking availability. One moment...</span>
+        <span className="text-xs font-mono text-[#555] mt-4">Loading drop details...</span>
       </div>
     );
   }
@@ -623,19 +671,20 @@ function DropPageContent() {
               )}
 
               <button
-                className={`btn-circuit w-full ${txState === 'signing' ? 'signing' : ''} ${isSoldOut || activeEdition.published === false ? '!bg-[#111] !text-[#555] !border-white/10' : ''}`}
+                className={`btn-circuit w-full ${txState === 'signing' || isVerifyingStock ? 'signing' : ''} ${isSoldOut || activeEdition.published === false ? '!bg-[#111] !text-[#555] !border-white/10' : ''}`}
                 onClick={activeEdition.published !== false ? handleOrder : undefined}
-                disabled={txState === 'signing' || isSoldOut || activeEdition.published === false}
+                disabled={txState === 'signing' || isVerifyingStock || isSoldOut || activeEdition.published === false}
               >
                 <span>
-                  {txState === 'signing' ? 'Processing on Solana...' : 
+                  {isVerifyingStock ? 'Checking stock...' :
+                   txState === 'signing' ? 'Processing on Solana...' : 
                    txState === 'success' ? '✓ Order Confirmed' :
                    activeEdition.published === false ? 'Preview Mode (Unpublished)' :
-                   isSoldOut ? 'Scarcity Reached' :
+                   isSoldOut ? 'Sold Out' :
                    `Pre-Order (${totalSol} SOL)`}
                 </span>
                 <span className="btn-arrow">
-                  {txState === 'signing' ? (
+                  {txState === 'signing' || isVerifyingStock ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M12 2a10 10 0 010 20 10 10 0 010-20"/></svg>
                   ) : isSoldOut || activeEdition.published === false ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-20"><path d="M18 6L6 18M6 6l12 12"/></svg>
