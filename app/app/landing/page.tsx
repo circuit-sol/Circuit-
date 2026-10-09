@@ -67,18 +67,21 @@ export default function LandingPage() {
 
           <div className="animate-fade-in flex flex-col items-center relative z-10">
             <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-8 px-4 py-1.5 border border-white/10 rounded-full">
-              Built on Solana
+              Made to order
             </span>
-            <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-[0.95] mb-10 max-w-5xl">
-              Fashion sold before <br className="hidden md:block" /> it’s made.
+            <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-[0.95] mb-4 max-w-5xl">
+              Scale fashion without trapped capital
             </h1>
+            <p className="text-sm md:text-base text-[#aaa] italic mb-8">
+              Fashion made for you
+            </p>
             <p className="text-base md:text-xl text-[#888] leading-relaxed max-w-2xl mb-12">
-              Circuit is a demand-first fashion brand where garments are only produced after buyers commit.
+              We only make your piece after you order it. No waste.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <a href="#collections-slider" className="btn-circuit py-4 px-10 text-xs w-full sm:w-auto justify-center">
-                <span>Browse Editions</span>
+                <span>Shop limited Drops</span>
               </a>
               <a href="#how-it-works" className="btn-outline-circuit py-4 px-10 text-xs w-full sm:w-auto justify-center border-white/10 hover:border-white/30">
                 How It Works
@@ -92,7 +95,7 @@ export default function LandingPage() {
           <div className="section-container relative z-10">
             <div className="text-center mb-12">
               <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-4 block">
-                Current Collections
+                Available Now
               </span>
               <h2 className="text-4xl md:text-6xl font-bold tracking-tight">
                 Select Your Edition.
@@ -182,8 +185,8 @@ export default function LandingPage() {
               </h2>
               <div className="space-y-6 text-[#888] leading-relaxed text-sm md:text-base">
                 <p>When those bets fail, the result is excess inventory, markdowns, and waste.</p>
-                <p>Circuit changes the order.</p>
-                <p className="text-white font-medium">Production only begins after demand is confirmed.</p>
+                <p>Circuit flips the order.</p>
+                <p className="text-white font-medium">Production starts after the window closes.</p>
               </div>
             </div>
 
@@ -193,7 +196,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-8 left-8">
                   <div className="w-12 h-0.5 bg-white mb-4" />
-                  <p className="text-[0.65rem] font-bold uppercase tracking-widest text-white/40">Current Editions</p>
+                  <p className="text-[0.65rem] font-bold uppercase tracking-widest text-white/40">Available Now</p>
                 </div>
               </div>
             </div>
@@ -289,10 +292,6 @@ export default function LandingPage() {
               <FAQItem
                 question="7. How long does production take?"
                 answer="Production begins only after your order is confirmed. Timeline is specific to each drop and communicated before you commit."
-              />
-              <FAQItem
-                question="8. When does Drop Zero open?"
-                answer="Drop Zero opens to the waitlist first. Join to be notified before the public."
               />
             </div>
           </div>

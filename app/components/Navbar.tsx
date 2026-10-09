@@ -11,9 +11,9 @@ import { truncateAddress } from '@/lib/utils';
 import { showToast } from './Toast';
 
 const NAV_LINKS = [
-  { href: '/drop', label: 'Drop', page: 'drop' },
-  { href: '/confirm', label: 'Confirm', page: 'confirm' },
-  { href: '/passport', label: 'Passport', page: 'passport' },
+  { href: '/drop', label: 'Shop', page: 'drop' },
+  { href: '/confirm', label: 'Confirm Arrival', page: 'confirm' },
+  { href: '/passport', label: 'My Passport', page: 'passport' },
   { href: '/creator', label: 'Creator Studio', page: 'creator' },
 ];
 
@@ -91,7 +91,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
             {activePage === 'landing' && customEditions && customEditions.length > 0 ? (
               <div className="relative group">
                 <button className="px-6 py-2 rounded-full text-[0.8rem] font-semibold uppercase tracking-[0.06em] transition-all text-white bg-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                  Active Editions ▾
+                  Open Drops ▾
                 </button>
                 <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-56 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all z-50">
                   <div className="card-glass p-2 border border-white/[0.1] rounded-2xl shadow-2xl flex flex-col gap-1">
@@ -146,7 +146,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                       className="px-4 py-3.5 border-b border-white/[0.1] mb-1 cursor-pointer hover:bg-white/[0.04] transition-colors group/wallet rounded-xl"
                     >
                       <div className="flex justify-between items-center mb-1.5">
-                        <p className="text-[0.6rem] font-bold text-[#A3A3A3] uppercase tracking-[0.15em]">Account Connected</p>
+                        <p className="text-[0.6rem] font-bold text-[#A3A3A3] uppercase tracking-[0.15em]">Your Account ID</p>
                         <span className="text-[0.55rem] text-[#666] group-hover/wallet:text-white/60 transition-colors uppercase font-mono">Copy 📋</span>
                       </div>
                       <p className="text-[0.7rem] font-mono text-white/70 break-all leading-relaxed transition-colors group-hover/wallet:text-white">{user?.walletAddress}</p>
@@ -158,7 +158,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                         className="w-full text-left px-4 py-3 text-[0.75rem] font-semibold text-[#D1D1D1] hover:text-white hover:bg-white/[0.08] rounded-xl transition-all flex items-center gap-3.5 group"
                       >
                         <span className="text-base group-hover:scale-110 transition-transform">📜</span>
-                        Purchase History
+                        My Orders
                       </Link>
 
                       <Link 
@@ -216,7 +216,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
           <div className="flex flex-col gap-8">
             {activePage === 'landing' && customEditions && customEditions.length > 0 ? (
               <>
-                <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em] mb-2">Active Editions</span>
+                <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em] mb-2">Open Drops</span>
                 {customEditions.map((ed, i) => (
                   <Link
                     key={ed.id}
@@ -258,7 +258,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
             {isSignedIn ? (
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col">
-                  <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em]">Authenticated as</span>
+                  <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em]">Signed in as</span>
                   <span className="text-lg font-bold text-white mb-2">{user?.email}</span>
                   
                   {/* Copyable Mobile Wallet Address */}
@@ -267,8 +267,8 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                     className="p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-xl flex flex-col gap-1.5 cursor-pointer hover:bg-white/[0.06] active:bg-white/[0.08] transition-all"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="text-[0.55rem] font-bold text-[#A3A3A3] uppercase tracking-[0.1em]">Connected Wallet</span>
-                      <span className="text-[0.55rem] text-[#666] uppercase font-mono">Tap to Copy 📋</span>
+                      <span className="text-[0.55rem] font-bold text-[#A3A3A3] uppercase tracking-[0.1em]">Your Account ID</span>
+                      <span className="text-[0.55rem] text-[#666] uppercase font-mono">Copy 📋</span>
                     </div>
                     <span className="text-[0.65rem] font-mono text-white/60 break-all leading-normal">{user?.walletAddress}</span>
                   </div>
@@ -279,7 +279,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                     onClick={() => setDrawerOpen(false)}
                     className="text-[0.75rem] font-bold text-white underline flex items-center gap-1.5"
                   >
-                    📜 Purchase History
+                    📜 My Orders
                   </Link>
 
                   <Link 
@@ -303,7 +303,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
             )}
             
             <div className="flex justify-between items-center text-[0.6rem] font-bold text-[#444] uppercase tracking-[0.2em]">
-              <span>On-Chain Infrastructure</span>
+              <span>Secure Order Tracking</span>
               <span>v1.0.0</span>
             </div>
           </div>

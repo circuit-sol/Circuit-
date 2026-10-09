@@ -100,7 +100,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <p className="text-sm text-[#A3A3A3]">
                 {isMobileDevice
                   ? 'Tap below to open Circuit directly in Phantom Mobile.'
-                  : 'Connect with Phantom to continue. Your wallet is your identity.'}
+                  : 'Sign in with Phantom. No password needed.'}
               </p>
             </div>
 
@@ -114,7 +114,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 {authStatusText || (
                   isAuthenticating
                     ? 'Verifying wallet...'
-                    : (isMobileDevice ? 'Open in Phantom App' : 'Connect with Phantom')
+                    : (isMobileDevice ? 'Open in Phantom App' : 'Continue with Phantom')
                 )}
               </span>
               <span className="btn-arrow" aria-hidden="true">
@@ -133,7 +133,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             <p className="text-center text-[0.65rem] text-[#555]">
               {isMobileDevice
                 ? 'Direct Universal Link into Phantom Web3 browser.'
-                : '1-tap confirmation. No seed phrases needed.'}
+                : 'One tap. No passwords or secret codes.'}
             </p>
           </>
         )}
@@ -144,10 +144,10 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             <div className="text-center">
               <div className="text-2xl mb-3">📬</div>
               <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">
-                Where should we send your updates?
+                Where should we send updates?
               </h2>
               <p className="text-sm text-[#A3A3A3]">
-                Add your email to receive order confirmations and shipping updates. You can skip this for now.
+                Add your email for order updates. You can skip this for now.
               </p>
             </div>
 

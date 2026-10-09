@@ -580,9 +580,6 @@ export default function CreatorStudioPage() {
             >
               <span>{isAuthenticating ? 'Connecting Phantom...' : 'Connect Designer Wallet'}</span>
             </button>
-            <span className="text-[0.65rem] font-mono text-[#555]">
-              Secured by Solana Sign-in-with-Solana (SIWS)
-            </span>
           </div>
         </main>
       </div>
@@ -599,11 +596,11 @@ export default function CreatorStudioPage() {
           <div>
             <div className="flex items-center gap-2 mb-2 font-mono">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[0.65rem] font-bold uppercase tracking-widest text-emerald-400">Atelier Workspace Active</span>
+              <span className="text-[0.65rem] font-bold uppercase tracking-widest text-emerald-400">Your Studio is Live</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Creator Studio</h1>
             <p className="text-[#888] text-sm mt-2 max-w-md leading-relaxed">
-              Architect demand-first collections, schedule escrow runs, and inspect live manufacturing requirements.
+              Create drops, track orders, and get paid safely.
             </p>
           </div>
 
@@ -629,13 +626,13 @@ export default function CreatorStudioPage() {
               </div>
             ) : (
               <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-1.5 px-3">
-                <span className="text-[0.65rem] uppercase font-bold text-[#666] font-mono">Workspace:</span>
+                <span className="text-[0.65rem] uppercase font-bold text-[#666] font-mono">My Studio:</span>
                 <span className="text-xs font-mono text-white font-bold">{selectedBrand?.name || 'Circuit Atelier Studio'}</span>
               </div>
             )}
 
-            <div className="px-3 py-1.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs font-mono text-[#888]">
-              {user?.walletAddress ? `${user.walletAddress.slice(0, 4)}...${user.walletAddress.slice(-4)}` : ''}
+            <div className="px-3 py-1.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs font-mono text-white/90">
+              {selectedBrand?.name || user?.email || (user?.walletAddress ? `${user.walletAddress.slice(0, 4)}...${user.walletAddress.slice(-4)}` : '')}
             </div>
           </div>
         </div>
@@ -643,10 +640,10 @@ export default function CreatorStudioPage() {
         {/* Studio Navigation Tabs */}
         <div className="flex gap-2 border-b border-white/[0.06] pb-4 mb-8 overflow-x-auto no-scrollbar">
           {[
-            { id: 'wizard', label: '1. Launch New Drop (Wizard)', icon: '🚀' },
-            { id: 'directory', label: `2. Collections Directory (${editions.length})`, icon: '📁' },
-            { id: 'demand', label: '3. Cutting & Demand Sheet', icon: '✂️' },
-            { id: 'claims', label: '4. Escrow Payout Claims', icon: '💰' },
+            { id: 'wizard', label: '1. Create a New Drop', icon: '🚀' },
+            { id: 'directory', label: `2. My Drops (${editions.length})`, icon: '📁' },
+            { id: 'demand', label: '3. Production planner', icon: '✂️' },
+            { id: 'claims', label: '4. My Earnings', icon: '💰' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -669,9 +666,9 @@ export default function CreatorStudioPage() {
             {/* Step Progress Tracker */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { num: 1, title: 'Garment Design', desc: 'Photos, fabric, specs & cap' },
-                { num: 2, title: 'Preorder Terms', desc: 'Timeline & pickup station' },
-                { num: 3, title: 'Deploy on Solana', desc: 'Co-sign & publish live' },
+                { num: 1, title: 'Your Piece', desc: 'Photos, fabric and details' },
+                { num: 2, title: 'Dates & Pickup', desc: 'When orders open and where buyers collect' },
+                { num: 3, title: 'Publish', desc: 'Approve and go live' },
               ].map((s) => (
                 <div
                   key={s.num}
@@ -720,47 +717,47 @@ export default function CreatorStudioPage() {
             {wizardStep === 1 && (
               <div className="card-glass p-8 border-white/10 rounded-3xl flex flex-col gap-6 animate-fade-in">
                 <div className="border-b border-white/10 pb-4">
-                  <h2 className="text-xl font-bold">Step 1: Collection Design & Media</h2>
-                  <p className="text-xs text-[#888] mt-1">Configure your physical garment metadata and upload high-resolution lookbook assets.</p>
+                  <h2 className="text-xl font-bold">Step 1: Your Piece</h2>
+                  <p className="text-xs text-[#888] mt-1">Add your garment details and photos.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Collection Title</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Drop Name</label>
                     <input
                       type="text"
                       value={editionForm.name}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="e.g. Circuit Demo — Yellow Gown"
+                      placeholder="e.g. Yellow Gown"
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30"
                     />
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Collection Slug ID</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Drop Link</label>
                     <input
                       type="text"
                       disabled={isEditingExisting}
                       value={editionForm.id}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                      placeholder="e.g. circuit-demo-drop-001"
+                      placeholder="e.g. yellow-gown"
                       className={`bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30 ${
                         isEditingExisting ? 'opacity-60 cursor-not-allowed' : ''
                       }`}
                     />
                     {isEditingExisting && (
-                      <span className="text-[0.6rem] font-mono text-[#666]">Slug ID is immutable once created.</span>
+                      <span className="text-[0.6rem] font-mono text-[#666]">Drop link is immutable once created.</span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Editorial Description</label>
+                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Description</label>
                   <textarea
                     rows={3}
                     value={editionForm.description}
                     onChange={(e) => setEditionForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe the silhouette, craftsmanship, tailoring process, and inspiration..."
+                    placeholder="Tell buyers about the look, the fabric and what inspired it."
                     className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 resize-none"
                   />
                 </div>
@@ -786,7 +783,7 @@ export default function CreatorStudioPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Embroidery / Thread</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Stitching & Details</label>
                     <input
                       type="text"
                       value={editionForm.embroidery}
@@ -809,7 +806,7 @@ export default function CreatorStudioPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Piece Cap / Max Supply</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Pieces Available</label>
                     <input
                       type="number"
                       value={editionForm.max_supply}
@@ -822,8 +819,8 @@ export default function CreatorStudioPage() {
                 {/* Media Uploader */}
                 <div className="flex flex-col gap-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Apparel Media ({editionForm.images.length}/10)</label>
-                    <span className="text-[0.6rem] text-[#666] font-mono">First photo will be storefront hero</span>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Photos ({editionForm.images.length}/10)</label>
+                    <span className="text-[0.6rem] text-[#666] font-mono">Your first photo is the cover image in the shop</span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -848,7 +845,7 @@ export default function CreatorStudioPage() {
                     {editionForm.images.length < 10 && (
                       <label className="aspect-[4/5] rounded-xl border border-dashed border-white/20 hover:border-white/40 bg-white/[0.01] hover:bg-white/[0.03] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer p-4 text-center">
                         <span className="text-xl">📷</span>
-                        <span className="text-[0.65rem] font-bold uppercase text-[#888]">Add Look</span>
+                        <span className="text-[0.65rem] font-bold uppercase text-[#888]">Add Photo</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -881,7 +878,7 @@ export default function CreatorStudioPage() {
                     }}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
                   >
-                    <span>Proceed to Preorder Terms →</span>
+                    <span>Proceed to Dates & Pickup →</span>
                   </button>
                 </div>
               </div>
@@ -891,12 +888,12 @@ export default function CreatorStudioPage() {
             {wizardStep === 2 && (
               <div className="card-glass p-8 border-white/10 rounded-3xl flex flex-col gap-6 animate-fade-in">
                 <div className="border-b border-white/10 pb-4">
-                  <h2 className="text-xl font-bold">Step 2: Preorder Terms & Fulfillment Stations</h2>
-                  <p className="text-xs text-[#888] mt-1">Configure opening, closing, production and release dates. Production starts no earlier than closing + 48 hours.</p>
+                  <h2 className="text-xl font-bold">Step 2: Dates & Pickup</h2>
+                  <p className="text-xs text-[#888] mt-1">When orders open and where buyers collect.</p>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Batch Identifier</label>
+                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Drop Name</label>
                   <input
                     type="text"
                     value={batchForm.name}
@@ -908,7 +905,7 @@ export default function CreatorStudioPage() {
                 {/* Timeline Matrix */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">1. Preorders Open (UTC)</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">1. Orders Open</label>
                     <input
                       type="datetime-local"
                       value={batchForm.opens_at}
@@ -918,7 +915,7 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">2. Preorders Close (UTC)</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">2. Orders Close</label>
                     <input
                       type="datetime-local"
                       value={batchForm.closes_at}
@@ -928,7 +925,7 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-amber-400 font-mono">3. Production Start (&gt;= Close + 48h)</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-amber-400 font-mono">3. Production starts</label>
                     <input
                       type="datetime-local"
                       value={batchForm.production_starts_at}
@@ -938,7 +935,7 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">4. Collection / Release Date</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">4. Pickup Date</label>
                     <input
                       type="datetime-local"
                       value={batchForm.release_at}
@@ -951,13 +948,16 @@ export default function CreatorStudioPage() {
                 {/* Pickup Station Details */}
                 <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">📍</span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">Physical Pickup Station</span>
+                    <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                      <circle cx="12" cy="9" r="2.5" />
+                    </svg>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">Pickup Location</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] font-mono text-[#777] uppercase">Station Name</label>
+                      <label className="text-[0.6rem] font-mono text-[#777] uppercase">Location Name</label>
                       <input
                         type="text"
                         value={batchForm.pickup_name}
@@ -996,11 +996,12 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[0.6rem] font-mono text-[#777] uppercase">Customer Instructions</label>
+                    <label className="text-[0.6rem] font-mono text-[#777] uppercase">Note for Buyers</label>
                     <input
                       type="text"
                       value={batchForm.pickup_instructions}
                       onChange={(e) => setBatchForm(prev => ({ ...prev, pickup_instructions: e.target.value }))}
+                      placeholder="Please show your order number when you arrive."
                       className="bg-black border border-white/10 rounded-lg p-2.5 text-xs text-white"
                     />
                   </div>
@@ -1012,7 +1013,7 @@ export default function CreatorStudioPage() {
                       onClick={() => setWizardStep(1)}
                       className="text-xs text-[#888] hover:text-white font-mono uppercase tracking-wider"
                     >
-                      ← Back to Design
+                      ← Back
                     </button>
                     <button
                       type="button"
@@ -1027,7 +1028,7 @@ export default function CreatorStudioPage() {
                     onClick={() => setWizardStep(3)}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
                   >
-                    <span>Review & Deploy to Solana →</span>
+                    <span>Review & Publish →</span>
                   </button>
                 </div>
               </div>
@@ -1037,33 +1038,40 @@ export default function CreatorStudioPage() {
             {wizardStep === 3 && (
               <div className="card-glass p-8 border-white/10 rounded-3xl flex flex-col gap-6 animate-fade-in">
                 <div className="border-b border-white/10 pb-4">
-                  <h2 className="text-xl font-bold">Step 3: Review & On-Chain Vault Deployment</h2>
+                  <h2 className="text-xl font-bold">Step 3: Review & Publish</h2>
                   <p className="text-xs text-[#888] mt-1">
-                    Your collection and preorder batch will be deployed with an immutable Solana escrow smart contract. As soon as the vault confirms, your drop automatically goes live on the public storefront.
+                    Buyers' payments are held safely until they receive their orders. Once you publish, your drop goes live in the shop.
                   </p>
                 </div>
 
                 {/* Summary Matrix */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 rounded-2xl bg-white/[0.02] border border-white/10">
                   <div className="flex flex-col gap-3">
-                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Collection Profile</span>
-                    <div className="text-sm font-bold text-white">{editionForm.name || 'Untitled Drop'}</div>
-                    <div className="text-xs text-[#888] leading-relaxed">{editionForm.description || 'No description provided.'}</div>
+                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Drop Details</span>
+                    <div className="text-sm font-bold text-white">{editionForm.name || 'Name your drop'}</div>
+                    <div className="text-xs text-[#888] leading-relaxed">{editionForm.description || 'Add a short description'}</div>
                     <div className="flex gap-4 pt-2 font-mono text-xs">
-                      <div><span className="text-[#666]">Unit:</span> ${editionForm.price_usd} USD</div>
-                      <div><span className="text-[#666]">Cap:</span> {editionForm.max_supply} Units</div>
+                      <div><span className="text-[#666]">Price:</span> ${editionForm.price_usd} each</div>
+                      <div><span className="text-[#666]">Limit:</span> {editionForm.max_supply} pieces</div>
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-3 border-t md:border-t-0 md:border-l border-white/10 md:pl-6 pt-4 md:pt-0">
-                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Escrow Vault Parameters</span>
+                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Order Timeline</span>
                     <div className="text-xs font-mono space-y-1.5 text-white/90">
-                      <div><span className="text-[#666]">Batch:</span> {batchForm.name}</div>
-                      <div><span className="text-[#666]">Opens:</span> {new Date(batchForm.opens_at).toLocaleString()}</div>
-                      <div><span className="text-[#666]">Closes:</span> {new Date(batchForm.closes_at).toLocaleString()}</div>
-                      <div><span className="text-[#666]">Production:</span> {new Date(batchForm.production_starts_at).toLocaleString()}</div>
-                      <div><span className="text-[#666]">Release:</span> {new Date(batchForm.release_at).toLocaleString()}</div>
-                      <div><span className="text-[#666]">Station:</span> {batchForm.pickup_name} ({batchForm.pickup_city})</div>
+                      <div><span className="text-[#666]">Drop Name:</span> {batchForm.name}</div>
+                      <div><span className="text-[#666]">Orders Open:</span> {new Date(batchForm.opens_at).toLocaleString()}</div>
+                      <div><span className="text-[#666]">Orders Close:</span> {new Date(batchForm.closes_at).toLocaleString()}</div>
+                      <div><span className="text-[#666]">Production starts:</span> {new Date(batchForm.production_starts_at).toLocaleString()}</div>
+                      <div><span className="text-[#666]">Ready for Pickup:</span> {new Date(batchForm.release_at).toLocaleString()}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[#666]">Pickup Spot:</span> 
+                        <svg className="w-3 h-3 text-white inline shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                          <circle cx="12" cy="9" r="2.5" />
+                        </svg>
+                        <span>{batchForm.pickup_name} ({batchForm.pickup_city})</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1081,7 +1089,7 @@ export default function CreatorStudioPage() {
                   <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col gap-3 animate-fade-in">
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                       <span>✓</span>
-                      <span>Preorder Vault Deployed & Published to Storefront!</span>
+                      <span>Drop Published to Storefront!</span>
                     </div>
                     <div className="flex flex-wrap gap-4 text-xs font-mono pt-2">
                       <a
@@ -1111,7 +1119,7 @@ export default function CreatorStudioPage() {
                     disabled={isDeploying}
                     className="text-xs text-[#888] hover:text-white font-mono uppercase tracking-wider"
                   >
-                    ← Back to Terms
+                    ← Back
                   </button>
 
                   <button
@@ -1121,7 +1129,7 @@ export default function CreatorStudioPage() {
                       isDeploying ? 'opacity-80 cursor-wait' : ''
                     }`}
                   >
-                    <span>{isDeploying ? (deployStepText || 'Broadcasting to Solana...') : 'Deploy Preorder Vault to Solana ➔'}</span>
+                    <span>{isDeploying ? (deployStepText || 'Broadcasting to Solana...') : 'Publish My Drop ➔'}</span>
                   </button>
                 </div>
               </div>
@@ -1134,8 +1142,8 @@ export default function CreatorStudioPage() {
           <div className="flex flex-col gap-6 animate-fade-in">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold">Managed Collections</h2>
-                <p className="text-xs text-[#888] mt-1">All design editions and preorder batches associated with {selectedBrand?.name || 'your atelier'}.</p>
+                <h2 className="text-2xl font-bold">My Drops</h2>
+                <p className="text-xs text-[#888] mt-1">All your drops, live and draft.</p>
               </div>
               <button
                 onClick={handleResetToNew}
@@ -1167,21 +1175,21 @@ export default function CreatorStudioPage() {
                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                               : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                           }`}>
-                            {isPublished ? '● Live on Storefront' : '○ Unpublished Draft'}
+                            {isPublished ? '● Live on Storefront' : '○ Draft (not live yet)'}
                           </span>
                         </div>
                       </div>
 
                       {/* Info */}
                       <div>
-                        <span className="text-[0.6rem] font-mono text-[#666] uppercase block mb-1">ID: {ed.id}</span>
+                        <span className="text-[0.6rem] font-mono text-[#666] uppercase block mb-1">Link: {ed.id}</span>
                         <h3 className="text-lg font-bold text-white truncate">{ed.name}</h3>
                         <p className="text-xs text-[#888] line-clamp-2 mt-1 leading-relaxed">{ed.description}</p>
                       </div>
 
                       <div className="flex justify-between items-center text-xs font-mono text-[#A3A3A3] pt-2 border-t border-white/5">
                         <span>${ed.price_usd} USD</span>
-                        <span>{ed.max_supply} Units Cap</span>
+                        <span>{ed.max_supply} pieces</span>
                       </div>
                     </div>
 
@@ -1227,8 +1235,8 @@ export default function CreatorStudioPage() {
         {activeTab === 'demand' && (
           <div className="flex flex-col gap-6 animate-fade-in">
             <div>
-              <h2 className="text-2xl font-bold">Cutting & Demand Sheet</h2>
-              <p className="text-xs text-[#888] mt-1">Confirmed buyer preorders aggregated by garment size feeding physical atelier production.</p>
+              <h2 className="text-2xl font-bold">Production planner</h2>
+              <p className="text-xs text-[#888] mt-1">Confirmed orders grouped by size, so you know exactly what to cut.</p>
             </div>
 
             {Object.keys(batchesByEdition).length === 0 ? (
@@ -1243,11 +1251,11 @@ export default function CreatorStudioPage() {
                     <div key={editionId} className="card-glass p-8 rounded-3xl border-white/10 flex flex-col gap-6">
                       <div className="flex justify-between items-baseline border-b border-white/10 pb-4">
                         <div>
-                          <span className="text-[0.6rem] font-mono text-[#666] uppercase block">Edition</span>
+                          <span className="text-[0.6rem] font-mono text-[#666] uppercase block">Drop</span>
                           <h3 className="text-xl font-bold">{ed?.name || editionId}</h3>
                         </div>
                         <span className="text-xs font-mono text-emerald-400 font-bold">
-                          Cap: {ed?.max_supply || 50} Pieces
+                          Limit: {ed?.max_supply || 50} pieces
                         </span>
                       </div>
 
@@ -1304,10 +1312,13 @@ export default function CreatorStudioPage() {
         {activeTab === 'claims' && (
           <div className="flex flex-col gap-6 animate-fade-in">
             <div>
-              <h2 className="text-2xl font-bold">Escrow Settlement & Payout Claims</h2>
-              <p className="text-xs text-[#888] mt-1">
-                Under the Circuit staged settlement model, 30% advance capital is eligible at closing + 48 hours, and 70% balance is eligible 7 days after the release date.
-              </p>
+              <h2 className="text-2xl font-bold">My Earnings</h2>
+              <div className="text-xs text-[#888] mt-2 space-y-1 leading-relaxed">
+                <p>Buyers pay upfront, so your money is secured before you start making. You&apos;re paid in two parts:</p>
+                <p className="pl-2">• 30% goes to you 48 hours after orders close, to fund production.</p>
+                <p className="pl-2">• 70% goes to you once the buyer confirms their piece arrived.</p>
+                <p>If a buyer doesn&apos;t confirm and there&apos;s no complaint, the 70% is released 7 days after delivery.</p>
+              </div>
             </div>
 
             <div className="space-y-6">

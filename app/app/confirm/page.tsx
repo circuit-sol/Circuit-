@@ -156,9 +156,9 @@ export default function ConfirmPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Confirm Garment Receipt</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Did Your Piece Arrive?</h1>
           <p className="text-sm text-[#A3A3A3] leading-relaxed max-w-[360px]">
-            Confirming collection verifies that your customized piece has arrived and activates your permanent Digital Product Passport.
+            Confirm it arrived and we'll unlock your order Passport.
           </p>
         </div>
 
@@ -173,12 +173,12 @@ export default function ConfirmPage() {
               onClick={() => setIsSignInOpen(true)}
               className="btn-circuit w-full justify-center text-xs py-4"
             >
-              <span>Sign In to Load Order</span>
+              <span>Sign in to find your order</span>
             </button>
           </div>
         ) : !latestOrder ? (
           <div className="w-full py-6 text-center text-[#666] text-xs">
-            No pending or active orders located for your email address.
+            We couldn't find any orders for your email.
             <a href="/drop" className="btn-outline-circuit mt-6 justify-center">Visit Shop</a>
           </div>
         ) : (
@@ -239,7 +239,7 @@ export default function ConfirmPage() {
               <span>
                 {txState === 'signing' ? 'Processing...' :
                  txState === 'success' ? '✓ Receipt Recorded' :
-                 'Confirm Garment Receipt'}
+                 'Confirm it arrived'}
               </span>
               {txState !== 'success' && txState !== 'signing' && (
                 <span className="btn-arrow">
@@ -273,7 +273,7 @@ export default function ConfirmPage() {
 
         <div className="flex items-center gap-2 text-[0.6rem] font-bold text-[#444] uppercase tracking-widest">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Secured by Solana Escrow
+          Your payment is protected until you confirm
         </div>
       </div>
 

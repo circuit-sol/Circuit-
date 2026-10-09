@@ -154,7 +154,7 @@ export const DEFAULT_CIRCUIT_EDITION = {
     { url: '/yellow-gown2.jpg', tag: 'Full Silhouette' },
     { url: '/yellow.jpg', tag: 'Editorial Close-up' },
   ],
-  description: 'An exclusive demand-driven atelier runway piece. Precision-crafted in Duchess satin and structured mesh bodice with hand-finished feather trim. Produced strictly upon confirmed on-chain commitment.',
+  description: 'An exclusive runway piece in Duchess satin, with a structured mesh bodice and hand-finished feather trim. Made only after you order.',
   price_usd: 30,
   has_variable_prices: false,
   prices_by_size: { 'Small': 30, 'Medium': 30, 'Large': 30, 'Extra Large': 30 },

@@ -234,16 +234,16 @@ function PassportContent() {
   if (!order) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black p-6 text-center">
-        <h1 className="text-2xl font-bold mb-4">Passport Not Loaded</h1>
+        <h1 className="text-2xl font-bold mb-4">No Passport Yet</h1>
         <p className="text-[#666] max-w-sm mb-8 leading-relaxed">
-          No active product passport is currently cached. Order a collection run to generate your passport digital certificate.
+          Order a piece and your Passport will appear here. It's your proof that the garment is yours.
         </p>
         <div className="flex gap-4">
           <a href="/passport/history" className="btn-circuit py-4 px-10 text-xs">
-            <span>View Purchases History</span>
+            <span>View My Orders</span>
           </a>
           <a href="/drop" className="btn-outline-circuit py-4 px-10 text-xs border-white/10 hover:border-white/30">
-            Visit Shop
+            Browse the Shop
           </a>
         </div>
       </div>
@@ -265,7 +265,7 @@ function PassportContent() {
           {/* Header Portal Navigation */}
           <div className="flex justify-end mb-8 relative z-10">
             <a href="/passport/history" className="btn-outline-circuit py-2 px-6 text-[0.65rem] border-white/10 hover:border-white/20">
-              View Purchases History ➔
+              View My Orders ➔
             </a>
           </div>
 

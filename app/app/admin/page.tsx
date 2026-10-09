@@ -1290,7 +1290,7 @@ export default function AdminDashboard() {
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                       }`}>
-                        {selectedEdition?.published ? '● Live on Storefront' : '○ Unpublished Draft'}
+                        {selectedEdition?.published ? '● Live on Storefront' : '○ Draft (not live yet)'}
                       </span>
                     </div>
                     <p className="text-[0.65rem] text-[#666] leading-relaxed">

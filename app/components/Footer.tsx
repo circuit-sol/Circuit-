@@ -30,10 +30,7 @@ export default function Footer() {
           </a>
         </div>
 
-        {/* Info */}
-        <div className="flex items-center gap-2">
-          <span className="text-[0.68rem] text-[#666]">Built on Solana · Nigeria · May 2026</span>
-        </div>
+
 
       </div>
     </footer>

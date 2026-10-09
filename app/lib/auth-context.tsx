@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function authenticate() {
       setAuthenticating(true);
       try {
-        setAuthStatusText('Requesting challenge...');
+        setAuthStatusText('Signing you in...');
         // Step 1: Get one-time challenge containing the exact message to sign
         const challenge = await backendApi.getChallenge(address);
 
