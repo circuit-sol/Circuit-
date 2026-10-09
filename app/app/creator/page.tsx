@@ -65,6 +65,10 @@ export default function CreatorStudioPage() {
     fabric: 'Duchess satin & structured mesh',
     headpiece: 'Velvet flower accent',
     embroidery: 'Hand-sewn feather trim',
+    instagram: '',
+    twitter: '',
+    whatsapp: '',
+    support_email: '',
     images: [] as ApparelImage[],
   });
 
@@ -194,6 +198,10 @@ export default function CreatorStudioPage() {
       fabric: 'Duchess satin & structured mesh',
       headpiece: 'Velvet flower accent',
       embroidery: 'Hand-sewn feather trim',
+      instagram: '',
+      twitter: '',
+      whatsapp: '',
+      support_email: '',
       images: [],
     });
     setDeployResult(null);
@@ -214,6 +222,10 @@ export default function CreatorStudioPage() {
       fabric: ed.fabric || '',
       headpiece: ed.headpiece || '',
       embroidery: ed.embroidery || '',
+      instagram: ed.social_links?.instagram || '',
+      twitter: ed.social_links?.twitter || '',
+      whatsapp: ed.social_links?.whatsapp || '',
+      support_email: ed.social_links?.support_email || '',
       images: (ed.images || []).map((img: any) => ({
         url: img.url,
         tag: img.tag || 'Look',
@@ -279,6 +291,12 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
+          social_links: {
+            instagram: editionForm.instagram.trim() || undefined,
+            twitter: editionForm.twitter.trim() || undefined,
+            whatsapp: editionForm.whatsapp.trim() || undefined,
+            support_email: editionForm.support_email.trim() || undefined,
+          },
         });
       } else {
         await backendApi.createEdition({
@@ -291,6 +309,12 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
+          social_links: {
+            instagram: editionForm.instagram.trim() || undefined,
+            twitter: editionForm.twitter.trim() || undefined,
+            whatsapp: editionForm.whatsapp.trim() || undefined,
+            support_email: editionForm.support_email.trim() || undefined,
+          },
         });
         setIsEditingExisting(true);
         setEditingEditionId(slugId);
@@ -427,6 +451,12 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
+          social_links: {
+            instagram: editionForm.instagram.trim() || undefined,
+            twitter: editionForm.twitter.trim() || undefined,
+            whatsapp: editionForm.whatsapp.trim() || undefined,
+            support_email: editionForm.support_email.trim() || undefined,
+          },
         });
       } else {
         await backendApi.createEdition({
@@ -439,6 +469,12 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
+          social_links: {
+            instagram: editionForm.instagram.trim() || undefined,
+            twitter: editionForm.twitter.trim() || undefined,
+            whatsapp: editionForm.whatsapp.trim() || undefined,
+            support_email: editionForm.support_email.trim() || undefined,
+          },
         });
       }
 
@@ -813,6 +849,63 @@ export default function CreatorStudioPage() {
                       onChange={(e) => setEditionForm(prev => ({ ...prev, max_supply: Number(e.target.value) }))}
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none"
                     />
+                  </div>
+                </div>
+
+                {/* Brand Presence & Direct Customer Support */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[0.65rem] font-bold uppercase tracking-wider text-white font-mono">
+                        Brand Presence & Customer Care
+                      </label>
+                      <span className="text-[10px] text-white/40 font-mono font-normal">Optional Trust Signals</span>
+                    </div>
+                    <p className="text-[0.65rem] text-[#888] mt-0.5">
+                      Direct contact points displayed to buyers on your drop page for authentication, sizing guidance, and pickup assistance.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">Instagram Handle / URL</label>
+                      <input
+                        type="text"
+                        placeholder="@atelier or https://instagram.com/..."
+                        value={editionForm.instagram}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, instagram: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">Twitter / X Handle</label>
+                      <input
+                        type="text"
+                        placeholder="@atelier or https://x.com/..."
+                        value={editionForm.twitter}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, twitter: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">WhatsApp Support Number</label>
+                      <input
+                        type="text"
+                        placeholder="+234 800 000 0000"
+                        value={editionForm.whatsapp}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">Customer Support Email</label>
+                      <input
+                        type="email"
+                        placeholder="care@atelier.com"
+                        value={editionForm.support_email}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, support_email: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -429,7 +429,7 @@ function DropPageContent() {
               Limited Drop
             </span>
             <span className="px-3 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-[0.08em] bg-white/[0.04] border border-white/[0.08] text-[#666]">
-              On-Chain Gated Escrow
+              Protected Payment
             </span>
             {!activeEdition.published && (
               <span className="px-3 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-[0.08em] bg-amber-500/10 border border-amber-500/25 text-amber-300 font-mono flex items-center gap-1.5">
@@ -446,13 +446,62 @@ function DropPageContent() {
             </Link>
           </div>
 
-          {/* Title */}
+          {/* Title & Brand */}
           <div className="flex flex-col">
             <h1 className="text-[3.5rem] md:text-[5.5rem] leading-[0.85] font-bold tracking-[-0.04em] mb-4">
               <span className="block">Proceed</span>
               <span className="block bg-gradient-to-b from-white to-[#666] bg-clip-text text-transparent">With Order</span>
             </h1>
-            <h2 className="text-[1.8rem] md:text-[2.2rem] font-light text-[#A3A3A3] tracking-[-0.02em]">{activeEdition.name}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+              <h2 className="text-[1.8rem] md:text-[2.2rem] font-light text-[#A3A3A3] tracking-[-0.02em]">{activeEdition.name}</h2>
+              {/* Brand Social & Support Links */}
+              {activeEdition.social_links && (
+                <div className="flex items-center gap-2">
+                  {activeEdition.social_links.instagram && (
+                    <a
+                      href={activeEdition.social_links.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Brand Instagram"
+                      className="w-7 h-7 rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/10 flex items-center justify-center text-xs text-[#A3A3A3] hover:text-white transition-all"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                    </a>
+                  )}
+                  {activeEdition.social_links.twitter && (
+                    <a
+                      href={activeEdition.social_links.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Brand X / Twitter"
+                      className="w-7 h-7 rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/10 flex items-center justify-center text-xs text-[#A3A3A3] hover:text-white transition-all font-bold font-mono"
+                    >
+                      𝕏
+                    </a>
+                  )}
+                  {activeEdition.social_links.whatsapp && (
+                    <a
+                      href={activeEdition.social_links.whatsapp}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Customer Care / WhatsApp"
+                      className="w-7 h-7 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-[10px] text-emerald-400 hover:text-emerald-300 transition-all font-bold"
+                    >
+                      💬
+                    </a>
+                  )}
+                  {activeEdition.social_links.support_email && (
+                    <a
+                      href={`mailto:${activeEdition.social_links.support_email}`}
+                      title="Support Email"
+                      className="w-7 h-7 rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/10 flex items-center justify-center text-xs text-[#A3A3A3] hover:text-white transition-all"
+                    >
+                      ✉️
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <p className="text-[0.95rem] text-[#A3A3A3] leading-[1.8] max-w-[540px]">
@@ -520,7 +569,7 @@ function DropPageContent() {
                       </span>
                     </div>
                     <div className="text-[0.65rem] text-[#888] font-mono space-y-0.5">
-                      <div>Release: {new Date(b.release_at).toLocaleDateString()}</div>
+                      <div>Estimated Arrival: {new Date(b.release_at).toLocaleDateString()}</div>
                       <div>{b.pickup_locations?.length || 1} Pickup Station{(b.pickup_locations?.length || 1) > 1 ? 's' : ''}</div>
                     </div>
                   </button>
@@ -642,17 +691,17 @@ function DropPageContent() {
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-[0.68rem] text-[#999] leading-relaxed space-y-2">
               <div className="flex items-center gap-2 text-white font-bold uppercase tracking-wider text-[0.65rem]">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Protected by Staged Solana Escrow Protocol</span>
+                <span>Protected by Circuit Escrow</span>
               </div>
               <ul className="space-y-1 list-disc list-inside text-[#888] font-mono text-[0.63rem]">
                 <li>
-                  <strong className="text-white">24-Hour Cancellation Window:</strong> 100% individual refund available within 24 hours of purchase, even near batch close.
+                  <strong className="text-white">24-Hour Free Cancellation:</strong> 100% individual refund available within 24 hours of purchase, even near batch close.
                 </li>
                 <li>
-                  <strong className="text-white">Staged Production Payout:</strong> 30% advance disbursed 48h after batch closing to fund manufacturing; 70% balance held until 7 days post-release.
+                  <strong className="text-white">Protected Payment:</strong> Your money is held safely in escrow until you receive and confirm your piece.
                 </li>
                 <li>
-                  <strong className="text-white">Dispute Protection:</strong> Missing orders can be reported to Circuit from release day for administrative review and holds.
+                  <strong className="text-white">Atelier Support & Mediation:</strong> Direct customer care backed by Circuit dispute protection.
                 </li>
               </ul>
             </div>

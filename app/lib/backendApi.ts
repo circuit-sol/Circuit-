@@ -62,6 +62,12 @@ export interface Edition {
   headpiece?: string;
   embroidery?: string;
   images?: EditionImage[];
+  social_links?: {
+    instagram?: string;
+    twitter?: string;
+    whatsapp?: string;
+    support_email?: string;
+  };
   is_active?: boolean;
   published?: boolean;
   chain_status?: string;
@@ -79,6 +85,12 @@ export interface CreateEditionPayload {
   fabric?: string;
   headpiece?: string;
   embroidery?: string;
+  social_links?: {
+    instagram?: string;
+    twitter?: string;
+    whatsapp?: string;
+    support_email?: string;
+  };
 }
 
 export interface UpdateEditionPayload {
@@ -89,6 +101,12 @@ export interface UpdateEditionPayload {
   fabric?: string;
   headpiece?: string;
   embroidery?: string;
+  social_links?: {
+    instagram?: string;
+    twitter?: string;
+    whatsapp?: string;
+    support_email?: string;
+  };
 }
 
 export interface PickupLocation {

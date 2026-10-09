@@ -135,6 +135,27 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 ? 'Direct Universal Link into Phantom Web3 browser.'
                 : 'One tap. No passwords or secret codes.'}
             </p>
+
+            {/* Phantom download helper */}
+            <div className="pt-2 border-t border-white/[0.08] flex flex-col gap-2 text-center">
+              <p className="text-[0.7rem] text-[#777]">
+                Don&apos;t have Phantom installed?
+              </p>
+              <a
+                href={
+                  isMobileDevice
+                    ? (typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+                        ? 'https://apps.apple.com/app/phantom-solana-wallet/id1598432977'
+                        : 'https://play.google.com/store/apps/details?id=app.phantom')
+                    : 'https://phantom.app/download'
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-outline-circuit justify-center py-2 text-[0.7rem] text-[#A3A3A3] hover:text-white border-white/10 hover:border-white/30"
+              >
+                <span>Get Phantom (Free) ↗</span>
+              </a>
+            </div>
           </>
         )}
 

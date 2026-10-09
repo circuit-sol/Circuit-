@@ -162,6 +162,13 @@ export const DEFAULT_CIRCUIT_EDITION = {
   fabric: 'Duchess satin & structured mesh',
   headpiece: 'Velvet flower accent',
   embroidery: 'Hand-sewn feather trim',
+  brand_name: 'Circuit Atelier Studio',
+  social_links: {
+    instagram: 'https://instagram.com/circuit.fashion',
+    twitter: 'https://x.com/circuit_fashion',
+    whatsapp: 'https://wa.me/2348000000000',
+    support_email: 'support@circuit.fashion',
+  },
   is_active: true,
   published: false,
 };
