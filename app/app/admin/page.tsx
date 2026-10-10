@@ -114,7 +114,8 @@ export default function AdminDashboard() {
 
   // Disputes & Support Mediation (Section 4)
   const [disputes, setDisputes] = useState<DisputeItem[]>([]);
-  const [disputeFilter, setDisputeFilter] = useState<'all' | 'active' | 'frozen' | 'resolved'>('all');
+  const [compliments, setCompliments] = useState<Array<{ order_id: string; user_email: string; message: string; created_at: string }>>([]);
+  const [disputeFilter, setDisputeFilter] = useState<'all' | 'active' | 'frozen' | 'resolved' | 'compliments'>('all');
   const [isProcessingDispute, setIsProcessingDispute] = useState<string | null>(null);
 
   // Broadcast Communications (Section 2)
@@ -231,7 +232,14 @@ export default function AdminDashboard() {
         } catch (_) {}
       }
 
-      // 6. Fetch Admin Reports / Disputes
+      // 6. Fetch Admin Reports / Disputes & Compliments
+      if (typeof window !== 'undefined') {
+        try {
+          const comp = JSON.parse(localStorage.getItem('circuit_compliments') || '[]');
+          setCompliments(comp);
+        } catch (_) {}
+      }
+
       try {
         const repRes = await backendApi.getAdminReports();
         if (repRes?.reports && Array.isArray(repRes.reports)) {
@@ -321,7 +329,7 @@ export default function AdminDashboard() {
   // Section 3 Model: 30% Advance + 70% Balance
   const advanceEscrowPool = activeEscrowVolume * 0.3;
   const balanceEscrowPool = activeEscrowVolume * 0.7;
-  const protocolFeeReserve = totalRevenue * 0.05; // 5% protocol cut
+  const protocolFeeReserve = totalRevenue * 0.07; // 7% platform protocol drop fee
 
   const allBatches = useMemo(() => {
     return Object.values(batchesByEdition).flat();
@@ -689,9 +697,14 @@ export default function AdminDashboard() {
               </div>
 
               <div className="card-glass p-6 border-white/10 relative overflow-hidden">
-                <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#888] mb-2 block font-mono">
-                  Protocol Fee Reserve (5%)
-                </span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#888] block font-mono">
+                    Protocol Fee Reserve
+                  </span>
+                  <span className="text-[0.55rem] font-mono px-2 py-0.5 rounded bg-white/5 text-[#888] border border-white/10">
+                    7% Drop Fee
+                  </span>
+                </div>
                 <span className="text-3xl font-bold text-purple-400 tracking-tight font-mono">
                   ${protocolFeeReserve.toFixed(2)}
                 </span>
@@ -1249,22 +1262,89 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Feedback Sentiment Summary (Thumbs Up vs Thumbs Down) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="card-glass p-5 border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[0.6rem] font-mono uppercase text-[#888] block">Buyer Compliments</span>
+                  <span className="text-2xl font-bold text-emerald-400 font-mono mt-1 block">
+                    {compliments.length} Notes
+                  </span>
+                  <span className="text-[0.6rem] text-[#666] font-mono">Positive atelier feedback</span>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl">
+                  👍
+                </div>
+              </div>
+
+              <div className="card-glass p-5 border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[0.6rem] font-mono uppercase text-[#888] block">Disputes & Complaints</span>
+                  <span className="text-2xl font-bold text-amber-400 font-mono mt-1 block">
+                    {disputes.filter(d => d.status === 'active').length} Open
+                  </span>
+                  <span className="text-[0.6rem] text-[#666] font-mono">Held in mediation queue</span>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl">
+                  👎
+                </div>
+              </div>
+
+              <div className="card-glass p-5 border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[0.6rem] font-mono uppercase text-[#888] block">Brand Dispute Frequency</span>
+                  <span className="text-xs font-bold text-white font-mono mt-2 block">
+                    Low Frequency (Clean Ateliers)
+                  </span>
+                  <span className="text-[0.6rem] text-emerald-400 font-mono">No recurring breach flags</span>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xl">
+                  🛡️
+                </div>
+              </div>
+            </div>
+
             {/* Filter Bar */}
             <div className="flex items-center gap-2 pb-4 border-b border-white/10">
-              {(['all', 'active', 'frozen', 'resolved'] as const).map((tab) => (
+              {(['all', 'active', 'frozen', 'resolved', 'compliments'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setDisputeFilter(tab)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider transition-all ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${
                     disputeFilter === tab
                       ? 'bg-white text-black'
                       : 'text-white/50 hover:text-white bg-white/[0.02]'
                   }`}
                 >
-                  {tab}
+                  {tab === 'compliments' && <span>👍</span>}
+                  <span>{tab === 'compliments' ? `Compliments (${compliments.length})` : tab}</span>
                 </button>
               ))}
             </div>
+
+            {/* Compliments View */}
+            {disputeFilter === 'compliments' && (
+              <div className="space-y-4">
+                {compliments.length === 0 ? (
+                  <div className="card-glass p-12 text-center border-dashed border-white/10">
+                    <p className="text-[#888] text-sm">No compliments submitted yet. Buyer praise will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {compliments.map((c, i) => (
+                      <div key={i} className="card-glass p-5 border-emerald-500/20 bg-emerald-950/[0.03] space-y-2">
+                        <div className="flex items-center justify-between text-[0.65rem] font-mono">
+                          <span className="text-emerald-400 font-bold">👍 Compliment for Order {c.order_id?.slice(0, 10)}</span>
+                          <span className="text-[#666]">{new Date(c.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-white/90 italic leading-relaxed">"{c.message}"</p>
+                        <span className="text-[0.6rem] font-mono text-[#666] block pt-1 border-t border-white/5">Buyer: {c.user_email}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Dispute Tickets List */}
             {filteredDisputes.length === 0 ? (

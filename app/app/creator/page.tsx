@@ -60,11 +60,11 @@ export default function CreatorStudioPage() {
     id: '',
     name: '',
     description: '',
-    price_usd: 30,
+    price_usd: 0,
     max_supply: 50,
-    fabric: 'Duchess satin & structured mesh',
-    headpiece: 'Velvet flower accent',
-    embroidery: 'Hand-sewn feather trim',
+    fabric: '',
+    headpiece: '',
+    embroidery: '',
     instagram: '',
     twitter: '',
     whatsapp: '',
@@ -193,11 +193,11 @@ export default function CreatorStudioPage() {
       id: '',
       name: '',
       description: '',
-      price_usd: 30,
+      price_usd: 0,
       max_supply: 50,
-      fabric: 'Duchess satin & structured mesh',
-      headpiece: 'Velvet flower accent',
-      embroidery: 'Hand-sewn feather trim',
+      fabric: '',
+      headpiece: '',
+      embroidery: '',
       instagram: '',
       twitter: '',
       whatsapp: '',
@@ -206,7 +206,8 @@ export default function CreatorStudioPage() {
     });
     setDeployResult(null);
     setWizardStep(1);
-    showToast('Reset Complete', 'Ready to design a new collection drop.');
+    setActiveTab('wizard');
+    showToast('New Drop Form Ready', 'Configure your fresh collection pieces.');
   };
 
   const handleEditEdition = (ed: any) => {
@@ -715,8 +716,9 @@ export default function CreatorStudioPage() {
               </div>
             )}
 
-            <div className="px-3 py-1.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs font-mono text-white/90">
-              {selectedBrand?.name || user?.email || (user?.walletAddress ? `${user.walletAddress.slice(0, 4)}...${user.walletAddress.slice(-4)}` : '')}
+            <div className="px-3 py-1.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs font-mono text-emerald-400 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span>{user?.walletAddress ? `${user.walletAddress.slice(0, 4)}...${user.walletAddress.slice(-4)}` : user?.email || 'Connected'}</span>
             </div>
           </div>
         </div>
@@ -726,7 +728,7 @@ export default function CreatorStudioPage() {
           {[
             { id: 'wizard', label: '1. Create a New Drop', icon: '🚀' },
             { id: 'directory', label: `2. My Drops (${editions.length})`, icon: '📁' },
-            { id: 'demand', label: '3. Production planner', icon: '✂️' },
+            { id: 'demand', label: '3. Production Guide', icon: '✂️' },
             { id: 'claims', label: '4. My Earnings', icon: '💰' },
           ].map((tab) => (
             <button
@@ -867,9 +869,10 @@ export default function CreatorStudioPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Stitching & Details</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Finishing & Details</label>
                     <input
                       type="text"
+                      placeholder="e.g. Hand-sewn trim, raw hem, metallic accents..."
                       value={editionForm.embroidery}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, embroidery: e.target.value }))}
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none"
@@ -1217,6 +1220,22 @@ export default function CreatorStudioPage() {
                     </div>
                   </div>
 
+                  {/* Lookbook Photos Review */}
+                  {editionForm.images.length > 0 && (
+                    <div className="flex flex-col gap-2 pt-4 border-t border-white/10 md:col-span-2">
+                      <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">
+                        Lookbook Photos ({editionForm.images.length})
+                      </span>
+                      <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                        {editionForm.images.map((img, i) => (
+                          <div key={i} className="w-16 h-20 rounded-xl relative overflow-hidden border border-white/10 shrink-0 bg-[#0D0D0D]">
+                            <Image src={img.url} alt={img.tag || `Look ${i + 1}`} fill className="object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Brand Social & Customer Care Channels */}
                   <div className="flex flex-col gap-2 pt-4 border-t border-white/10 md:col-span-2">
                     <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Brand Trust & Care Signals</span>
@@ -1239,14 +1258,6 @@ export default function CreatorStudioPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Notice Pill */}
-                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center gap-3">
-                  <span className="text-lg">🛡️</span>
-                  <span>
-                    Two-party co-signature: Circuit operational signer validates batch terms, and your connected Phantom wallet authorizes the seller authority account on Devnet.
-                  </span>
                 </div>
 
                 {/* Deployment Results Card */}
@@ -1425,31 +1436,40 @@ export default function CreatorStudioPage() {
           </div>
         )}
 
-        {/* ── TAB 3: DEMAND & CUTTING SHEET ─────────────────────────────────── */}
+        {/* ── TAB 3: PRODUCTION GUIDE ───────────────────────────────────────── */}
         {activeTab === 'demand' && (
           <div className="flex flex-col gap-6 animate-fade-in">
-            <div>
-              <h2 className="text-2xl font-bold">Production planner</h2>
-              <p className="text-xs text-[#888] mt-1">Confirmed orders grouped by size, so you know exactly what to cut.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div>
+                <h2 className="text-2xl font-bold">Production Guide</h2>
+                <p className="text-xs text-[#888] mt-1">Confirmed orders sorted by size, color and units to cut.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn-outline-circuit py-2 px-4 text-xs font-mono self-start sm:self-auto"
+              >
+                <span>🖨️ Print Cutting Guide</span>
+              </button>
             </div>
 
             {Object.keys(batchesByEdition).length === 0 ? (
-              <div className="card-glass p-12 text-center rounded-3xl border-white/10 text-xs text-[#666]">
-                No active batches found. Deploy a preorder vault to start gathering customer demand.
+              <div className="card-glass p-12 text-center rounded-3xl border-white/10 text-xs text-[#888]">
+                No active production runs found. Once your drop gathers customer orders, your size cutting guide will populate here.
               </div>
             ) : (
               <div className="space-y-8">
                 {Object.entries(batchesByEdition).map(([editionId, batches]) => {
                   const ed = editions.find(e => e.id === editionId);
                   return (
-                    <div key={editionId} className="card-glass p-8 rounded-3xl border-white/10 flex flex-col gap-6">
+                    <div key={editionId} className="card-glass p-6 md:p-8 rounded-3xl border-white/10 flex flex-col gap-6">
                       <div className="flex justify-between items-baseline border-b border-white/10 pb-4">
                         <div>
-                          <span className="text-[0.6rem] font-mono text-[#666] uppercase block">Drop</span>
+                          <span className="text-[0.6rem] font-mono text-[#666] uppercase block">Collection</span>
                           <h3 className="text-xl font-bold">{ed?.name || editionId}</h3>
                         </div>
                         <span className="text-xs font-mono text-emerald-400 font-bold">
-                          Limit: {ed?.max_supply || 50} pieces
+                          Cap: {ed?.max_supply || 50} pieces
                         </span>
                       </div>
 
@@ -1474,22 +1494,39 @@ export default function CreatorStudioPage() {
                             <div className="flex flex-wrap justify-between items-center gap-2">
                               <div>
                                 <span className="text-xs font-bold text-white uppercase font-mono">{b.name}</span>
-                                <span className="text-[0.65rem] text-[#666] font-mono block">Status: {b.chain_status} | Opens: {new Date(b.opens_at).toLocaleDateString()}</span>
+                                <span className="text-[0.65rem] text-[#888] font-mono block">
+                                  Closes: {new Date(b.closes_at).toLocaleDateString()} | Ready: {new Date(b.release_at).toLocaleDateString()}
+                                </span>
                               </div>
-                              <span className="text-xs font-mono text-white bg-white/10 px-3 py-1 rounded-full">
-                                {totalCommitted} Pieces Committed
+                              <span className="text-xs font-mono text-white bg-white/10 px-3 py-1 rounded-full font-bold">
+                                {totalCommitted} Pieces to Cut
                               </span>
                             </div>
 
-                            {/* Size Matrix Breakdown */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                              {Object.entries(sizeCounts).map(([sz, count]) => (
-                                <div key={sz} className="p-4 rounded-xl bg-black border border-white/10 flex flex-col justify-between">
-                                  <span className="text-[0.6rem] font-mono text-[#777] uppercase font-bold">{sz}</span>
-                                  <span className="text-2xl font-bold text-white mt-2">{count}</span>
-                                  <span className="text-[0.6rem] text-[#555] font-mono mt-1">Pattern pieces to cut</span>
-                                </div>
-                              ))}
+                            {/* Automated Cutting Guide Table */}
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs font-mono border border-white/10 rounded-xl overflow-hidden">
+                                <thead className="bg-white/[0.03] text-[#888] uppercase text-[0.6rem]">
+                                  <tr>
+                                    <th className="p-3">Size Pattern</th>
+                                    <th className="p-3">Confirmed Orders</th>
+                                    <th className="p-3">Fabric Sourcing Spec</th>
+                                    <th className="p-3 text-right">Production Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                  {Object.entries(sizeCounts).map(([sz, count]) => (
+                                    <tr key={sz} className="hover:bg-white/[0.01]">
+                                      <td className="p-3 font-bold text-white">{sz}</td>
+                                      <td className="p-3 text-emerald-400 font-bold">{count} units</td>
+                                      <td className="p-3 text-[#888]">{ed?.fabric || 'Standard atelier cut'}</td>
+                                      <td className="p-3 text-right text-[#666]">
+                                        {count > 0 ? '✓ Ready for cutting table' : 'Nil'}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         );
@@ -1502,69 +1539,91 @@ export default function CreatorStudioPage() {
           </div>
         )}
 
-        {/* ── TAB 4: ESCROW PAYOUT CLAIMS ───────────────────────────────────── */}
+        {/* ── TAB 4: MY EARNINGS ─────────────────────────────────────────────── */}
         {activeTab === 'claims' && (
           <div className="flex flex-col gap-6 animate-fade-in">
-            <div>
-              <h2 className="text-2xl font-bold">My Earnings</h2>
-              <div className="text-xs text-[#888] mt-2 space-y-1 leading-relaxed">
-                <p>Buyers pay upfront, so your money is secured before you start making. You&apos;re paid in two parts:</p>
-                <p className="pl-2">• 30% goes to you 48 hours after orders close, to fund production.</p>
-                <p className="pl-2">• 70% goes to you once the buyer confirms their piece arrived.</p>
-                <p>If a buyer doesn&apos;t confirm and there&apos;s no complaint, the 70% is released 7 days after delivery.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div>
+                <h2 className="text-2xl font-bold">My Earnings</h2>
+                <p className="text-xs text-[#888] mt-1">Direct production advances and balance claims.</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[0.65rem] font-mono px-2.5 py-1 rounded-lg bg-white/[0.04] text-[#888] border border-white/10">
+                  7% Drop Protocol Fee
+                </span>
               </div>
             </div>
 
+            {/* Payout Milestone Policy Drawer (FAQ) */}
+            <details className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 text-xs text-[#888] group">
+              <summary className="cursor-pointer font-mono text-white/80 hover:text-white flex items-center justify-between font-bold">
+                <span>How milestone escrow payouts work (FAQ)</span>
+                <span className="text-xs group-open:rotate-180 transition-transform">▾</span>
+              </summary>
+              <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5 leading-relaxed text-[#aaa]">
+                <p>• <strong>30% Advance</strong> unlocks 48 hours after orders close to fund atelier fabric sourcing and manufacturing.</p>
+                <p>• <strong>70% Balance</strong> unlocks when the buyer confirms delivery (or automatically 7 days post-delivery if no complaints are filed).</p>
+                <p>• 7% Circuit platform protocol fee is applied upon settlement.</p>
+              </div>
+            </details>
+
             <div className="space-y-6">
-              {Object.entries(batchesByEdition).flatMap(([_, batches]) => batches).map((b) => {
-                const closesMs = new Date(b.closes_at).getTime();
-                const releaseMs = new Date(b.release_at).getTime();
-                const nowMs = Date.now();
+              {Object.entries(batchesByEdition).flatMap(([_, batches]) => batches).length === 0 ? (
+                <div className="card-glass p-12 text-center rounded-3xl border-white/10 text-xs text-[#888]">
+                  No active payout batches yet. Once your preorder drop concludes, your 30% advance and 70% balance payouts will unlock here.
+                </div>
+              ) : (
+                Object.entries(batchesByEdition).flatMap(([_, batches]) => batches).map((b) => {
+                  const closesMs = new Date(b.closes_at).getTime();
+                  const releaseMs = new Date(b.release_at).getTime();
+                  const nowMs = Date.now();
 
-                const advanceEligible = nowMs >= closesMs + 48 * 3600000;
-                const balanceEligible = nowMs >= releaseMs + 7 * 86400000;
+                  const advanceEligible = nowMs >= closesMs + 48 * 3600000;
+                  const balanceEligible = nowMs >= releaseMs + 7 * 86400000;
 
-                return (
-                  <div key={b.id} className="card-glass p-8 rounded-3xl border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 font-mono">
-                        <span className="text-xs font-bold uppercase text-white">{b.name}</span>
-                        <span className="text-[0.65rem] text-[#666] font-mono">({b.id.slice(0, 8)}...)</span>
+                  return (
+                    <div key={b.id} className="card-glass p-8 rounded-3xl border-white/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2 font-mono">
+                          <span className="text-xs font-bold uppercase text-white">{b.name}</span>
+                          <span className="text-[0.65rem] text-[#666] font-mono">({b.id.slice(0, 8)}...)</span>
+                        </div>
+                        <div className="text-xs font-mono text-[#888] space-y-1">
+                          <div>30% Advance Window: {advanceEligible ? '🟢 Eligible to Claim' : `⏳ Eligible on ${new Date(closesMs + 48 * 3600000).toLocaleDateString()}`}</div>
+                          <div>70% Balance Window: {balanceEligible ? '🟢 Eligible to Claim' : `⏳ Eligible on ${new Date(releaseMs + 7 * 86400000).toLocaleDateString()}`}</div>
+                        </div>
                       </div>
-                      <div className="text-xs font-mono text-[#888] space-y-1">
-                        <div>30% Advance Window: {advanceEligible ? '🟢 Eligible to Claim' : `⏳ Eligible on ${new Date(closesMs + 48 * 3600000).toLocaleDateString()}`}</div>
-                        <div>70% Balance Window: {balanceEligible ? '🟢 Eligible to Claim' : `⏳ Eligible on ${new Date(releaseMs + 7 * 86400000).toLocaleDateString()}`}</div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          onClick={() => handleClaimPayout(b.id, 'advance')}
+                          disabled={claimingBatchId === b.id}
+                          className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider font-mono border transition-all ${
+                            advanceEligible
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                              : 'bg-white/[0.02] text-[#666] border-white/10'
+                          }`}
+                        >
+                          {claimingBatchId === b.id ? 'Processing...' : 'Claim 30% Advance Payout'}
+                        </button>
+
+                        <button
+                          onClick={() => handleClaimPayout(b.id, 'balance')}
+                          disabled={claimingBatchId === b.id}
+                          className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider font-mono border transition-all ${
+                            balanceEligible
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                              : 'bg-white/[0.02] text-[#666] border-white/10'
+                          }`}
+                        >
+                          {claimingBatchId === b.id ? 'Processing...' : 'Claim 70% Balance Payout'}
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={() => handleClaimPayout(b.id, 'advance')}
-                        disabled={claimingBatchId === b.id}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider font-mono border transition-all ${
-                          advanceEligible
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                            : 'bg-white/[0.02] text-[#666] border-white/10'
-                        }`}
-                      >
-                        {claimingBatchId === b.id ? 'Processing...' : 'Claim 30% Advance Payout'}
-                      </button>
-
-                      <button
-                        onClick={() => handleClaimPayout(b.id, 'balance')}
-                        disabled={claimingBatchId === b.id}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider font-mono border transition-all ${
-                          balanceEligible
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
-                            : 'bg-white/[0.02] text-[#666] border-white/10'
-                        }`}
-                      >
-                        {claimingBatchId === b.id ? 'Processing...' : 'Claim 70% Balance Payout'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         )}

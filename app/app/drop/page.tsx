@@ -618,7 +618,7 @@ function DropPageContent() {
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-baseline">
               <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">
-                Fulfillment Station (Pickup Only)
+                Pick up location
               </span>
               <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded bg-white/[0.05] border border-white/10 text-white/80">
                 In-Person Collection

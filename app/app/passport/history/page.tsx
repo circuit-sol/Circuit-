@@ -204,7 +204,7 @@ export default function HistoryPage() {
           ) : loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-              <span className="text-xs font-mono text-[#555]">Querying Order Vault...</span>
+              <span className="text-xs font-mono text-[#888]">Finding your orders...</span>
             </div>
           ) : orders.length === 0 ? (
             <div className="card-glass p-12 text-center max-w-xl mx-auto border-white/10 py-16">
@@ -213,9 +213,9 @@ export default function HistoryPage() {
                   <circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold mb-4">No Registered Orders</h2>
-              <p className="text-[#666] text-sm leading-relaxed mb-10 max-w-sm mx-auto">
-                We did not locate any active on-chain production purchases linked to the logged email address: <strong className="text-white">{user?.email}</strong>.
+              <h2 className="text-2xl font-bold mb-4">No Orders Yet</h2>
+              <p className="text-[#888] text-sm leading-relaxed mb-10 max-w-sm mx-auto">
+                No active orders found for <strong className="text-white">{user?.email}</strong>. Once you reserve a piece, your order and digital passport will appear here.
               </p>
               <a href="/drop" className="btn-circuit mx-auto px-10 py-4 text-xs">
                 <span>Browse Drops Shop</span>

@@ -25,9 +25,13 @@ function PassportContent() {
   const [confirmingReceipt, setConfirmingReceipt] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportCategory, setReportCategory] = useState<'Delayed delivery' | 'Wrong size' | 'Other'>('Delayed delivery');
   const [reportMessage, setReportMessage] = useState('');
   const [isReporting, setIsReporting] = useState(false);
   const [isReported, setIsReported] = useState(false);
+  const [showComplimentModal, setShowComplimentModal] = useState(false);
+  const [complimentMessage, setComplimentMessage] = useState('');
+  const [isComplimented, setIsComplimented] = useState(false);
   const [cancelCountdown, setCancelCountdown] = useState<{ hours: number; minutes: number; seconds: number; isExpired: boolean } | null>(null);
   const { user, isSignedIn } = useAuth();
   const { signTransaction } = useWallet();
@@ -76,7 +80,8 @@ function PassportContent() {
     }
     setIsReporting(true);
     try {
-      await backendApi.reportOrderIssue(order.id, reportMessage.trim());
+      const fullMessage = `[${reportCategory}] ${reportMessage.trim()}`;
+      await backendApi.reportOrderIssue(order.id, fullMessage);
       setIsReported(true);
       setShowReportModal(false);
       showToast('✓ Report Submitted', 'Dispute logged with Circuit admin. Remaining payouts will be reviewed.');
@@ -88,6 +93,25 @@ function PassportContent() {
       showToast('✗ Error', msg);
     } finally {
       setIsReporting(false);
+    }
+  };
+
+  const handleSendCompliment = () => {
+    if (!order || !complimentMessage.trim()) return;
+    try {
+      const compliments = JSON.parse(localStorage.getItem('circuit_compliments') || '[]');
+      compliments.push({
+        order_id: order.id,
+        user_email: user?.email || 'buyer@circuit.sol',
+        message: complimentMessage.trim(),
+        created_at: new Date().toISOString(),
+      });
+      localStorage.setItem('circuit_compliments', JSON.stringify(compliments));
+      setIsComplimented(true);
+      setShowComplimentModal(false);
+      showToast('✓ Compliment Sent', 'Thank you! Your feedback has been shared with the atelier.');
+    } catch {
+      showToast('✓ Compliment Sent', 'Thank you for your feedback!');
     }
   };
 
@@ -226,7 +250,7 @@ function PassportContent() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black">
         <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-        <span className="text-xs font-mono text-[#555] mt-4">Connecting Identity Node...</span>
+        <span className="text-xs font-mono text-[#888] mt-4">Authenticating Garment Origin...</span>
       </div>
     );
   }
@@ -530,25 +554,79 @@ function PassportContent() {
                 </div>
               </div>
 
-              {/* Dispute & Incident Reporting */}
-              <div className="p-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-between">
+              {/* Dispute & Compliment Feedback Section */}
+              <div className="p-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="text-xs font-bold text-white block">Order Issue or Missing Item?</span>
-                  <span className="text-[0.65rem] text-[#777] font-mono">Available from batch release date. Reports go directly to Circuit admin.</span>
+                  <span className="text-xs font-bold text-white block">Atelier Feedback & Order Support</span>
+                  <span className="text-[0.65rem] text-[#888] font-mono">Send positive compliments or report sizing/delivery issues.</span>
                 </div>
-                <button
-                  onClick={() => setShowReportModal(true)}
-                  disabled={isReported}
-                  className="btn-outline-circuit py-2 px-4 text-xs border-white/20 text-[#aaa] hover:text-white"
-                >
-                  {isReported ? 'Report Logged' : 'Report Issue'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowComplimentModal(true)}
+                    disabled={isComplimented}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all flex items-center gap-1.5"
+                  >
+                    <span>👍</span>
+                    <span>{isComplimented ? 'Compliment Sent' : 'Compliment'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    disabled={isReported}
+                    className="btn-outline-circuit py-2 px-3.5 text-xs border-white/20 text-[#aaa] hover:text-white flex items-center gap-1.5"
+                  >
+                    <span>👎</span>
+                    <span>{isReported ? 'Report Logged' : 'Report Issue'}</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Leave a Compliment Modal */}
+              {showComplimentModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-[#111] border border-white/10 rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-fade-in">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">✨</span>
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Leave a Compliment</h3>
+                      </div>
+                      <button onClick={() => setShowComplimentModal(false)} className="text-[#666] hover:text-white text-lg">✕</button>
+                    </div>
+                    <p className="text-xs text-[#888] leading-relaxed">
+                      Loved the garment craftsmanship, fit, or tailoring? Send a positive note to the atelier.
+                    </p>
+                    <textarea
+                      value={complimentMessage}
+                      onChange={(e) => setComplimentMessage(e.target.value.slice(0, 500))}
+                      placeholder="Share what you loved about this piece..."
+                      className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 min-h-[90px]"
+                    />
+                    <div className="flex justify-between items-center text-[0.65rem] text-[#666] font-mono">
+                      <span>{complimentMessage.length}/500 chars</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowComplimentModal(false)}
+                          className="btn-outline-circuit py-2 px-4 text-xs border-white/10 text-[#888]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSendCompliment}
+                          disabled={!complimentMessage.trim()}
+                          className="btn-circuit py-2 px-5 text-xs uppercase"
+                        >
+                          <span>Send Compliment</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Report Issue Modal */}
               {showReportModal && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-[#111] border border-white/10 rounded-3xl p-6 max-w-md w-full flex flex-col gap-4">
+                  <div className="bg-[#111] border border-white/10 rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-fade-in">
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-bold text-white uppercase tracking-wider">Report Order Issue</h3>
                       <button onClick={() => setShowReportModal(false)} className="text-[#666] hover:text-white text-lg">✕</button>
@@ -561,13 +639,31 @@ function PassportContent() {
                         Notice: Dispute reporting formally opens on the batch release date ({new Date(batch.release_at).toLocaleDateString()}).
                       </div>
                     )}
-                    <textarea
-                      value={reportMessage}
-                      onChange={(e) => setReportMessage(e.target.value)}
-                      placeholder="Please describe the issue (e.g. item missing from station, defect, etc.)..."
-                      className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 min-h-[100px]"
-                    />
-                    <div className="flex gap-3 justify-end">
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.65rem] font-mono uppercase text-[#888]">Issue Type</label>
+                      <select
+                        value={reportCategory}
+                        onChange={(e) => setReportCategory(e.target.value as any)}
+                        className="bg-black border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none font-mono"
+                      >
+                        <option value="Delayed delivery">Delayed delivery</option>
+                        <option value="Wrong size">Wrong size</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <textarea
+                        value={reportMessage}
+                        onChange={(e) => setReportMessage(e.target.value.slice(0, 500))}
+                        placeholder="Please describe the issue (e.g. item missing from station, defect, etc.)..."
+                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 min-h-[90px]"
+                      />
+                      <span className="text-[0.6rem] text-right text-[#666] font-mono">{reportMessage.length}/500 chars</span>
+                    </div>
+
+                    <div className="flex gap-3 justify-end pt-2">
                       <button
                         onClick={() => setShowReportModal(false)}
                         className="btn-outline-circuit py-2 px-4 text-xs border-white/10 text-[#888]"

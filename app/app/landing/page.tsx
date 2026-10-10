@@ -101,7 +101,7 @@ export default function LandingPage() {
                 Select Your Edition.
               </h2>
               <p className="text-[#888] mt-4 text-sm max-w-md mx-auto">
-                Explore active editions.
+                Reserve pieces directly from the atelier before the window closes.
               </p>
             </div>
 
@@ -184,9 +184,8 @@ export default function LandingPage() {
                 Fashion often produces before real demand exists.
               </h2>
               <div className="space-y-6 text-[#888] leading-relaxed text-sm md:text-base">
-                <p>When those bets fail, the result is excess inventory, markdowns, and waste.</p>
-                <p>Circuit flips the order.</p>
-                <p className="text-white font-medium">Production starts after the window closes.</p>
+                <p>When those bets fail, the result is excess inventory, markdowns, and capital losses.</p>
+                <p className="text-white font-medium">Circuit flips the order.</p>
               </div>
             </div>
 
@@ -205,22 +204,32 @@ export default function LandingPage() {
 
         {/* HOW IT WORKS */}
         <section id="how-it-works" className="pt-12 pb-10 md:pt-20 md:pb-16 section-container">
-          <div className="text-center mb-20">
-            <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#444] mb-4 block">Process</span>
+          <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight">How It Works.</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/10 border border-white/10 rounded-3xl overflow-hidden">
             {[
-              { title: 'Commit', desc: 'Secure your place in the drop by placing an order for the garment.' },
-              { title: 'Secure Payment', desc: 'Your payment goes into a secure hold that neither you nor Circuit can touch until delivery' },
-              { title: 'Production', desc: 'Production begins after your order is confirmed.' },
-              { title: 'Delivery', desc: 'Confirm delivery and your payment releases to Circuit' }
+              {
+                step: '01',
+                title: 'Payment in Escrow',
+                desc: 'Your payment is held until your garment arrives.',
+              },
+              {
+                step: '02',
+                title: 'Dynamic Production',
+                desc: 'Your garment is made after your order is confirmed.',
+              },
+              {
+                step: '03',
+                title: 'Verifiable Digital Tag',
+                desc: 'Every garment gets a permanent record when it is made.',
+              },
             ].map((item, i) => (
               <div key={i} className="bg-black p-10 flex flex-col gap-4 group hover:bg-white/[0.02] transition-colors">
-                <span className="text-[0.6rem] font-mono text-[#333] group-hover:text-white/40 transition-colors">0{i + 1}</span>
-                <h4 className="text-lg font-bold">{item.title}</h4>
-                <p className="text-xs text-[#666] leading-relaxed">{item.desc}</p>
+                <span className="text-[0.65rem] font-mono font-bold text-white/40 group-hover:text-emerald-400 transition-colors">{item.step}</span>
+                <h4 className="text-lg font-bold text-white">{item.title}</h4>
+                <p className="text-xs text-[#888] leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -231,7 +240,7 @@ export default function LandingPage() {
           <div className="flex items-end justify-between mb-8 md:mb-12">
             <div className="flex flex-col gap-2">
               <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666]">Craftsmanship</span>
-              <h2 className="text-2xl md:text-4xl font-bold tracking-tight">Precision Tailoring.</h2>
+              <h2 className="text-2xl md:text-4xl font-bold tracking-tight">Atelier Craftsmanship.</h2>
             </div>
             <span className="text-[0.65rem] font-mono text-[#666] uppercase tracking-widest hidden sm:block border border-white/10 px-4 py-2 rounded-full">
               Made to Measure // Circuit

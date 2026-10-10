@@ -131,9 +131,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             </button>
 
             <p className="text-center text-[0.65rem] text-[#555]">
-              {isMobileDevice
-                ? 'Direct Universal Link into Phantom Web3 browser.'
-                : 'One tap. No passwords or secret codes.'}
+              One tap. No passwords or secret codes.
             </p>
 
             {/* Phantom download helper */}
