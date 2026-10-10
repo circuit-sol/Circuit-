@@ -76,7 +76,7 @@ export default function CreatorStudioPage() {
   const now = Date.now();
   const [batchForm, setBatchForm] = useState({
     name: 'Inaugural Atelier Run — 01',
-    opens_at: new Date(now + 3600000).toISOString().slice(0, 16), // +1 hour
+    opens_at: new Date(now + 60000).toISOString().slice(0, 16), // +1 minute
     closes_at: new Date(now + 86400000 * 7).toISOString().slice(0, 16), // +7 days
     production_starts_at: new Date(now + 86400000 * 10).toISOString().slice(0, 16), // +10 days (>= closes + 48h)
     release_at: new Date(now + 86400000 * 25).toISOString().slice(0, 16), // +25 days
@@ -373,8 +373,8 @@ export default function CreatorStudioPage() {
         let prodMs = new Date(batchForm.production_starts_at).getTime();
         let relMs = new Date(batchForm.release_at).getTime();
 
-        if (isNaN(opensMs) || opensMs <= Date.now() + 300000) {
-          opensMs = Date.now() + 3600000;
+        if (isNaN(opensMs) || opensMs <= Date.now() + 35000) {
+          opensMs = Date.now() + 60000;
         }
         if (isNaN(closesMs) || closesMs <= opensMs) {
           closesMs = opensMs + 86400000 * 7;
@@ -482,8 +482,8 @@ export default function CreatorStudioPage() {
 
     // Critical: Solana on-chain clock check and SQL constraint require opens_at > clock_timestamp() + interval '30 seconds'.
     // If opens_at was set in the past or too close to current time, bump it safely to 1 hour in the future.
-    if (isNaN(opensMs) || opensMs <= Date.now() + 300000) {
-      opensMs = Date.now() + 3600000;
+    if (isNaN(opensMs) || opensMs <= Date.now() + 35000) {
+      opensMs = Date.now() + 60000;
     }
     if (isNaN(closesMs) || closesMs <= opensMs) {
       closesMs = opensMs + 86400000 * 7;
@@ -594,7 +594,7 @@ export default function CreatorStudioPage() {
           } catch (_) {}
           const updatedBatchRes = await backendApi.updateBatchDraft(editingBatchId, batchPayload, currentRev);
           if (updatedBatchRes?.batch) {
-            targetBatchRevision = updatedBatchRes.batch.revision;
+            targetBatchRevision = updatedBatchRes.batch.revision ?? targetBatchRevision;
           }
         } catch (bErr: any) {
           console.warn('Batch update note during deploy:', bErr);
