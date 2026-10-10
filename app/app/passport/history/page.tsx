@@ -206,6 +206,25 @@ export default function HistoryPage() {
               <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
               <span className="text-xs font-mono text-[#888]">Finding your orders...</span>
             </div>
+          ) : !user?.email ? (
+            <div className="card-glass p-12 text-center max-w-xl mx-auto border-white/10 py-16">
+              <div className="w-16 h-16 rounded-[1.5rem] bg-white/[0.03] border border-white/10 flex items-center justify-center mx-auto mb-8">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                  <polyline points="22,6 12,13 2,6"/>
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold mb-4">Email Address Required</h2>
+              <p className="text-[#888] text-sm leading-relaxed mb-10 max-w-sm mx-auto">
+                Your wallet is connected, but no email is linked to your account. Add your email to query and verify your garment purchase history and digital product passports.
+              </p>
+              <button
+                onClick={() => setIsSignInOpen(true)}
+                className="btn-circuit mx-auto px-10 py-4 text-xs"
+              >
+                <span>Link Notification Email</span>
+              </button>
+            </div>
           ) : orders.length === 0 ? (
             <div className="card-glass p-12 text-center max-w-xl mx-auto border-white/10 py-16">
               <div className="w-16 h-16 rounded-[1.5rem] bg-white/[0.03] border border-white/10 flex items-center justify-center mx-auto mb-8">
@@ -215,7 +234,7 @@ export default function HistoryPage() {
               </div>
               <h2 className="text-2xl font-bold mb-4">No Orders Yet</h2>
               <p className="text-[#888] text-sm leading-relaxed mb-10 max-w-sm mx-auto">
-                No active orders found for <strong className="text-white">{user?.email}</strong>. Once you reserve a piece, your order and digital passport will appear here.
+                No active orders found for <strong className="text-white">{user.email}</strong>. Once you reserve a piece, your order and digital passport will appear here.
               </p>
               <a href="/drop" className="btn-circuit mx-auto px-10 py-4 text-xs">
                 <span>Browse Drops Shop</span>

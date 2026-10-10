@@ -151,6 +151,25 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                       </div>
                       <p className="text-[0.7rem] font-mono text-white/70 break-all leading-relaxed transition-colors group-hover/wallet:text-white">{user?.walletAddress}</p>
                     </div>
+
+                    {/* Notification Email Section */}
+                    <div 
+                      onClick={() => { setIsSignInOpen(true); setIsProfileOpen(false); }}
+                      className="px-4 py-3 border-b border-white/[0.1] mb-1 cursor-pointer hover:bg-white/[0.04] transition-colors rounded-xl flex items-center justify-between group/email"
+                    >
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-[0.6rem] font-bold text-[#A3A3A3] uppercase tracking-[0.15em]">
+                          Notification Email
+                        </span>
+                        <span className="text-[0.7rem] truncate text-white/90">
+                          {user?.email || <span className="text-amber-400 font-medium">⚠️ No email linked</span>}
+                        </span>
+                      </div>
+                      <span className="text-[0.65rem] text-white/50 group-hover/email:text-white transition-colors underline shrink-0">
+                        {user?.email ? 'Edit' : 'Add'}
+                      </span>
+                    </div>
+
                     <div className="p-1 flex flex-col gap-1">
                       <Link 
                         href="/passport/history"
@@ -258,8 +277,18 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
             {isSignedIn ? (
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col">
-                  <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em]">Signed in as</span>
-                  <span className="text-lg font-bold text-white mb-2">{user?.email}</span>
+                  <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em]">Connected Account</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-base font-bold text-white truncate max-w-[200px]">
+                      {user?.email || <span className="text-amber-400 text-xs font-normal">⚠️ No email linked</span>}
+                    </span>
+                    <button
+                      onClick={() => { setIsSignInOpen(true); setDrawerOpen(false); }}
+                      className="text-[0.7rem] text-white/70 hover:text-white underline font-semibold"
+                    >
+                      {user?.email ? 'Change' : '+ Add Email'}
+                    </button>
+                  </div>
                   
                   {/* Copyable Mobile Wallet Address */}
                   <div 

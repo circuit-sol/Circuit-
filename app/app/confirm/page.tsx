@@ -86,7 +86,8 @@ export default function ConfirmPage() {
     }
 
     if (!user?.email) {
-      showToast('Sign in required', 'Please sign in to confirm delivery.');
+      showToast('Email Required', 'Please provide an email to confirm physical garment delivery.');
+      setIsSignInOpen(true);
       return;
     }
 
@@ -177,9 +178,23 @@ export default function ConfirmPage() {
             </button>
           </div>
         ) : !latestOrder ? (
-          <div className="w-full py-6 text-center text-[#666] text-xs">
-            We couldn't find any orders for your email.
-            <a href="/drop" className="btn-outline-circuit mt-6 justify-center">Visit Shop</a>
+          <div className="w-full py-6 text-center text-[#888] text-xs">
+            {!user?.email ? (
+              <div className="flex flex-col items-center gap-3 max-w-xs mx-auto py-2">
+                <p>Your wallet is connected, but no email is linked to load your active orders.</p>
+                <button
+                  onClick={() => setIsSignInOpen(true)}
+                  className="btn-circuit px-6 py-2.5 text-xs justify-center"
+                >
+                  <span>Link Notification Email</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <p>We couldn&apos;t find any orders for your email ({user.email}).</p>
+                <a href="/drop" className="btn-outline-circuit mt-6 justify-center">Visit Shop</a>
+              </>
+            )}
           </div>
         ) : (
           <>

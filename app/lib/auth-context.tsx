@@ -71,12 +71,20 @@ function setStoredSession(token: string, wallet: string, email?: string | null) 
   try {
     localStorage.setItem('circuit_token', token);
     localStorage.setItem('circuit_wallet', wallet);
-    if (email) localStorage.setItem('circuit_email', email);
+    if (email) {
+      localStorage.setItem('circuit_email', email);
+    } else {
+      localStorage.removeItem('circuit_email');
+    }
   } catch (_) {}
   try {
     sessionStorage.setItem('circuit_token', token);
     sessionStorage.setItem('circuit_wallet', wallet);
-    if (email) sessionStorage.setItem('circuit_email', email);
+    if (email) {
+      sessionStorage.setItem('circuit_email', email);
+    } else {
+      sessionStorage.removeItem('circuit_email');
+    }
   } catch (_) {}
 }
 
@@ -321,19 +329,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Save notification email ──────────────────────────────────────────
   const saveEmail = useCallback(async (email: string) => {
+    const cleanEmail = email.trim();
     try {
-      await backendApi.saveUserEmail(email);
+      await backendApi.saveUserEmail(cleanEmail);
       const { token, wallet: savedWallet } = getStoredSession();
-      if (token && savedWallet) setStoredSession(token, savedWallet, email);
-      setUser((prev: UserSession | null) => prev ? { ...prev, email } : prev);
-      setNeedsEmail(false);
+      if (token && savedWallet) setStoredSession(token, savedWallet, cleanEmail || null);
+      setUser((prev: UserSession | null) => prev ? { ...prev, email: cleanEmail || null } : prev);
+      setNeedsEmail(!cleanEmail);
     } catch (err) {
       console.error('Failed to save email:', err);
       // Fallback: save in local storage
       const { token, wallet: savedWallet } = getStoredSession();
-      if (token && savedWallet) setStoredSession(token, savedWallet, email);
-      setUser((prev: UserSession | null) => prev ? { ...prev, email } : prev);
-      setNeedsEmail(false);
+      if (token && savedWallet) setStoredSession(token, savedWallet, cleanEmail || null);
+      setUser((prev: UserSession | null) => prev ? { ...prev, email: cleanEmail || null } : prev);
+      setNeedsEmail(!cleanEmail);
     }
   }, []);
 

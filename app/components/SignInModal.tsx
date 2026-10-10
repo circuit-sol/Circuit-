@@ -9,27 +9,47 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const { triggerConnect, isAuthenticating, authStatusText, isMobileDevice, isSignedIn, needsEmail, saveEmail } = useAuth();
+  const {
+    triggerConnect,
+    isAuthenticating,
+    authStatusText,
+    isMobileDevice,
+    isSignedIn,
+    needsEmail,
+    saveEmail,
+    user,
+  } = useAuth();
 
-  // Email capture state (post-login prompt)
-  const [email, setEmail]           = useState('');
+  // Email capture state (post-login prompt / profile update)
+  const [email, setEmail]               = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailError, setEmailError]     = useState('');
-  const emailInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef                   = useRef<HTMLInputElement>(null);
 
-  // Close automatically once fully signed in and email has been handled
+  // Track if user was already signed in when modal opened
+  const wasSignedInOnOpen = useRef(isSignedIn);
+
   useEffect(() => {
-    if (isSignedIn && !needsEmail) {
+    if (isOpen) {
+      wasSignedInOnOpen.current = isSignedIn;
+      setEmail(user?.email || '');
+      setEmailError('');
+    }
+  }, [isOpen, isSignedIn, user?.email]);
+
+  // Only auto-close if the user just completed wallet sign-in during THIS session AND already had an email attached
+  useEffect(() => {
+    if (!wasSignedInOnOpen.current && isSignedIn && user?.email && !needsEmail) {
       onClose();
     }
-  }, [isSignedIn, needsEmail, onClose]);
+  }, [isSignedIn, user?.email, needsEmail, onClose]);
 
-  // Focus email input when the email prompt appears
+  // Focus email input when email prompt or update view is shown
   useEffect(() => {
-    if (needsEmail && emailInputRef.current) {
-      setTimeout(() => emailInputRef.current?.focus(), 100);
+    if (isOpen && (isSignedIn || needsEmail) && emailInputRef.current) {
+      setTimeout(() => emailInputRef.current?.focus(), 120);
     }
-  }, [needsEmail]);
+  }, [isOpen, isSignedIn, needsEmail]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -50,25 +70,31 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
     setEmailLoading(true);
     setEmailError('');
-    await saveEmail(trimmed);
-    setEmailLoading(false);
-    setEmail('');
+    try {
+      await saveEmail(trimmed);
+      setEmailLoading(false);
+      onClose();
+    } catch (err: any) {
+      setEmailLoading(false);
+      setEmailError(err?.message || 'Failed to save email. Please try again.');
+    }
   };
 
   const handleSkipEmail = () => {
-    // User can skip — email is optional for now
     saveEmail('');
     onClose();
   };
 
   if (!isOpen) return null;
 
+  const showEmailView = isSignedIn || needsEmail;
+
   return (
     <div
       className="fixed inset-0 z-[2000] flex items-center justify-center p-6"
       role="dialog"
       aria-modal="true"
-      aria-label={needsEmail ? 'Add your email' : 'Sign in to Circuit'}
+      aria-label={showEmailView ? 'Email settings' : 'Sign in to Circuit'}
     >
       {/* Backdrop */}
       <div
@@ -76,12 +102,12 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         onClick={!isAuthenticating ? onClose : undefined}
       />
 
-      {/* Modal */}
+      {/* Modal Card */}
       <div
-        className="relative card-glass max-w-[400px] w-full p-8 flex flex-col gap-6 max-h-[90vh] overflow-y-auto no-scrollbar"
-        style={{ animation: 'fadeIn 0.3s ease-out' }}
+        className="relative card-glass max-w-[420px] w-full p-8 flex flex-col gap-6 max-h-[90vh] overflow-y-auto no-scrollbar border border-white/[0.12] shadow-[0_25px_60px_rgba(0,0,0,0.8)]"
+        style={{ animation: 'fadeIn 0.25s ease-out' }}
       >
-        {/* Close — hidden while authenticating to prevent half-state */}
+        {/* Close Button — hidden while authenticating */}
         {!isAuthenticating && (
           <button
             onClick={onClose}
@@ -92,8 +118,8 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
           </button>
         )}
 
-        {/* ── View 1: Connect Wallet ─────────────────────────────────── */}
-        {!needsEmail && (
+        {/* ── View 1: Connect Wallet (pre-login) ─────────────────────── */}
+        {!showEmailView && (
           <>
             <div className="text-center">
               <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">Sign in to Circuit</h2>
@@ -131,7 +157,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             </button>
 
             <p className="text-center text-[0.65rem] text-[#555]">
-              One tap. No passwords or secret codes.
+              One tap. Cryptographically signed with your Solana key.
             </p>
 
             {/* Phantom download helper */}
@@ -157,17 +183,32 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
           </>
         )}
 
-        {/* ── View 2: Email Capture (post-login) ────────────────────── */}
-        {needsEmail && (
+        {/* ── View 2: Email Capture / Update (logged-in view) ────────── */}
+        {showEmailView && (
           <>
             <div className="text-center">
-              <div className="text-2xl mb-3">📬</div>
+              {/* Connected Wallet Status Pill */}
+              {user?.walletAddress && (
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[0.65rem] text-[#A3A3A3] font-mono mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
+                  <span>Connected: {user.walletAddress.slice(0, 4)}...{user.walletAddress.slice(-4)}</span>
+                </div>
+              )}
+
               <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">
-                Where should we send updates?
+                {user?.email ? 'Update Notification Email' : 'Where should we send updates?'}
               </h2>
               <p className="text-sm text-[#A3A3A3]">
-                Add your email for order updates. You can skip this for now.
+                {user?.email
+                  ? 'Update the email address used for order receipts and pickup updates.'
+                  : 'Add your email for order receipts, tracking, and atelier pickup notices.'}
               </p>
+
+              {user?.email && (
+                <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-[0.75rem] text-[#888] inline-block font-mono">
+                  Current: <span className="text-white font-medium">{user.email}</span>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleEmailSubmit} className="flex flex-col gap-4">
@@ -176,14 +217,17 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   htmlFor="notification-email"
                   className="block text-[0.65rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-2"
                 >
-                  Email Address
+                  {user?.email ? 'New Email Address' : 'Email Address'}
                 </label>
                 <input
                   ref={emailInputRef}
                   id="notification-email"
                   type="email"
                   value={email}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setEmail(e.target.value); setEmailError(''); }}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    setEmail(e.target.value);
+                    setEmailError('');
+                  }}
                   placeholder="you@gmail.com"
                   className="w-full px-4 py-3 bg-white/[0.04] border border-white/[0.12] rounded-xl text-white text-sm placeholder:text-[#666] focus:border-[#D1D1D1] focus:outline-none transition-colors"
                   autoComplete="email"
@@ -198,7 +242,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 disabled={!email.trim() || emailLoading}
                 className="btn-circuit w-full justify-center"
               >
-                <span>{emailLoading ? 'Saving...' : 'Continue'}</span>
+                <span>{emailLoading ? 'Saving...' : user?.email ? 'Save New Email' : 'Continue'}</span>
                 <span className="btn-arrow" aria-hidden="true">
                   {emailLoading ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -212,13 +256,23 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleSkipEmail}
-                className="text-sm text-[#555] hover:text-[#888] transition-colors text-center"
-              >
-                Skip for now
-              </button>
+              {user?.email ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-sm text-[#555] hover:text-[#888] transition-colors text-center"
+                >
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSkipEmail}
+                  className="text-sm text-[#555] hover:text-[#888] transition-colors text-center"
+                >
+                  Skip for now
+                </button>
+              )}
             </form>
           </>
         )}

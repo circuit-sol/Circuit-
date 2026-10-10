@@ -280,7 +280,8 @@ function DropPageContent() {
     }
 
     if (!user?.email) {
-      showToast('Sign in required', 'Please sign in to place an order.');
+      showToast('Email Required', 'Please provide an email to receive your order receipt and tracking updates.');
+      setIsSignInOpen(true);
       return;
     }
 
