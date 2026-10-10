@@ -425,6 +425,107 @@ router.get("/brands/me", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/brands — create a new brand and assign authenticated user as owner
+router.post("/brands", requireAuth, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
+      });
+    }
+
+    const body = req.body || {};
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (name.length < 1 || name.length > 120) {
+      return res.status(400).json({
+        error: "INVALID_BRAND_NAME",
+        message: "Brand name must be between 1 and 120 characters.",
+      });
+    }
+
+    let slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
+    if (!slug) {
+      slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 48);
+    }
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+      return res.status(400).json({
+        error: "INVALID_SLUG",
+        message: "Slug must be lowercase alphanumeric words separated by single hyphens.",
+      });
+    }
+
+    const paymentWallet = typeof body.payment_wallet_address === "string" && body.payment_wallet_address.trim()
+      ? body.payment_wallet_address.trim()
+      : req.auth.walletAddress;
+
+    if (!paymentWallet || paymentWallet.length < 32 || paymentWallet.length > 44) {
+      return res.status(400).json({
+        error: "INVALID_PAYMENT_WALLET",
+        message: "Valid Solana payment wallet address required.",
+      });
+    }
+
+    // 1. Insert brand into public.brands
+    const { data: brand, error: brandError } = await supabase
+      .from("brands")
+      .insert({
+        name,
+        slug,
+        payment_wallet_address: paymentWallet,
+      })
+      .select("id, name, slug, payment_wallet_address, created_at")
+      .single();
+
+    if (brandError) {
+      if (brandError.code === "23505") {
+        return res.status(409).json({
+          error: "BRAND_SLUG_ALREADY_EXISTS",
+          message: `Brand with slug '${slug}' already exists.`,
+        });
+      }
+      throw brandError;
+    }
+
+    // 2. Assign authenticated creator as owner in public.brand_memberships
+    const { error: memberError } = await supabase
+      .from("brand_memberships")
+      .insert({
+        brand_id: brand.id,
+        user_id: req.auth.userId,
+        role: "owner",
+      });
+
+    if (memberError) {
+      console.error("Failed to assign brand membership:", memberError.message);
+      await supabase.from("brands").delete().eq("id", brand.id);
+      throw memberError;
+    }
+
+    return res.status(201).json({
+      brand: {
+        ...brand,
+        role: "owner",
+      },
+    });
+  } catch (error) {
+    console.error("Create brand failed:", error.message);
+    return res.status(500).json({
+      error: "BRAND_CREATION_FAILED",
+      message: error.message,
+    });
+  }
+});
+
 // ── BRANDS END ──────────────────────────────────────────────────────────────────
 
 // ── Editions ──────────────────────────────────────────────────────────────────

@@ -302,6 +302,18 @@ export function getMyBrands() {
   }, true);
 }
 
+/** Create a new brand managed by the authenticated user */
+export function createBrand(payload: {
+  name: string;
+  slug?: string;
+  payment_wallet_address?: string;
+}) {
+  return request<{ brand: Brand }>('/api/brands', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, true);
+}
+
 // ── Editions / Drops ───────────────────────────────────────────────────
 
 /** Public list of active and on-chain initialized editions */

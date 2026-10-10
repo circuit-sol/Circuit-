@@ -98,7 +98,25 @@ export default function CreatorStudioPage() {
       setLoading(true);
       try {
         const brandsRes = await backendApi.getMyBrands().catch(() => ({ brands: [] }));
-        const userBrands = brandsRes.brands || [];
+        let userBrands = brandsRes.brands || [];
+
+        // If creator has no brand yet, auto-register their atelier in the database
+        if (userBrands.length === 0 && user?.walletAddress) {
+          try {
+            const cleanSlug = `atelier-${user.walletAddress.slice(0, 8).toLowerCase()}`;
+            const regRes = await backendApi.createBrand({
+              name: 'Circuit Atelier Studio',
+              slug: cleanSlug,
+              payment_wallet_address: user.walletAddress,
+            });
+            if (regRes?.brand) {
+              userBrands = [regRes.brand];
+            }
+          } catch (autoErr) {
+            console.warn('Auto brand onboarding note:', autoErr);
+          }
+        }
+
         setBrands(userBrands);
 
         const currentBrand: backendApi.Brand = userBrands.length > 0
@@ -243,7 +261,9 @@ export default function CreatorStudioPage() {
       const primaryLoc = b.pickup_locations?.[0];
       setBatchForm({
         name: b.name || 'Batch 01',
-        opens_at: b.opens_at ? new Date(b.opens_at).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+        opens_at: b.opens_at && new Date(b.opens_at).getTime() > Date.now() + 60000
+          ? new Date(b.opens_at).toISOString().slice(0, 16)
+          : new Date(Date.now() + 3600000).toISOString().slice(0, 16),
         closes_at: b.closes_at ? new Date(b.closes_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
         production_starts_at: b.production_starts_at ? new Date(b.production_starts_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 16),
         release_at: b.release_at ? new Date(b.release_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 25).toISOString().slice(0, 16),
