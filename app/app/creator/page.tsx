@@ -76,7 +76,7 @@ export default function CreatorStudioPage() {
   const now = Date.now();
   const [batchForm, setBatchForm] = useState({
     name: 'Inaugural Atelier Run — 01',
-    opens_at: new Date(now + 3600000).toISOString().slice(0, 16), // +1 hour
+    opens_at: new Date(now + 60000).toISOString().slice(0, 16), // +1 minute
     closes_at: new Date(now + 86400000 * 7).toISOString().slice(0, 16), // +7 days
     production_starts_at: new Date(now + 86400000 * 10).toISOString().slice(0, 16), // +10 days (>= closes + 48h)
     release_at: new Date(now + 86400000 * 25).toISOString().slice(0, 16), // +25 days
@@ -243,7 +243,9 @@ export default function CreatorStudioPage() {
       const primaryLoc = b.pickup_locations?.[0];
       setBatchForm({
         name: b.name || 'Batch 01',
-        opens_at: b.opens_at ? new Date(b.opens_at).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+        opens_at: b.opens_at && new Date(b.opens_at).getTime() > Date.now() + 60000
+          ? new Date(b.opens_at).toISOString().slice(0, 16)
+          : new Date(Date.now() + 60000).toISOString().slice(0, 16),
         closes_at: b.closes_at ? new Date(b.closes_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 16),
         production_starts_at: b.production_starts_at ? new Date(b.production_starts_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 10).toISOString().slice(0, 16),
         release_at: b.release_at ? new Date(b.release_at).toISOString().slice(0, 16) : new Date(Date.now() + 86400000 * 25).toISOString().slice(0, 16),
@@ -353,13 +355,22 @@ export default function CreatorStudioPage() {
         const prodMs = new Date(batchForm.production_starts_at).getTime();
         const relMs = new Date(batchForm.release_at).getTime();
 
+        const safeOpens = new Date(opensMs);
+        safeOpens.setMilliseconds(0);
+        const safeCloses = new Date(closesMs);
+        safeCloses.setMilliseconds(0);
+        const safeProd = new Date(prodMs);
+        safeProd.setMilliseconds(0);
+        const safeRel = new Date(relMs);
+        safeRel.setMilliseconds(0);
+
         const fullAddress = `${batchForm.pickup_address}, ${batchForm.pickup_city}, ${batchForm.pickup_country}`.slice(0, 500);
         const batchPayload = {
           name: batchForm.name.trim(),
-          opens_at: new Date(opensMs).toISOString(),
-          closes_at: new Date(closesMs).toISOString(),
-          production_starts_at: new Date(prodMs).toISOString(),
-          release_at: new Date(relMs).toISOString(),
+          opens_at: safeOpens.toISOString(),
+          closes_at: safeCloses.toISOString(),
+          production_starts_at: safeProd.toISOString(),
+          release_at: safeRel.toISOString(),
           pickup_locations: [
             {
               name: batchForm.pickup_name.trim() || 'Circuit Atelier Station',
@@ -373,7 +384,12 @@ export default function CreatorStudioPage() {
 
         if (editingBatchId) {
           try {
-            const res = await backendApi.updateBatchDraft(editingBatchId, batchPayload, editingBatchRevision);
+            let currentRev = editingBatchRevision;
+            try {
+              const fresh = await backendApi.getMyBatchById(editingBatchId);
+              if (fresh?.batch?.revision) currentRev = fresh.batch.revision;
+            } catch (_) {}
+            const res = await backendApi.updateBatchDraft(editingBatchId, batchPayload, currentRev);
             if (res?.batch?.revision) setEditingBatchRevision(res.batch.revision);
           } catch (bErr) {
             console.warn('Batch draft update note:', bErr);
@@ -433,6 +449,10 @@ export default function CreatorStudioPage() {
     const prodMs = new Date(batchForm.production_starts_at).getTime();
     const relMs = new Date(batchForm.release_at).getTime();
 
+    if (isNaN(opensMs) || opensMs <= Date.now() + 35000) {
+      showToast('Invalid Opening Time', 'Batch opening time must be at least 1 minute in the future so the Solana vault can initialize.');
+      return;
+    }
     if (closesMs <= opensMs) {
       showToast('Invalid Dates', 'Preorder closing date must be after opening date.');
       return;
@@ -506,12 +526,21 @@ export default function CreatorStudioPage() {
       // Step C: Create or Update Preorder Batch Draft
       setDeployStepText('3/4 Creating preorder batch terms...');
       const fullAddress = `${batchForm.pickup_address}, ${batchForm.pickup_city}, ${batchForm.pickup_country}`.slice(0, 500);
+      const safeOpens = new Date(opensMs);
+      safeOpens.setMilliseconds(0);
+      const safeCloses = new Date(closesMs);
+      safeCloses.setMilliseconds(0);
+      const safeProd = new Date(prodMs);
+      safeProd.setMilliseconds(0);
+      const safeRel = new Date(relMs);
+      safeRel.setMilliseconds(0);
+
       const batchPayload = {
         name: batchForm.name.trim(),
-        opens_at: new Date(opensMs).toISOString(),
-        closes_at: new Date(closesMs).toISOString(),
-        production_starts_at: new Date(prodMs).toISOString(),
-        release_at: new Date(relMs).toISOString(),
+        opens_at: safeOpens.toISOString(),
+        closes_at: safeCloses.toISOString(),
+        production_starts_at: safeProd.toISOString(),
+        release_at: safeRel.toISOString(),
         pickup_locations: [
           {
             name: batchForm.pickup_name.trim() || 'Circuit Atelier Station',
@@ -527,13 +556,15 @@ export default function CreatorStudioPage() {
       let targetBatchRevision = editingBatchRevision;
 
       if (editingBatchId) {
+        // Fetch fresh revision to avoid BATCH_REVISION_CONFLICT
+        let currentRev = targetBatchRevision;
         try {
-          const updatedBatchRes = await backendApi.updateBatchDraft(editingBatchId, batchPayload, editingBatchRevision);
-          if (updatedBatchRes?.batch) {
-            targetBatchRevision = updatedBatchRes.batch.revision || targetBatchRevision + 1;
-          }
-        } catch (bErr) {
-          console.warn('Batch update note during deploy:', bErr);
+          const fresh = await backendApi.getMyBatchById(editingBatchId);
+          if (fresh?.batch?.revision) currentRev = fresh.batch.revision;
+        } catch (_) {}
+        const updatedBatchRes = await backendApi.updateBatchDraft(editingBatchId, batchPayload, currentRev);
+        if (updatedBatchRes?.batch?.revision) {
+          targetBatchRevision = updatedBatchRes.batch.revision ?? targetBatchRevision;
         }
       } else {
         const batchRes = await backendApi.createBatchDraft({
@@ -1019,6 +1050,7 @@ export default function CreatorStudioPage() {
                     <input
                       type="datetime-local"
                       value={batchForm.opens_at}
+                      min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
                       onChange={(e) => setBatchForm(prev => ({ ...prev, opens_at: e.target.value }))}
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none"
                     />

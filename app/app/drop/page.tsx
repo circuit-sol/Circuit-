@@ -318,6 +318,14 @@ function DropPageContent() {
 
       // 1. If wallet is connected and signTransaction is available, execute verified 4-step chain flow
       if (selectedBatch && signTransaction) {
+        // Pre-flight check: ensure batch is open
+        if (selectedBatch.opens_at && new Date(selectedBatch.opens_at).getTime() > Date.now()) {
+          const openTimeStr = new Date(selectedBatch.opens_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          showToast('Preorder Not Open Yet', `This drop is scheduled to open at ${openTimeStr}. Please check back then!`);
+          setTxState('idle');
+          return;
+        }
+
         const pickupLocId = selectedLocationId || selectedBatch.pickup_locations?.[0]?.id || 'c4b12345-6789-4abc-def0-123456789ab1';
         try {
           showToast('Preparing Order', 'Generating verified intent on Solana Devnet...');
@@ -351,39 +359,63 @@ function DropPageContent() {
           });
           showToast('✓ Confirmed', `Order #${(mintedCount || 0) + 1} confirmed on Solana Devnet!`);
           return;
-        } catch (chainErr) {
-          console.warn('Verified chain intent encountered issue, falling back gracefully:', chainErr);
-          // Fall through to standard escrow handshake if chain engine in simulation/mock
+        } catch (chainErr: any) {
+          console.warn('Verified chain intent encountered issue:', chainErr);
+          const errMsg = chainErr?.message || chainErr?.error || '';
+          if (errMsg.includes('BATCH_NOT_OPEN')) {
+            const openTimeStr = selectedBatch?.opens_at ? new Date(selectedBatch.opens_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'the scheduled time';
+            showToast('Preorder Not Open', `This drop opens at ${openTimeStr}. Please check back when it opens!`);
+            setTxState('idle');
+            return;
+          }
+          if (errMsg.includes('BATCH_CLOSED')) {
+            showToast('Preorder Closed', 'This preorder batch has concluded.');
+            setTxState('idle');
+            return;
+          }
+          if (errMsg.includes('INSUFFICIENT_FUNDS')) {
+            showToast('Insufficient SOL', 'Your wallet does not have enough SOL for this purchase.');
+            setTxState('idle');
+            return;
+          }
+
+          // In verified chain mode, do not fall through to legacy custodial routes
+          if (process.env.NEXT_PUBLIC_SIMULATION_MODE !== 'true') {
+            showToast('Order Failed', errMsg || 'Could not complete on-chain purchase.');
+            setTxState('idle');
+            return;
+          }
         }
       }
 
-      // 2. Fallback handshake (custodial/simulation escrow)
-      const result = await initializeEscrow(edition.id, totalSol, user.walletAddress);
+      // 2. Simulation fallback (only if NEXT_PUBLIC_SIMULATION_MODE is true)
+      if (process.env.NEXT_PUBLIC_SIMULATION_MODE === 'true') {
+        const result = await initializeEscrow(edition.id, totalSol, user.walletAddress);
+        await saveOrder({
+          email: user.email,
+          drop_id: edition.id,
+          tx_signature: result.txSignature,
+          escrow_pda: result.escrowPDA,
+          amount_usd: totalUsd,
+          size: selectedSize,
+          quantity: quantity,
+        });
 
-      await saveOrder({
-        email: user.email,
-        drop_id: edition.id,
-        tx_signature: result.txSignature,
-        escrow_pda: result.escrowPDA,
-        amount_usd: totalUsd,
-        size: selectedSize,
-        quantity: quantity,
-      });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('circuit_last_order_tx', result.txSignature);
+        }
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('circuit_last_order_tx', result.txSignature);
+        setMintedCount((prev) => prev + quantity);
+        setTxState('success');
+        setTxStep('idle');
+        setTxResult({
+          txSignature: result.txSignature,
+          solscanUrl: result.solscanUrl,
+          escrowPDA: result.escrowPDA,
+          orderNumber: result.orderNumber,
+        });
+        showToast('✓', `Order #${result.orderNumber} confirmed`);
       }
-
-      setMintedCount((prev) => prev + quantity);
-      setTxState('success');
-      setTxStep('idle');
-      setTxResult({
-        txSignature: result.txSignature,
-        solscanUrl: result.solscanUrl,
-        escrowPDA: result.escrowPDA,
-        orderNumber: result.orderNumber,
-      });
-      showToast('✓', `Order #${result.orderNumber} confirmed`);
     } catch (err: unknown) {
       const e = err as { code?: string };
       if (e?.code === 'DropSoldOut') {
@@ -564,8 +596,12 @@ function DropPageContent() {
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-bold text-white tracking-wide">{b.name}</span>
-                      <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border border-emerald-400/30 text-emerald-400 bg-emerald-400/10">
-                        {b.sales_window_status || 'Open'}
+                      <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                        b.opens_at && new Date(b.opens_at).getTime() > Date.now()
+                          ? 'border-amber-400/30 text-amber-400 bg-amber-400/10'
+                          : 'border-emerald-400/30 text-emerald-400 bg-emerald-400/10'
+                      }`}>
+                        {b.opens_at && new Date(b.opens_at).getTime() > Date.now() ? 'Opens Soon' : (b.sales_window_status || 'Open')}
                       </span>
                     </div>
                     <div className="text-[0.65rem] text-[#888] font-mono space-y-0.5">
@@ -730,6 +766,8 @@ function DropPageContent() {
                    txState === 'success' ? '✓ Order Confirmed' :
                    activeEdition.published === false ? 'Preview Mode (Unpublished)' :
                    isSoldOut ? 'Sold Out' :
+                   selectedBatch?.opens_at && new Date(selectedBatch.opens_at).getTime() > Date.now() ?
+                     `Opens at ${new Date(selectedBatch.opens_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` :
                    `Pre-Order (${totalSol} SOL)`}
                 </span>
                 <span className="btn-arrow">

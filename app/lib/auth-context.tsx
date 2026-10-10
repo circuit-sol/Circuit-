@@ -107,7 +107,7 @@ function removeStoredSession() {
 // ── Provider ─────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { publicKey, signMessage, connected, disconnect, select, wallets, connect } = useWallet();
+  const { wallet, publicKey, signMessage, connected, disconnect, select, wallets, connect } = useWallet();
 
   const [user, setUser]                       = useState<UserSession | null>(null);
   const [isAuthenticating, setAuthenticating] = useState(false);
@@ -289,20 +289,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // 2. Desktop browser extension or inside Phantom Mobile in-app browser
-    const phantom = wallets.find((w: { adapter: { name: string } }) => w.adapter.name === 'Phantom');
+    const phantom = wallets.find((w: { adapter: { name: string } }) => w.adapter.name === 'Phantom') || wallets[0];
     if (phantom) {
       select(phantom.adapter.name as any);
       if (!connected) {
         try {
           setAuthStatusText('Connecting to Phantom...');
-          await connect();
+          if (wallet?.adapter?.name === phantom.adapter.name) {
+            await connect();
+          } else {
+            // Allow adapter state setter tick to apply selection
+            setTimeout(async () => {
+              try {
+                await connect();
+              } catch (cErr: any) {
+                if (cErr?.name !== 'WalletNotSelectedError') {
+                  console.warn('Phantom connect notice:', cErr?.message || cErr);
+                }
+              }
+            }, 60);
+          }
         } catch (err: any) {
-          console.warn('Phantom connect notice:', err?.message || err);
+          if (err?.name !== 'WalletNotSelectedError') {
+            console.warn('Phantom connect notice:', err?.message || err);
+          }
           setAuthStatusText(null);
         }
       }
     }
-  }, [wallets, select, connect, connected]);
+  }, [wallets, select, connect, connected, wallet]);
 
   // ── Save notification email ──────────────────────────────────────────
   const saveEmail = useCallback(async (email: string) => {
