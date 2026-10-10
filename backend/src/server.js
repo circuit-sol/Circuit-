@@ -14,6 +14,7 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
   ...(process.env.FRONTEND_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean),
   "http://localhost:3000",
+  "http://127.0.0.1:3000",
   "https://circuit-sol.vercel.app",
   "https://circuit-production-9fdc.up.railway.app",
   "https://circuit.fashion",
@@ -25,10 +26,15 @@ app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        return callback(new Error("CORS policy violation"), false);
+      const cleanOrigin = origin.replace(/\/+$/, "");
+      // Allow any localhost/127.0.0.1 port for smooth local testing
+      if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
+        return callback(null, true);
       }
-      return callback(null, true);
+      if (allowedOrigins.some(o => o.replace(/\/+$/, "") === cleanOrigin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
     },
     credentials: true,
   }),

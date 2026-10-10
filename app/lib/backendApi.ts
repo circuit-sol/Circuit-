@@ -243,7 +243,13 @@ async function request<T>(path: string, init?: RequestInit, authenticated = fals
     headers: { ...headers, ...(init?.headers as Record<string, string> ?? {}) },
   });
 
-  const body = await res.json() as Record<string, unknown>;
+  let body: Record<string, unknown> = {};
+  try {
+    body = await res.json() as Record<string, unknown>;
+  } catch {
+    body = { error: `HTTP ${res.status}: ${res.statusText}` };
+  }
+
   if (!res.ok) {
     const err = Object.assign(
       new Error((body['message'] ?? body['error'] ?? 'Backend error') as string),

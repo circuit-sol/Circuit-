@@ -131,10 +131,11 @@ router.post(["/nonce", "/challenge"], async (req, res) => {
     });
   } catch (error) {
     // Log diagnostic information locally, not credentials or tokens.
-    console.error("Create wallet challenge failed:", error.message);
+    console.error("Create wallet challenge failed:", error.message || error);
 
     return res.status(500).json({
       error: "CHALLENGE_CREATION_FAILED",
+      details: error.message || String(error),
     });
   }
 });
