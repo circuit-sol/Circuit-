@@ -207,6 +207,8 @@ export interface ChainOrder {
   cancelled: boolean;
   refunded_lamports: string;
   collected_at?: string;
+  created_at?: string;
+  garment_serial?: string;
 }
 
 // ── Session Token ──────────────────────────────────────────────────────

@@ -25,18 +25,26 @@ export function truncateAddress(addr: string, start = 6, end = 4): string {
   return `${addr.slice(0, start)}...${addr.slice(-end)}`;
 }
 
-// ── Solscan URL Builders ─────────────────────────────────────────────
+// ── Solscan & Solana Explorer URL Builders ───────────────────────────
 
 export function solscanTxUrl(sig: string): string {
-  return `${SOLSCAN_BASE}/tx/${sig}?cluster=${CLUSTER}`;
+  return `https://explorer.solana.com/tx/${sig}?cluster=${CLUSTER}`;
+}
+
+export function solanaExplorerTxUrl(sig: string): string {
+  return `https://explorer.solana.com/tx/${sig}?cluster=${CLUSTER}`;
 }
 
 export function solscanAccountUrl(addr: string): string {
-  return `${SOLSCAN_BASE}/account/${addr}?cluster=${CLUSTER}`;
+  return `https://explorer.solana.com/address/${addr}?cluster=${CLUSTER}`;
+}
+
+export function solanaExplorerAccountUrl(addr: string): string {
+  return `https://explorer.solana.com/address/${addr}?cluster=${CLUSTER}`;
 }
 
 export function solscanTokenUrl(mint: string): string {
-  return `${SOLSCAN_BASE}/token/${mint}?cluster=${CLUSTER}`;
+  return `https://explorer.solana.com/address/${mint}?cluster=${CLUSTER}`;
 }
 
 // ── Formatting ───────────────────────────────────────────────────────

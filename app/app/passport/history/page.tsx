@@ -5,7 +5,8 @@ import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { getUserOrders, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
-import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
+import { solscanTxUrl, solanaExplorerTxUrl, formatSerialNumber } from '@/lib/utils';
+import * as backendApi from '@/lib/backendApi';
 import SignInModal from '@/components/SignInModal';
 import { showToast } from '@/components/Toast';
 
@@ -100,16 +101,16 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
           <div className="pt-4 flex gap-4">
             {order.tx_signature && (
               <a 
-                href={solscanTxUrl(order.tx_signature)}
+                href={solanaExplorerTxUrl(order.tx_signature)}
                 target="_blank"
-                rel="noopener"
+                rel="noopener noreferrer"
                 className="btn-outline-circuit flex-1 py-3 text-[0.65rem] text-center justify-center border-white/10 hover:border-white/20"
               >
-                View Record ↗
+                Explorer Tx ↗
               </a>
             )}
             <a 
-              href={`/passport?order=${order.id}`}
+              href={`/passport?order=${order.id || order.tx_signature}`}
               className="btn-circuit flex-1 py-3 text-[0.65rem] text-center justify-center"
             >
               <span>View Passport</span>
@@ -130,17 +131,17 @@ export default function HistoryPage() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   useEffect(() => {
-    if (isSignedIn && user?.email) {
+    if (isSignedIn) {
       loadHistory();
     } else {
+      setOrders([]);
       setLoading(false);
     }
-  }, [isSignedIn, user]);
+  }, [isSignedIn, user?.email]);
 
   async function loadHistory() {
     try {
       setLoading(true);
-      if (!user?.email) return;
 
       // 1. Fetch editions metadata to map drop details quickly
       const editionsList = await getEditions();
@@ -148,11 +149,97 @@ export default function HistoryPage() {
       editionsList.forEach((e: any) => {
         em[e.id] = e;
       });
-      setEditionsMap(em);
 
-      // 2. Fetch user orders from database
-      const userOrders = await getUserOrders(user.email);
-      setOrders(userOrders || []);
+      // 2. Fetch on-chain orders if authenticated with wallet
+      let chainOrders: any[] = [];
+      if (isSignedIn) {
+        try {
+          const chainRes = await backendApi.getMyChainOrders();
+          if (chainRes?.orders) {
+            chainOrders = chainRes.orders;
+          }
+        } catch (chainErr) {
+          console.warn('Chain orders load notice:', chainErr);
+        }
+      }
+
+      // 3. Fetch user orders from database if email is linked
+      let dbOrders: any[] = [];
+      if (user?.email) {
+        try {
+          const res = await getUserOrders(user.email);
+          if (res) dbOrders = res;
+        } catch (dbErr) {
+          console.warn('DB orders load notice:', dbErr);
+        }
+      }
+
+      // 4. Fetch local cached orders
+      let localOrders: any[] = [];
+      if (typeof window !== 'undefined') {
+        try {
+          localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+        } catch {}
+      }
+
+      // 5. Unify, map, and deduplicate orders
+      const mergedMap = new Map<string, any>();
+
+      // Chain orders first (most authoritative on-chain data)
+      for (const c of chainOrders) {
+        let mappedEditionId = c.batch_id;
+        if (!em[mappedEditionId]) {
+          try {
+            const bRes = await backendApi.getPublicBatchById(c.batch_id);
+            if (bRes?.batch?.edition_id) {
+              mappedEditionId = bRes.batch.edition_id;
+              if (em[mappedEditionId]) {
+                em[c.batch_id] = em[mappedEditionId];
+              }
+            }
+          } catch {}
+        }
+
+        const normalized = {
+          id: c.id,
+          drop_id: mappedEditionId,
+          batch_id: c.batch_id,
+          tx_signature: c.purchase_signature,
+          escrow_pda: c.vault_address || c.order_address,
+          amount_usd: c.amount_lamports ? (Number(c.amount_lamports) / 1e9 * 150).toFixed(2) : '150.00',
+          amount_sol: c.amount_lamports ? (Number(c.amount_lamports) / 1e9).toFixed(3) : '0.800',
+          size: c.size || 'M',
+          quantity: c.quantity || 1,
+          status: c.cancelled ? 'cancelled' : (c.collected_at ? 'delivered' : 'pending'),
+          created_at: c.created_at || c.purchased_at || new Date().toISOString(),
+          garment_serial: c.garment_serial,
+          shipment_details: c.collected_at ? 'Item collected from atelier pickup station.' : undefined,
+        };
+        const key = c.purchase_signature || c.id;
+        mergedMap.set(key, normalized);
+      }
+
+      // Local cached orders
+      for (const loc of localOrders) {
+        const key = loc.tx_signature || loc.id;
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, loc);
+        }
+      }
+
+      // DB orders
+      for (const d of dbOrders) {
+        const key = d.tx_signature || d.id;
+        if (!mergedMap.has(key)) {
+          mergedMap.set(key, d);
+        }
+      }
+
+      setEditionsMap(em);
+      const combined = Array.from(mergedMap.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setOrders(combined);
     } catch (err) {
       console.error('Error fetching dynamic history records:', err);
     } finally {

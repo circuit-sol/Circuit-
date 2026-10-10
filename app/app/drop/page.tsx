@@ -13,7 +13,7 @@ import {
   resetState,
   executeVerifiedPurchase,
 } from '@/lib/solana-service';
-import { solscanTxUrl } from '@/lib/utils';
+import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
@@ -27,6 +27,17 @@ interface TxResult {
   solscanUrl?: string;
   escrowPDA?: string;
   orderNumber?: number;
+  orderId?: string;
+  vaultAddress?: string;
+  orderAddress?: string;
+  amountSol?: number;
+  amountUsd?: number;
+  quantity?: number;
+  size?: string;
+  editionName?: string;
+  batchName?: string;
+  releaseAt?: string;
+  pickupLocation?: string;
   message?: string;
 }
 
@@ -344,10 +355,43 @@ function DropPageContent() {
             },
           });
 
+          // Persist order in database for order lookup and supply counter
+          try {
+            await saveOrder({
+              email: user.email,
+              drop_id: activeEdition.id,
+              tx_signature: verified.signature,
+              escrow_pda: verified.order?.vault_address || verified.order?.order_address || verified.signature,
+              amount_usd: totalUsd,
+              size: selectedSize,
+              quantity: quantity,
+            });
+          } catch (dbErr) {
+            console.warn('DB order save notice:', dbErr);
+          }
+
           // Cache order info for passport
           if (typeof window !== 'undefined') {
             localStorage.setItem('circuit_last_order_tx', verified.signature);
             localStorage.setItem('circuit_last_order_id', verified.orderId);
+            const richOrder = {
+              id: verified.orderId,
+              drop_id: activeEdition.id,
+              batch_id: selectedBatch.id,
+              tx_signature: verified.signature,
+              vault_address: verified.order?.vault_address,
+              order_address: verified.order?.order_address,
+              amount_usd: totalUsd,
+              amount_sol: totalSol,
+              quantity,
+              size: selectedSize,
+              created_at: new Date().toISOString(),
+              edition_name: activeEdition.name,
+              release_at: selectedBatch.release_at,
+              pickup_location_id: pickupLocId,
+            };
+            const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+            localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
           }
 
           setMintedCount((prev) => prev + quantity);
@@ -356,7 +400,18 @@ function DropPageContent() {
           setTxResult({
             txSignature: verified.signature,
             solscanUrl: verified.solscanUrl,
+            orderId: verified.orderId,
+            vaultAddress: verified.order?.vault_address,
+            orderAddress: verified.order?.order_address,
             orderNumber: (mintedCount || 0) + 1,
+            amountSol: totalSol,
+            amountUsd: totalUsd,
+            quantity,
+            size: selectedSize,
+            editionName: activeEdition.name,
+            batchName: selectedBatch.name,
+            releaseAt: selectedBatch.release_at,
+            pickupLocation: selectedBatch.pickup_locations?.find((l) => (l.id || '') === pickupLocId)?.name || 'Official Atelier Station',
           });
           showToast('✓ Confirmed', `Order #${(mintedCount || 0) + 1} confirmed on Solana Devnet!`);
           return;
@@ -787,14 +842,87 @@ function DropPageContent() {
           {/* Transaction Outputs */}
           <div id="drop-tx" role="status" aria-live="polite" className="min-h-[60px]">
             {txState === 'success' && txResult.txSignature && (
-              <div className="tx-msg ok flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-white">✓</span>
-                  <span>Payment secured in escrow. Order queued.</span>
+              <div className="card-glass p-6 md:p-7 border border-emerald-500/30 bg-emerald-500/[0.04] rounded-3xl flex flex-col gap-4 animate-scale-in shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">Payment Secured in Escrow</span>
+                  </div>
+                  <span className="text-[0.65rem] font-mono text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20">
+                    Solana Devnet
+                  </span>
                 </div>
-                <div className="flex gap-4 text-[0.7rem] font-bold uppercase tracking-widest">
-                  <a href={txResult.solscanUrl} target="_blank" rel="noopener" className="text-[#666] hover:text-white transition-colors">Explorer Proof ↗</a>
-                  <Link href="/confirm" className="text-white underline underline-offset-4">Next: Add Shipment Details →</Link>
+
+                {/* Garment & Edition stats */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <span className="text-[0.6rem] uppercase tracking-wider text-[#777] block mb-1">Edition Reserved</span>
+                    <span className="font-bold text-white text-sm">
+                      #{txResult.orderNumber || 1} of {maxSupply} Units
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <span className="text-[0.6rem] uppercase tracking-wider text-[#777] block mb-1">Escrow Amount</span>
+                    <span className="font-bold text-emerald-400 text-sm">
+                      {txResult.amountSol} SOL <span className="text-[0.65rem] text-[#888] font-normal">(~${txResult.amountUsd} USD)</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Drop Timeline */}
+                <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex flex-col gap-1.5 text-xs font-mono">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#888]">Estimated Atelier Delivery:</span>
+                    <span className="text-white font-bold">
+                      {txResult.releaseAt ? new Date(txResult.releaseAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Scheduled post-production'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[0.7rem]">
+                    <span className="text-[#666]">Collection Station:</span>
+                    <span className="text-[#bbb] truncate max-w-[200px]">{txResult.pickupLocation || 'Official Atelier'}</span>
+                  </div>
+                </div>
+
+                {/* On-Chain Explorer Proofs */}
+                <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.08]">
+                  <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#666]">Solana Explorer Verifications</span>
+                  <div className="flex flex-wrap gap-2 text-[0.7rem] font-mono">
+                    <a
+                      href={solanaExplorerTxUrl(txResult.txSignature)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-white/90 hover:text-white transition-colors flex items-center gap-1.5"
+                    >
+                      <span>Tx Proof ↗</span>
+                    </a>
+                    {txResult.vaultAddress && (
+                      <a
+                        href={solanaExplorerAccountUrl(txResult.vaultAddress)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-[#aaa] hover:text-white transition-colors flex items-center gap-1.5"
+                      >
+                        <span>Escrow Vault PDA ↗</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary Passport CTA */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <Link
+                    href={`/passport?order=${txResult.orderId || txResult.txSignature}`}
+                    className="btn-circuit flex-1 justify-center py-3 text-xs"
+                  >
+                    <span>Open Digital Product Passport ➔</span>
+                  </Link>
+                  <Link
+                    href="/passport/history"
+                    className="btn-outline-circuit justify-center py-3 text-xs border-white/10 hover:border-white/20 text-[#aaa] hover:text-white"
+                  >
+                    <span>My Order History</span>
+                  </Link>
                 </div>
               </div>
             )}

@@ -10,6 +10,7 @@ import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 import { formatSerialNumber } from '@/lib/utils';
+import * as backendApi from '@/lib/backendApi';
 
 type TxState = 'idle' | 'loading' | 'signing' | 'success' | 'error';
 
@@ -44,31 +45,80 @@ export default function ConfirmPage() {
   }, [txState, latestOrder, router]);
 
   useEffect(() => {
-    if (isSignedIn && user?.email) {
+    if (isSignedIn) {
       loadLatestOrder();
     } else {
       setLatestOrder(null);
       setActiveEdition(null);
     }
-  }, [isSignedIn, user]);
+  }, [isSignedIn, user?.email]);
 
   async function loadLatestOrder() {
     try {
       setTxState('loading');
-      if (!user?.email) return;
+      let latest: any = null;
 
-      const orders = await getUserOrders(user.email);
-      if (orders && orders.length > 0) {
-        // Find the latest order (sorted descending by default)
-        const latest = orders[0];
+      // 1. Check verified chain orders if authenticated with active wallet
+      if (isSignedIn) {
+        try {
+          const chainRes = await backendApi.getMyChainOrders();
+          if (chainRes?.orders && chainRes.orders.length > 0) {
+            const c = chainRes.orders[0];
+            latest = {
+              id: c.id,
+              drop_id: c.batch_id,
+              batch_id: c.batch_id,
+              tx_signature: c.purchase_signature,
+              escrow_pda: c.vault_address || c.order_address,
+              amount_usd: c.amount_lamports ? (Number(c.amount_lamports) / 1e9 * 150).toFixed(2) : '150.00',
+              size: c.size || 'M',
+              quantity: c.quantity || 1,
+              status: c.cancelled ? 'cancelled' : (c.collected_at ? 'delivered' : 'pending'),
+              garment_serial: c.garment_serial,
+            };
+          }
+        } catch {}
+      }
+
+      // 2. Check DB orders by user email
+      if (!latest && user?.email) {
+        try {
+          const orders = await getUserOrders(user.email);
+          if (orders && orders.length > 0) {
+            latest = orders[0];
+          }
+        } catch {}
+      }
+
+      // 3. Check local storage cache
+      if (!latest && typeof window !== 'undefined') {
+        try {
+          const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+          if (localOrders && localOrders.length > 0) {
+            latest = localOrders[0];
+          }
+        } catch {}
+      }
+
+      if (latest) {
         setLatestOrder(latest);
-
         if (latest.delivery_location) setDeliveryLocation(latest.delivery_location);
         if (latest.delivery_address) setDeliveryAddress(latest.delivery_address);
 
-        // Fetch edition
-        const ed = await getEditionById(latest.drop_id);
-        setActiveEdition(ed);
+        // Resolve edition
+        let editionId = latest.drop_id;
+        if (latest.batch_id) {
+          try {
+            const bRes = await backendApi.getPublicBatchById(latest.batch_id);
+            if (bRes?.batch?.edition_id) {
+              editionId = bRes.batch.edition_id;
+            }
+          } catch {}
+        }
+        if (editionId) {
+          const ed = await getEditionById(editionId);
+          setActiveEdition(ed);
+        }
       }
     } catch (err) {
       console.error('Error fetching latest order details:', err);
