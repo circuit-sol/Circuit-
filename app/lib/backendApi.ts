@@ -553,6 +553,7 @@ function ensureIsoUtc(dateStr: string): string {
   if (isNaN(parsed.getTime())) {
     throw new Error('INVALID_BATCH_DATE');
   }
+  parsed.setMilliseconds(0);
   return parsed.toISOString();
 }
 
