@@ -103,18 +103,9 @@ function DropPageContent() {
   const [paymentMethod, setPaymentMethod] = useState<'fiat' | 'crypto'>('crypto');
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [showFiatModal, setShowFiatModal] = useState(false);
+  const [copiedTx, setCopiedTx] = useState(false);
   const processingRef = useRef(false);
   const router = useRouter();
-
-  // Auto-redirect to confirmation page after successful payment
-  useEffect(() => {
-    if (txState === 'success') {
-      const timer = setTimeout(() => {
-        router.push('/confirm');
-      }, 1500); // 1.5s delay so user can see the success state briefly
-      return () => clearTimeout(timer);
-    }
-  }, [txState, router]);
 
   // Fetch Drop, Supply Details, and Batches
   useEffect(() => {
@@ -480,6 +471,9 @@ function DropPageContent() {
             pickupLocation: selectedBatch.pickup_locations?.find((l) => (l.id || '') === pickupLocId)?.name || 'Official Atelier Station',
           });
           showToast('✓ Confirmed', `Order #${(mintedCount || 0) + 1} confirmed on Solana Devnet!`);
+          setTimeout(() => {
+            document.getElementById('drop-tx')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }, 100);
           return;
         } catch (chainErr: any) {
           console.warn('Verified chain intent encountered issue:', chainErr);
@@ -534,9 +528,22 @@ function DropPageContent() {
           txSignature: result.txSignature,
           solscanUrl: result.solscanUrl,
           escrowPDA: result.escrowPDA,
+          vaultAddress: result.escrowPDA,
+          orderId: result.orderNumber ? String(result.orderNumber) : result.txSignature,
           orderNumber: result.orderNumber,
+          amountSol: totalSol,
+          amountUsd: totalUsd,
+          quantity,
+          size: selectedSize,
+          editionName: activeEdition.name,
+          batchName: selectedBatch?.name,
+          releaseAt: selectedBatch?.release_at,
+          pickupLocation: selectedBatch?.pickup_locations?.find((l) => (l.id || '') === selectedLocationId)?.name || 'Official Atelier Station',
         });
         showToast('✓', `Order #${result.orderNumber} confirmed`);
+        setTimeout(() => {
+          document.getElementById('drop-tx')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
       }
     } catch (err: unknown) {
       const e = err as { code?: string };
@@ -736,45 +743,100 @@ function DropPageContent() {
             </div>
           </div>
 
-          {/* Fulfillment: In-Person Pickup Only */}
+          {/* Fulfillment & Delivery Method */}
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-baseline">
               <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">
-                Pick up location
+                Fulfillment Method
               </span>
-              <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded bg-white/[0.05] border border-white/10 text-white/80">
-                In-Person Collection
+              <span className="text-[0.6rem] font-mono text-[#888]">
+                Escrow-Protected Handover
               </span>
             </div>
 
-            {selectedBatch && selectedBatch.pickup_locations?.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <select
-                  value={selectedLocationId}
-                  onChange={(e) => setSelectedLocationId(e.target.value)}
-                  className="w-full bg-[#0d0d0d] border border-white/[0.12] rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-white/40"
-                >
-                  {selectedBatch.pickup_locations.map((loc, idx) => (
-                    <option key={loc.id || idx} value={loc.id || `loc-${idx}`}>
-                      {loc.name} — {loc.address}, {loc.city}, {loc.country}
-                    </option>
-                  ))}
-                </select>
+            {/* Method Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: In-Person Collection Station (Active) */}
+              <div className="p-4 rounded-2xl border border-white/20 bg-white/[0.06] shadow-[0_0_20px_rgba(255,255,255,0.03)] flex flex-col justify-between relative overflow-hidden">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    <span className="text-xs font-bold text-white tracking-wide">Atelier Station</span>
+                  </div>
+                  <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border border-emerald-400/30 text-emerald-400 bg-emerald-400/10">
+                    Active
+                  </span>
+                </div>
+                <p className="text-[0.68rem] text-[#aaa] leading-relaxed">
+                  In-person authentication & NFC verification at official brand studio station.
+                </p>
+              </div>
 
-                {(() => {
-                  const activeLoc = selectedBatch.pickup_locations.find((l) => (l.id || '') === selectedLocationId) || selectedBatch.pickup_locations[0];
-                  return activeLoc?.instructions ? (
-                    <p className="text-[0.65rem] text-[#777] font-mono italic px-1">
-                      ℹ Instructions: {activeLoc.instructions}
-                    </p>
-                  ) : null;
-                })()}
+              {/* Option 2: Delivery Coverage (Greyed Out / Disabled Future Feature) */}
+              <div
+                className="p-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.015] opacity-60 cursor-not-allowed select-none flex flex-col justify-between relative overflow-hidden group"
+                title="Delivery Coverage will be available in an upcoming release"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-[#777]">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#666]">
+                      <rect x="1" y="3" width="15" height="13" />
+                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                      <circle cx="5.5" cy="18.5" r="2.5" />
+                      <circle cx="18.5" cy="18.5" r="2.5" />
+                    </svg>
+                    <span className="text-xs font-bold tracking-wide text-[#888]">Delivery Coverage</span>
+                  </div>
+                  <span className="text-[0.58rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-amber-400/20 text-amber-400/80 bg-amber-400/5">
+                    Future Feature
+                  </span>
+                </div>
+                <p className="text-[0.68rem] text-[#666] leading-relaxed">
+                  Insured door-to-door bonded courier logistics with tamper-evident transit escrow.
+                </p>
+                <div className="mt-2 text-[0.6rem] font-mono text-[#555] flex items-center gap-1">
+                  <span>🔒 Regional carrier rollout pending</span>
+                </div>
               </div>
-            ) : (
-              <div className="p-3 text-xs text-[#888] border border-white/[0.08] rounded-xl bg-white/[0.02]">
-                Official Brand Studio Collection Station
-              </div>
-            )}
+            </div>
+
+            {/* Active Station Selector */}
+            <div className="flex flex-col gap-2 mt-1">
+              <span className="text-[0.62rem] text-[#666] uppercase tracking-[0.1em] font-semibold">
+                Select Collection Station
+              </span>
+              {selectedBatch && selectedBatch.pickup_locations?.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <select
+                    value={selectedLocationId}
+                    onChange={(e) => setSelectedLocationId(e.target.value)}
+                    className="w-full bg-[#0d0d0d] border border-white/[0.12] rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-white/40"
+                  >
+                    {selectedBatch.pickup_locations.map((loc, idx) => (
+                      <option key={loc.id || idx} value={loc.id || `loc-${idx}`}>
+                        {loc.name} — {loc.address}, {loc.city}, {loc.country}
+                      </option>
+                    ))}
+                  </select>
+
+                  {(() => {
+                    const activeLoc = selectedBatch.pickup_locations.find((l) => (l.id || '') === selectedLocationId) || selectedBatch.pickup_locations[0];
+                    return activeLoc?.instructions ? (
+                      <p className="text-[0.65rem] text-[#777] font-mono italic px-1">
+                        ℹ Instructions: {activeLoc.instructions}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
+              ) : (
+                <div className="p-3 text-xs text-[#888] border border-white/[0.08] rounded-xl bg-white/[0.02]">
+                  Official Brand Studio Collection Station
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Sizing & Quantity */}
@@ -920,6 +982,11 @@ function DropPageContent() {
                   </span>
                 </div>
 
+                {/* Subtitle Reassurance */}
+                <p className="text-[0.72rem] text-[#aaa] leading-relaxed">
+                  Your funds are secured in on-chain escrow. Review your transaction proof below or open your Digital Product Passport whenever you are ready.
+                </p>
+
                 {/* Garment & Edition stats */}
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
@@ -952,26 +1019,40 @@ function DropPageContent() {
 
                 {/* On-Chain Explorer Proofs */}
                 <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.08]">
-                  <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#666]">Solana Explorer Verifications</span>
+                  <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#666]">On-Chain Blockchain Verifications</span>
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-mono">
                     <a
                       href={solanaExplorerTxUrl(txResult.txSignature)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-white/90 hover:text-white transition-colors flex items-center gap-1.5"
+                      className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/12 border border-white/15 text-white font-medium transition-all flex items-center gap-1.5 hover:border-emerald-500/40"
                     >
-                      <span>Tx Proof ↗</span>
+                      <span>View on Solana Explorer ↗</span>
                     </a>
                     {txResult.vaultAddress && (
                       <a
                         href={solanaExplorerAccountUrl(txResult.vaultAddress)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/10 border border-white/10 text-[#aaa] hover:text-white transition-colors flex items-center gap-1.5"
+                        className="px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/10 border border-white/10 text-[#aaa] hover:text-white transition-all flex items-center gap-1.5"
                       >
                         <span>Escrow Vault PDA ↗</span>
                       </a>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (txResult.txSignature) {
+                          navigator.clipboard.writeText(txResult.txSignature);
+                          setCopiedTx(true);
+                          setTimeout(() => setCopiedTx(false), 2000);
+                          showToast('Copied', 'Transaction signature copied to clipboard');
+                        }
+                      }}
+                      className="px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-[#888] hover:text-white transition-colors flex items-center gap-1.5"
+                    >
+                      <span>{copiedTx ? '✓ Copied' : 'Copy Tx Hash'}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -979,15 +1060,15 @@ function DropPageContent() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Link
                     href={`/passport?order=${txResult.orderId || txResult.txSignature}`}
-                    className="btn-circuit flex-1 justify-center py-3 text-xs"
+                    className="btn-circuit flex-1 justify-center py-3.5 text-xs font-bold"
                   >
-                    <span>Open Digital Product Passport ➔</span>
+                    <span>View Digital Product Passport ➔</span>
                   </Link>
                   <Link
                     href="/passport/history"
-                    className="btn-outline-circuit justify-center py-3 text-xs border-white/10 hover:border-white/20 text-[#aaa] hover:text-white"
+                    className="btn-outline-circuit justify-center py-3.5 text-xs border-white/10 hover:border-white/20 text-[#aaa] hover:text-white font-semibold"
                   >
-                    <span>My Order History</span>
+                    <span>My Wardrobe / History</span>
                   </Link>
                 </div>
               </div>
@@ -1143,9 +1224,29 @@ function DropPageContent() {
                 onClick={() => {
                   setTxState('signing');
                   setTimeout(() => {
+                    const simSig = 'fiat-sim-' + Date.now().toString(36);
+                    setShowFiatModal(false);
                     setTxState('success');
-                    router.push('/confirm');
-                  }, 2000);
+                    setMintedCount((prev) => prev + quantity);
+                    setTxResult({
+                      txSignature: simSig,
+                      solscanUrl: `https://explorer.solana.com/tx/${simSig}?cluster=devnet`,
+                      orderNumber: (mintedCount || 0) + 1,
+                      orderId: simSig,
+                      amountSol: totalSol,
+                      amountUsd: totalUsd,
+                      quantity,
+                      size: selectedSize,
+                      editionName: activeEdition.name,
+                      batchName: selectedBatch?.name,
+                      releaseAt: selectedBatch?.release_at,
+                      pickupLocation: selectedBatch?.pickup_locations?.find((l) => (l.id || '') === selectedLocationId)?.name || 'Official Atelier Station',
+                    });
+                    showToast('✓ Card Payment Secured', 'Payment verified and escrow record generated.');
+                    setTimeout(() => {
+                      document.getElementById('drop-tx')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }, 100);
+                  }, 1200);
                 }}
                 disabled={txState === 'signing'}
               >
