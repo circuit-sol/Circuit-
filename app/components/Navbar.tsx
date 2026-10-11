@@ -22,6 +22,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
   const { user, isSignedIn, signOut } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
+  const [signInMode, setSignInMode] = useState<'signin' | 'update-email'>('signin');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -154,7 +155,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
 
                     {/* Notification Email Section */}
                     <div 
-                      onClick={() => { setIsSignInOpen(true); setIsProfileOpen(false); }}
+                      onClick={() => { setSignInMode('update-email'); setIsSignInOpen(true); setIsProfileOpen(false); }}
                       className="px-4 py-3 border-b border-white/[0.1] mb-1 cursor-pointer hover:bg-white/[0.04] transition-colors rounded-xl flex items-center justify-between group/email"
                     >
                       <div className="flex flex-col min-w-0 pr-2">
@@ -204,7 +205,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
 
             ) : (
               <button 
-                onClick={() => setIsSignInOpen(true)}
+                onClick={() => { setSignInMode('signin'); setIsSignInOpen(true); }}
                 className="hidden md:block bg-white text-black px-6 py-2 rounded-full text-[0.75rem] font-bold uppercase tracking-[0.06em] hover:shadow-[0_8px_30px_rgba(255,255,255,0.15)] transition-all"
               >
                 Sign In
@@ -283,7 +284,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
                       {user?.email || <span className="text-amber-400 text-xs font-normal">⚠️ No email linked</span>}
                     </span>
                     <button
-                      onClick={() => { setIsSignInOpen(true); setDrawerOpen(false); }}
+                      onClick={() => { setSignInMode('update-email'); setIsSignInOpen(true); setDrawerOpen(false); }}
                       className="text-[0.7rem] text-white/70 hover:text-white underline font-semibold"
                     >
                       {user?.email ? 'Change' : '+ Add Email'}
@@ -324,7 +325,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
               </div>
             ) : (
               <button 
-                onClick={() => { setIsSignInOpen(true); setDrawerOpen(false); }}
+                onClick={() => { setSignInMode('signin'); setIsSignInOpen(true); setDrawerOpen(false); }}
                 className="bg-white text-black w-full py-4 rounded-2xl text-[0.8rem] font-bold uppercase tracking-[0.1em]"
               >
                 Sign In to Circuit
@@ -339,7 +340,7 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
         </div>
       </div>
 
-      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
+      <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} mode={signInMode} />
     </>
   );
 }

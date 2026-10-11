@@ -6,9 +6,10 @@ import { useAuth } from '@/lib/auth-context';
 interface SignInModalProps {
   isOpen: boolean;
   onClose: () => void;
+  mode?: 'signin' | 'update-email';
 }
 
-export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
+export default function SignInModal({ isOpen, onClose, mode = 'signin' }: SignInModalProps) {
   const {
     triggerConnect,
     isAuthenticating,
@@ -26,30 +27,36 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const [emailError, setEmailError]     = useState('');
   const emailInputRef                   = useRef<HTMLInputElement>(null);
 
-  // Track if user was already signed in when modal opened
-  const wasSignedInOnOpen = useRef(isSignedIn);
-
   useEffect(() => {
     if (isOpen) {
-      wasSignedInOnOpen.current = isSignedIn;
       setEmail(user?.email || '');
       setEmailError('');
-    }
-  }, [isOpen, isSignedIn, user?.email]);
 
-  // Only auto-close if the user just completed wallet sign-in during THIS session AND already had an email attached
+      // If user already has an email and this is not a manual update request from profile toggle:
+      // close immediately! Never show the email update popup unsolicited.
+      if (isSignedIn && user?.email && mode !== 'update-email') {
+        onClose();
+      }
+    }
+  }, [isOpen, isSignedIn, user?.email, mode, onClose]);
+
+  // If user completes sign-in during this session and already has an email: close immediately
   useEffect(() => {
-    if (!wasSignedInOnOpen.current && isSignedIn && user?.email && !needsEmail) {
+    if (isOpen && isSignedIn && user?.email && mode !== 'update-email') {
       onClose();
     }
-  }, [isSignedIn, user?.email, needsEmail, onClose]);
+  }, [isOpen, isSignedIn, user?.email, mode, onClose]);
+
+  // Determine whether to display email view
+  const isExplicitUpdate = mode === 'update-email';
+  const showEmailView = isExplicitUpdate || (isSignedIn && !user?.email);
 
   // Focus email input when email prompt or update view is shown
   useEffect(() => {
-    if (isOpen && (isSignedIn || needsEmail) && emailInputRef.current) {
+    if (isOpen && showEmailView && emailInputRef.current) {
       setTimeout(() => emailInputRef.current?.focus(), 120);
     }
-  }, [isOpen, isSignedIn, needsEmail]);
+  }, [isOpen, showEmailView]);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -86,8 +93,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   };
 
   if (!isOpen) return null;
-
-  const showEmailView = isSignedIn || needsEmail;
 
   return (
     <div
@@ -196,15 +201,15 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               )}
 
               <h2 className="text-xl font-bold tracking-[-0.02em] mb-2">
-                {user?.email ? 'Update Notification Email' : 'Where should we send updates?'}
+                {isExplicitUpdate ? 'Update Notification Email' : 'Where should we send updates?'}
               </h2>
               <p className="text-sm text-[#A3A3A3]">
-                {user?.email
+                {isExplicitUpdate
                   ? 'Update the email address used for order receipts and pickup updates.'
                   : 'Add your email for order receipts, tracking, and atelier pickup notices.'}
               </p>
 
-              {user?.email && (
+              {isExplicitUpdate && user?.email && (
                 <div className="mt-2.5 px-3 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-[0.75rem] text-[#888] inline-block font-mono">
                   Current: <span className="text-white font-medium">{user.email}</span>
                 </div>
@@ -217,7 +222,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   htmlFor="notification-email"
                   className="block text-[0.65rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-2"
                 >
-                  {user?.email ? 'New Email Address' : 'Email Address'}
+                  {isExplicitUpdate ? 'New Email Address' : 'Email Address'}
                 </label>
                 <input
                   ref={emailInputRef}
@@ -242,7 +247,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 disabled={!email.trim() || emailLoading}
                 className="btn-circuit w-full justify-center"
               >
-                <span>{emailLoading ? 'Saving...' : user?.email ? 'Save New Email' : 'Continue'}</span>
+                <span>{emailLoading ? 'Saving...' : isExplicitUpdate ? 'Save New Email' : 'Save Email'}</span>
                 <span className="btn-arrow" aria-hidden="true">
                   {emailLoading ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -256,7 +261,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 </span>
               </button>
 
-              {user?.email ? (
+              {isExplicitUpdate ? (
                 <button
                   type="button"
                   onClick={onClose}
