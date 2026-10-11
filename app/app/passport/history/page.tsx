@@ -182,8 +182,49 @@ export default function HistoryPage() {
         } catch {}
       }
 
-      // 5. Unify, map, and deduplicate orders
-      const mergedMap = new Map<string, any>();
+      // 5. Unify, map, and deduplicate orders with composite keys
+      const rawHistoryOrders: any[] = [];
+      const seenSignatures = new Set<string>();
+      const seenIds = new Set<string>();
+      const seenEscrows = new Set<string>();
+
+      const addOrMergeHistoryOrder = (normalized: any) => {
+        if (!normalized) return;
+        const sig = (normalized.tx_signature || normalized.purchase_signature || normalized.signature || '').trim().toLowerCase();
+        const id = (normalized.id || '').trim().toLowerCase();
+        const escrow = (normalized.escrow_pda || normalized.order_address || normalized.vault_address || '').trim().toLowerCase();
+
+        const isKnown = (sig && seenSignatures.has(sig)) ||
+                        (id && seenIds.has(id)) ||
+                        (escrow && seenEscrows.has(escrow));
+
+        if (isKnown) {
+          const existing = rawHistoryOrders.find((e) => {
+            const eSig = (e.tx_signature || e.purchase_signature || e.signature || '').trim().toLowerCase();
+            const eId = (e.id || '').trim().toLowerCase();
+            const eEscrow = (e.escrow_pda || e.order_address || e.vault_address || '').trim().toLowerCase();
+            return (sig && eSig && sig === eSig) ||
+                   (id && eId && id === eId) ||
+                   (escrow && eEscrow && escrow === eEscrow);
+          });
+          if (existing) {
+            for (const [k, v] of Object.entries(normalized)) {
+              if (v !== undefined && v !== null && (existing[k] === undefined || existing[k] === null || existing[k] === '')) {
+                existing[k] = v;
+              }
+            }
+          }
+          if (sig) seenSignatures.add(sig);
+          if (id) seenIds.add(id);
+          if (escrow) seenEscrows.add(escrow);
+          return;
+        }
+
+        if (sig) seenSignatures.add(sig);
+        if (id) seenIds.add(id);
+        if (escrow) seenEscrows.add(escrow);
+        rawHistoryOrders.push(normalized);
+      };
 
       // Chain orders first (most authoritative on-chain data)
       for (const c of chainOrders) {
@@ -215,28 +256,27 @@ export default function HistoryPage() {
           garment_serial: c.garment_serial,
           shipment_details: c.collected_at ? 'Item collected from atelier pickup station.' : undefined,
         };
-        const key = c.purchase_signature || c.id;
-        mergedMap.set(key, normalized);
-      }
-
-      // Local cached orders
-      for (const loc of localOrders) {
-        const key = loc.tx_signature || loc.id;
-        if (!mergedMap.has(key)) {
-          mergedMap.set(key, loc);
-        }
+        addOrMergeHistoryOrder(normalized);
       }
 
       // DB orders
       for (const d of dbOrders) {
-        const key = d.tx_signature || d.id;
-        if (!mergedMap.has(key)) {
-          mergedMap.set(key, d);
-        }
+        addOrMergeHistoryOrder(d);
+      }
+
+      // Scoped local cached orders
+      const currentWallet = (user?.walletAddress || '').trim().toLowerCase();
+      const currentEmail = (user?.email || '').trim().toLowerCase();
+      for (const loc of localOrders) {
+        const locWallet = (loc.wallet_address || loc.buyer_wallet || '').trim().toLowerCase();
+        const locEmail = (loc.email || '').trim().toLowerCase();
+        if (currentWallet && locWallet && locWallet !== currentWallet) continue;
+        if (currentEmail && locEmail && locEmail !== currentEmail && (!locWallet || locWallet !== currentWallet)) continue;
+        addOrMergeHistoryOrder(loc);
       }
 
       setEditionsMap(em);
-      const combined = Array.from(mergedMap.values()).sort(
+      const combined = rawHistoryOrders.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       setOrders(combined);

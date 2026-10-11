@@ -155,15 +155,49 @@ function PassportContent() {
         setLoading(true);
         const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
         const rawOrders: any[] = [];
-        const seenKeys = new Set<string>();
+        const seenSignatures = new Set<string>();
+        const seenIds = new Set<string>();
+        const seenEscrows = new Set<string>();
 
-        const addOrder = (ord: any) => {
+        const addOrMergeOrder = (ord: any) => {
           if (!ord) return;
-          const key = (ord.id || ord.purchase_signature || ord.tx_signature || '').trim();
-          if (key && !seenKeys.has(key)) {
-            seenKeys.add(key);
-            rawOrders.push(ord);
+          const sig = (ord.purchase_signature || ord.tx_signature || ord.signature || '').trim().toLowerCase();
+          const id = (ord.id || '').trim().toLowerCase();
+          const escrow = (ord.order_address || ord.vault_address || ord.escrow_pda || '').trim().toLowerCase();
+
+          // Check if we already registered this order by signature, id, or escrow
+          const isKnown = (sig && seenSignatures.has(sig)) ||
+                          (id && seenIds.has(id)) ||
+                          (escrow && seenEscrows.has(escrow));
+
+          if (isKnown) {
+            // Find existing record and enrich missing metadata without adding a duplicate wardrobe piece
+            const existing = rawOrders.find((existingOrd) => {
+              const eSig = (existingOrd.purchase_signature || existingOrd.tx_signature || existingOrd.signature || '').trim().toLowerCase();
+              const eId = (existingOrd.id || '').trim().toLowerCase();
+              const eEscrow = (existingOrd.order_address || existingOrd.vault_address || existingOrd.escrow_pda || '').trim().toLowerCase();
+              return (sig && eSig && sig === eSig) ||
+                     (id && eId && id === eId) ||
+                     (escrow && eEscrow && escrow === eEscrow);
+            });
+            if (existing) {
+              for (const [k, v] of Object.entries(ord)) {
+                if (v !== undefined && v !== null && (existing[k] === undefined || existing[k] === null || existing[k] === '')) {
+                  existing[k] = v;
+                }
+              }
+            }
+            if (sig) seenSignatures.add(sig);
+            if (id) seenIds.add(id);
+            if (escrow) seenEscrows.add(escrow);
+            return;
           }
+
+          // Register newly identified order
+          if (sig) seenSignatures.add(sig);
+          if (id) seenIds.add(id);
+          if (escrow) seenEscrows.add(escrow);
+          rawOrders.push({ ...ord });
         };
 
         // 1. If explicit orderIdParam in URL, attempt direct lookup first
@@ -172,12 +206,12 @@ function PassportContent() {
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
             if (uuidRegex.test(orderIdParam)) {
               const chainRes = await backendApi.getChainOrderById(orderIdParam);
-              if (chainRes?.order) addOrder(chainRes.order);
+              if (chainRes?.order) addOrMergeOrder(chainRes.order);
             } else {
               const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(orderIdParam)}`);
               if (res.ok) {
                 const dbOrd = await res.json();
-                if (dbOrd) addOrder(dbOrd);
+                if (dbOrd) addOrMergeOrder(dbOrd);
               }
             }
           } catch (e) {
@@ -185,12 +219,12 @@ function PassportContent() {
           }
         }
 
-        // 2. Fetch authenticated on-chain orders
+        // 2. Fetch authenticated on-chain orders (Authoritative source)
         if (isSignedIn) {
           try {
             const chainRes = await backendApi.getMyChainOrders();
             if (chainRes?.orders && Array.isArray(chainRes.orders)) {
-              chainRes.orders.forEach(addOrder);
+              chainRes.orders.forEach(addOrMergeOrder);
             }
           } catch (e) {
             console.warn('Chain orders query notice:', e);
@@ -202,34 +236,50 @@ function PassportContent() {
           try {
             const dbOrders = await getUserOrders(user.email);
             if (Array.isArray(dbOrders)) {
-              dbOrders.forEach(addOrder);
+              dbOrders.forEach(addOrMergeOrder);
             }
           } catch (e) {
             console.warn('User DB orders query notice:', e);
           }
         }
 
-        // 4. Local storage fallback cache
+        // 4. Local storage fallback cache (Strictly scoped to current wallet / email)
         if (typeof window !== 'undefined') {
           try {
             const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+            const currentWallet = (user?.walletAddress || '').trim().toLowerCase();
+            const currentEmail = (user?.email || '').trim().toLowerCase();
+
             if (Array.isArray(localOrders)) {
-              localOrders.forEach(addOrder);
+              localOrders.forEach((loc) => {
+                const locWallet = (loc.wallet_address || loc.buyer_wallet || '').trim().toLowerCase();
+                const locEmail = (loc.email || '').trim().toLowerCase();
+
+                // If logged in, filter out cached orders from different users or demo runs
+                if (currentWallet && locWallet && locWallet !== currentWallet) return;
+                if (currentEmail && locEmail && locEmail !== currentEmail && (!locWallet || locWallet !== currentWallet)) return;
+
+                addOrMergeOrder(loc);
+              });
             }
-            const cachedId = localStorage.getItem('circuit_last_order_id');
-            const cachedTx = localStorage.getItem('circuit_last_order_tx');
-            if (cachedId && !seenKeys.has(cachedId)) {
-              const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedId)}`);
-              if (res.ok) {
-                const dbOrd = await res.json();
-                if (dbOrd) addOrder(dbOrd);
+
+            // Fallback: If no orders found yet, check cached order ids
+            if (rawOrders.length === 0) {
+              const cachedId = localStorage.getItem('circuit_last_order_id');
+              const cachedTx = localStorage.getItem('circuit_last_order_tx');
+              if (cachedId) {
+                const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedId)}`);
+                if (res.ok) {
+                  const dbOrd = await res.json();
+                  if (dbOrd) addOrMergeOrder(dbOrd);
+                }
               }
-            }
-            if (cachedTx && !seenKeys.has(cachedTx)) {
-              const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedTx)}`);
-              if (res.ok) {
-                const dbOrd = await res.json();
-                if (dbOrd) addOrder(dbOrd);
+              if (cachedTx) {
+                const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedTx)}`);
+                if (res.ok) {
+                  const dbOrd = await res.json();
+                  if (dbOrd) addOrMergeOrder(dbOrd);
+                }
               }
             }
           } catch {}
@@ -436,51 +486,95 @@ function PassportContent() {
             </div>
           </div>
 
-          {/* Interactive Multi-Drop Wardrobe Switcher */}
+          {/* Interactive Multi-Drop Digital Wardrobe Grid (No Horizontal Scrolling) */}
           {wardrobe.length > 1 && (
-            <div className="mb-10 p-3 rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-xl relative z-10">
-              <div className="text-[0.6rem] font-mono uppercase tracking-widest text-white/40 mb-2 px-1">
-                Select Garment Passport to Inspect:
+            <div className="mb-12 p-5 md:p-6 rounded-3xl bg-white/[0.02] border border-white/[0.08] backdrop-blur-2xl relative z-10 shadow-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 px-1 pb-3 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                  <span className="text-[0.65rem] font-mono uppercase tracking-[0.2em] text-white/70 font-semibold">
+                    Digital Wardrobe Collection ({wardrobe.length} Pieces)
+                  </span>
+                </div>
+                <span className="text-[0.6rem] font-mono text-white/40">
+                  Select a garment passport below to inspect identity & verification
+                </span>
               </div>
-              <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-thin">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {wardrobe.map((piece) => {
-                  const isSelected = piece.id === (order?.id || orderId) || piece.order?.id === (order?.id || orderId) || piece.order?.purchase_signature === (order?.id || orderId);
+                  const activeKey = order?.id || orderId || order?.purchase_signature || order?.tx_signature;
+                  const isSelected =
+                    piece.id === activeKey ||
+                    piece.order?.id === activeKey ||
+                    piece.order?.purchase_signature === activeKey ||
+                    piece.order?.tx_signature === activeKey;
                   const isPieceMinted = ['produced', 'shipped', 'delivered'].includes(piece.status);
+                  const isPieceCancelled = piece.status === 'cancelled' || piece.order?.cancelled;
+
                   return (
                     <button
                       key={piece.id}
                       type="button"
                       onClick={() => handleSelectPiece(piece)}
-                      className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all duration-300 shrink-0 cursor-pointer ${
+                      className={`relative flex items-center gap-3.5 p-3.5 rounded-2xl border text-left transition-all duration-300 cursor-pointer group ${
                         isSelected
-                          ? 'bg-white text-black border-white shadow-[0_0_25px_rgba(255,255,255,0.25)] scale-[1.01]'
-                          : 'bg-black/50 text-white/70 border-white/10 hover:border-white/30 hover:text-white hover:bg-white/[0.04]'
+                          ? 'bg-white text-black border-white shadow-[0_10px_30px_rgba(255,255,255,0.15)] ring-1 ring-white/50 scale-[1.01]'
+                          : 'bg-black/60 text-white/80 border-white/10 hover:border-white/30 hover:bg-white/[0.04] hover:text-white'
                       }`}
                     >
-                      <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-white/20 shrink-0 bg-neutral-900">
+                      {/* Luxury thumbnail */}
+                      <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-white/15 shrink-0 bg-neutral-900 shadow-md">
                         <Image
                           src={piece.thumbnail}
                           alt={piece.displayTitle}
                           fill
-                          className="object-cover"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-white/10 ring-1 ring-inset ring-black/20" />
+                        )}
                       </div>
-                      <div className="flex flex-col min-w-0 pr-1">
-                        <span className="text-xs font-bold tracking-tight truncate max-w-[150px]">
-                          {piece.displayTitle}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-[0.6rem] font-mono opacity-80">
-                          <span className={`w-1.5 h-1.5 rounded-full ${isPieceMinted ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-                          <span>Size {piece.size}</span>
-                          <span>•</span>
-                          <span className="uppercase">{piece.status}</span>
+
+                      {/* Info & Badges */}
+                      <div className="flex flex-col min-w-0 flex-1 pr-1">
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="text-xs font-bold tracking-tight truncate">
+                            {piece.displayTitle}
+                          </span>
+                          {isSelected && (
+                            <span className="shrink-0 text-[0.55rem] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-black text-white">
+                              Active
+                            </span>
+                          )}
                         </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 text-[0.65rem] font-mono">
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-black/10 text-black/80 font-medium' : 'bg-white/5 text-white/70'
+                          }`}>
+                            Size {piece.size}
+                          </span>
+                          <span>•</span>
+                          <span className={`inline-flex items-center gap-1 font-semibold uppercase ${
+                            isPieceCancelled ? 'text-red-500' :
+                            isPieceMinted ? (isSelected ? 'text-emerald-700' : 'text-emerald-400') :
+                            (isSelected ? 'text-amber-700' : 'text-amber-400')
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              isPieceCancelled ? 'bg-red-500' :
+                              isPieceMinted ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                            }`} />
+                            {piece.status}
+                          </span>
+                        </div>
+
+                        {piece.garmentSerial && (
+                          <span className={`text-[0.6rem] font-mono mt-1 ${isSelected ? 'text-black/60' : 'text-white/40'}`}>
+                            Serial #{piece.garmentSerial}
+                          </span>
+                        )}
                       </div>
-                      {isSelected && (
-                        <span className="ml-1 text-[0.55rem] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-black text-white">
-                          Viewing
-                        </span>
-                      )}
                     </button>
                   );
                 })}
