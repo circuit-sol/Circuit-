@@ -203,17 +203,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
     try {
       setAuthStatusText('Preparing challenge...');
-      const challenge = await backendApi.getChallenge(targetAddress);
+
+      // Timeout helper to prevent infinite hanging on mobile app switches
+      const withTimeout = <T,>(p: Promise<T>, ms: number, msg: string): Promise<T> =>
+        Promise.race([
+          p,
+          new Promise<T>((_, reject) => setTimeout(() => reject(new Error(msg)), ms)),
+        ]);
+
+      // Step 1: Get one-time challenge containing the exact message to sign
+      const challenge = await withTimeout(
+        backendApi.getChallenge(targetAddress),
+        15000,
+        'Network timeout requesting sign-in challenge. Please check your connection and try again.'
+      );
 
       setAuthStatusText('Confirm sign-in in Phantom...');
       const messageBytes = new TextEncoder().encode(challenge.message);
 
-      // 25s timeout so user is never frozen indefinitely on mobile
-      const signPromise = signFn(messageBytes);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Sign-in request timed out in Phantom. Please tap Continue with Phantom to try again.')), 25000)
+      // Step 2: Sign the exact backend message (45s timeout for mobile switching)
+      const sigResult = await withTimeout(
+        signFn(messageBytes),
+        45000,
+        'Wallet signature request timed out or was dismissed in Phantom.'
       );
-      const sigResult = await Promise.race([signPromise, timeoutPromise]);
 
       setAuthStatusText('Verifying on Circuit...');
       const rawSig = (sigResult as any)?.signature instanceof Uint8Array
@@ -223,7 +236,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         : (sigResult as any)?.signature || sigResult;
 
       const signatureBs58 = utils.bytes.bs58.encode(rawSig);
-      const authData = await backendApi.verifySignature(targetAddress, signatureBs58, challenge.nonce);
+
+      // Step 3: Verify on backend → receive JWT & user profile
+      const authData = await withTimeout(
+        backendApi.verifySignature(targetAddress, signatureBs58, challenge.nonce),
+        15000,
+        'Verification request timed out. Please try signing in again.'
+      );
 
       backendApi.setSessionToken(authData.token);
       setStoredSession(authData.token, targetAddress, authData.user.email);
@@ -244,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log(`%c⚡ Circuit: Authenticated via SIWS — ${targetAddress}`, 'color: #D1D1D1; font-weight: bold;');
     } catch (err: any) {
-      console.error('SIWS authentication failed:', err);
+      console.error('SIWS authentication failed:', err?.message || err);
       const rawMsg = err?.message || 'Authentication failed. Please try again.';
       const isReject = /reject|cancel|denied/i.test(rawMsg);
       setAuthError(isReject ? 'Sign-in cancelled in Phantom. Tap to retry.' : rawMsg);

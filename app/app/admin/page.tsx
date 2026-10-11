@@ -167,47 +167,57 @@ export default function AdminDashboard() {
         console.warn('Could not fetch brands:', brandErr);
       }
 
-      // 3. Fetch Orders (with local storage fallback)
+      // 3. Multi-Source Orders Aggregation (DB, Chain Orders, Batch Orders, and Local Storage)
+      const allOrdersMap = new Map<string, Order>();
+
+      const addAdminOrder = (o: any, fallbackDropId?: string) => {
+        if (!o) return;
+        const key = o.id || o.purchase_signature || o.tx_signature;
+        if (!key || allOrdersMap.has(key)) return;
+        allOrdersMap.set(key, {
+          id: key,
+          email: o.email || (o.buyer_wallet ? `${(o.buyer_wallet || '').slice(0, 4)}...${(o.buyer_wallet || '').slice(-4)}@sol.wallet` : 'buyer@circuit.sol'),
+          drop_id: o.drop_id || fallbackDropId || 'circuit-demo-drop-001',
+          status: o.status || (o.cancelled ? 'cancelled' : 'confirmed'),
+          tx_signature: o.purchase_signature || o.tx_signature || key,
+          created_at: o.purchased_at || o.created_at || new Date().toISOString(),
+          size: o.size || 'Medium',
+          amount_usd: o.amount_usd || (o.amount_lamports ? Number(BigInt(o.amount_lamports)) / 1e9 * 150 : 120),
+          garment_serial: o.garment_serial,
+          delivery_location: o.delivery_location,
+          delivery_address: o.delivery_address,
+          shipment_details: o.shipment_details,
+        });
+      };
+
+      // Source A: Try /api/db/orders endpoint
       try {
         const res = await fetch(`${BASE}/api/db/orders`);
         if (res.ok) {
           const ord = await res.json();
-          const ordersList = ord || [];
-          setOrders(ordersList);
+          if (Array.isArray(ord)) ord.forEach((o) => addAdminOrder(o));
+        }
+      } catch (_) {}
 
-          const statesMap: typeof editableStates = {};
-          ordersList.forEach((o: Order) => {
-            statesMap[o.id] = {
-              status: o.status || 'pending',
-              serial: o.garment_serial || '',
-              shipmentDetails: o.shipment_details || '',
-            };
-          });
-          setEditableStates(statesMap);
-        } else {
-          if (typeof window !== 'undefined') {
-            const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-            setOrders(localOrders);
-            const statesMap: typeof editableStates = {};
-            localOrders.forEach((o: Order) => {
-              statesMap[o.id] = {
-                status: o.status || 'pending',
-                serial: o.garment_serial || '',
-                shipmentDetails: o.shipment_details || '',
-              };
-            });
-            setEditableStates(statesMap);
-          }
+      // Source B: Chain orders for authenticated wallet
+      try {
+        const chainRes = await backendApi.getMyChainOrders();
+        if (chainRes?.orders && Array.isArray(chainRes.orders)) {
+          chainRes.orders.forEach((o) => addAdminOrder(o));
         }
-      } catch (orderErr) {
-        console.warn('Orders endpoint notice:', orderErr);
-        if (typeof window !== 'undefined') {
+      } catch (_) {}
+
+      // Source C: Local storage cached receipts
+      if (typeof window !== 'undefined') {
+        try {
           const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-          setOrders(localOrders);
-        }
+          if (Array.isArray(localOrders)) {
+            localOrders.forEach((o) => addAdminOrder(o));
+          }
+        } catch (_) {}
       }
 
-      // 4. Fetch Editions & Batches
+      // 4. Fetch Editions & Batches, and pull orders for each active batch
       const editionsList = await getEditions(false);
       setEditions(editionsList || []);
 
@@ -216,11 +226,33 @@ export default function AdminDashboard() {
           const bRes = await backendApi.getMyBatches({ editionId: ed.id });
           if (bRes?.batches) {
             setBatchesByEdition(prev => ({ ...prev, [ed.id]: bRes.batches }));
+            for (const b of bRes.batches) {
+              try {
+                const oRes = await backendApi.getBatchOrders(b.id);
+                if (oRes?.orders && Array.isArray(oRes.orders)) {
+                  oRes.orders.forEach((o) => addAdminOrder(o, ed.id));
+                }
+              } catch (_) {}
+            }
           }
         } catch (e) {
           console.warn(`Could not load batches for ${ed.id}:`, e);
         }
       }
+
+      // Populate final aggregated orders list
+      const ordersList = Array.from(allOrdersMap.values());
+      setOrders(ordersList);
+
+      const statesMap: typeof editableStates = {};
+      ordersList.forEach((o: Order) => {
+        statesMap[o.id] = {
+          status: o.status || 'pending',
+          serial: o.garment_serial || '',
+          shipmentDetails: o.shipment_details || '',
+        };
+      });
+      setEditableStates(statesMap);
 
       // 5. Load Stored Approvals & Brand Suspensions
       if (typeof window !== 'undefined') {

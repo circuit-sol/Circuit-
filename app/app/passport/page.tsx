@@ -13,10 +13,25 @@ import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 
+export interface WardrobePiece {
+  id: string;
+  order: any;
+  edition: any;
+  batch: backendApi.Batch | null;
+  displayTitle: string;
+  thumbnail: string;
+  size: string;
+  quantity: number;
+  status: string;
+  garmentSerial?: string;
+  createdAt: string;
+}
+
 function PassportContent() {
   const searchParams = useSearchParams();
-  const orderIdParam = searchParams.get('order');
+  const orderIdParam = searchParams.get('order') || searchParams.get('orderId');
   const [orderId, setOrderId] = useState<string | null>(orderIdParam);
+  const [wardrobe, setWardrobe] = useState<WardrobePiece[]>([]);
   const [order, setOrder] = useState<any>(null);
   const [edition, setEdition] = useState<any>(null);
   const [batch, setBatch] = useState<backendApi.Batch | null>(null);
@@ -36,6 +51,20 @@ function PassportContent() {
   const { user, isSignedIn } = useAuth();
   const { signTransaction } = useWallet();
 
+  const handleSelectPiece = (piece: WardrobePiece) => {
+    setOrderId(piece.id);
+    setOrder(piece.order);
+    setBatch(piece.batch);
+    setEdition(piece.edition);
+    setIsComplimented(false);
+    setIsReported(false);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('order', piece.id);
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
   const handleConfirmCollection = async () => {
     if (!order) return;
     setConfirmingReceipt(true);
@@ -47,6 +76,7 @@ function PassportContent() {
       }
       await updateOrderStatusLifecycle(order.id, 'collected');
       setOrder((prev: any) => ({ ...prev, status: 'collected', collected_at: new Date().toISOString() }));
+      setWardrobe((prev) => prev.map((w) => w.id === order.id ? { ...w, status: 'delivered', order: { ...w.order, status: 'collected', collected_at: new Date().toISOString() } } : w));
       showToast('✓ Pickup Recorded', 'Item collection logged on-chain. Note: Seller 70% balance payout will release 7 days post-release date.');
     } catch (err) {
       console.error(err);
@@ -63,6 +93,7 @@ function PassportContent() {
     try {
       await executeVerifiedCancel(order.id, signTransaction);
       setOrder((prev: any) => ({ ...prev, cancelled: true, status: 'cancelled' }));
+      setWardrobe((prev) => prev.map((w) => w.id === order.id ? { ...w, status: 'cancelled', order: { ...w.order, cancelled: true, status: 'cancelled' } } : w));
       showToast('✓ Order Cancelled', 'Refund returned to your wallet on Solana devnet.');
     } catch (err) {
       console.error(err);
@@ -115,151 +146,226 @@ function PassportContent() {
     }
   };
 
-  // Sync orderId parameter, retrieve active authenticated orders, or fallback to cached order
+  // Unified Wardrobe Resolution: Resolves all purchases (chain, db, cache) into the digital wardrobe
   useEffect(() => {
-    async function resolveOrderId() {
-      if (orderIdParam) {
-        setOrderId(orderIdParam);
-        return;
-      }
+    let isCancelled = false;
 
-      // 1. Check verified chain orders if authenticated with active wallet
-      if (isSignedIn) {
-        try {
-          const chainRes = await backendApi.getMyChainOrders();
-          if (chainRes?.orders && chainRes.orders.length > 0) {
-            const latest = chainRes.orders[0];
-            // Prefer latest.id (UUID) for direct backend API order lookup
-            setOrderId(latest.id || latest.purchase_signature);
-            return;
+    async function loadWardrobe() {
+      try {
+        setLoading(true);
+        const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+        const rawOrders: any[] = [];
+        const seenKeys = new Set<string>();
+
+        const addOrder = (ord: any) => {
+          if (!ord) return;
+          const key = (ord.id || ord.purchase_signature || ord.tx_signature || '').trim();
+          if (key && !seenKeys.has(key)) {
+            seenKeys.add(key);
+            rawOrders.push(ord);
           }
-        } catch (e) {
-          console.warn('Chain orders query notice:', e);
-        }
-      }
+        };
 
-      // 2. Query database for user's email if available
-      if (isSignedIn && user?.email) {
-        try {
-          const orders = await getUserOrders(user.email);
-          if (orders && orders.length > 0) {
-            const latestOrder = orders[0];
-            setOrderId(latestOrder.id || latestOrder.tx_signature);
-            return;
+        // 1. If explicit orderIdParam in URL, attempt direct lookup first
+        if (orderIdParam) {
+          try {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(orderIdParam)) {
+              const chainRes = await backendApi.getChainOrderById(orderIdParam);
+              if (chainRes?.order) addOrder(chainRes.order);
+            } else {
+              const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(orderIdParam)}`);
+              if (res.ok) {
+                const dbOrd = await res.json();
+                if (dbOrd) addOrder(dbOrd);
+              }
+            }
+          } catch (e) {
+            console.warn('Direct orderIdParam lookup notice:', e);
           }
-        } catch (err) {
-          console.error('Error resolving fallback order:', err);
         }
-      }
 
-      // 3. Fallback: check localStorage cache
-      if (typeof window !== 'undefined') {
-        const cachedId = localStorage.getItem('circuit_last_order_id');
-        const cachedTx = localStorage.getItem('circuit_last_order_tx');
-        if (cachedId) {
-          setOrderId(cachedId);
+        // 2. Fetch authenticated on-chain orders
+        if (isSignedIn) {
+          try {
+            const chainRes = await backendApi.getMyChainOrders();
+            if (chainRes?.orders && Array.isArray(chainRes.orders)) {
+              chainRes.orders.forEach(addOrder);
+            }
+          } catch (e) {
+            console.warn('Chain orders query notice:', e);
+          }
+        }
+
+        // 3. Fetch DB orders associated with the user's email
+        if (isSignedIn && user?.email) {
+          try {
+            const dbOrders = await getUserOrders(user.email);
+            if (Array.isArray(dbOrders)) {
+              dbOrders.forEach(addOrder);
+            }
+          } catch (e) {
+            console.warn('User DB orders query notice:', e);
+          }
+        }
+
+        // 4. Local storage fallback cache
+        if (typeof window !== 'undefined') {
+          try {
+            const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+            if (Array.isArray(localOrders)) {
+              localOrders.forEach(addOrder);
+            }
+            const cachedId = localStorage.getItem('circuit_last_order_id');
+            const cachedTx = localStorage.getItem('circuit_last_order_tx');
+            if (cachedId && !seenKeys.has(cachedId)) {
+              const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedId)}`);
+              if (res.ok) {
+                const dbOrd = await res.json();
+                if (dbOrd) addOrder(dbOrd);
+              }
+            }
+            if (cachedTx && !seenKeys.has(cachedTx)) {
+              const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedTx)}`);
+              if (res.ok) {
+                const dbOrd = await res.json();
+                if (dbOrd) addOrder(dbOrd);
+              }
+            }
+          } catch {}
+        }
+
+        if (isCancelled) return;
+
+        if (rawOrders.length === 0) {
+          setWardrobe([]);
+          setOrder(null);
+          setBatch(null);
+          setEdition(null);
+          setLoading(false);
           return;
         }
-        if (cachedTx) {
-          setOrderId(cachedTx);
-          return;
+
+        // 5. Build Wardrobe Pieces with cached batch & edition metadata resolution
+        const batchCache = new Map<string, backendApi.Batch | null>();
+        const editionCache = new Map<string, any>();
+
+        const pieces: WardrobePiece[] = await Promise.all(
+          rawOrders.map(async (ord: any) => {
+            let batchData: backendApi.Batch | null = null;
+            if (ord.batch_id) {
+              if (batchCache.has(ord.batch_id)) {
+                batchData = batchCache.get(ord.batch_id)!;
+              } else {
+                try {
+                  const bRes = await backendApi.getPublicBatchById(ord.batch_id);
+                  batchData = bRes?.batch || null;
+                } catch {
+                  batchData = null;
+                }
+                batchCache.set(ord.batch_id, batchData);
+              }
+            }
+
+            const editionId = ord.drop_id || batchData?.edition_id;
+            let editionData = null;
+            if (editionId) {
+              if (editionCache.has(editionId)) {
+                editionData = editionCache.get(editionId);
+              } else {
+                try {
+                  editionData = await getEditionById(editionId);
+                } catch {
+                  editionData = null;
+                }
+                editionCache.set(editionId, editionData);
+              }
+            }
+
+            const finalEdition = editionData || DEFAULT_CIRCUIT_EDITION;
+            const pieceId = ord.id || ord.purchase_signature || ord.tx_signature;
+
+            return {
+              id: pieceId,
+              order: ord,
+              edition: finalEdition,
+              batch: batchData,
+              displayTitle: finalEdition?.name || batchData?.name || ord.drop_name || 'Circuit Garment',
+              thumbnail: finalEdition?.images?.[0]?.url || '/satin.png',
+              size: ord.size || 'M',
+              quantity: ord.quantity || 1,
+              status: ord.status || 'pending',
+              garmentSerial: ord.garment_serial,
+              createdAt: ord.created_at || new Date().toISOString(),
+            };
+          })
+        );
+
+        if (isCancelled) return;
+
+        // Sort by creation date descending (newest first)
+        pieces.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        // Determine currently active piece
+        let selectedPiece = pieces[0];
+        const targetId = orderIdParam || orderId;
+        if (targetId) {
+          const match = pieces.find(
+            (p) => p.id === targetId || p.order?.id === targetId || p.order?.purchase_signature === targetId || p.order?.tx_signature === targetId
+          );
+          if (match) selectedPiece = match;
+        }
+
+        setWardrobe(pieces);
+        setOrderId(selectedPiece.id);
+        setOrder(selectedPiece.order);
+        setBatch(selectedPiece.batch);
+        setEdition(selectedPiece.edition);
+      } catch (err) {
+        console.error('Error loading digital wardrobe:', err);
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
         }
       }
-
-      setLoading(false);
     }
 
-    resolveOrderId();
+    loadWardrobe();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [orderIdParam, isSignedIn, user?.walletAddress, user?.email]);
 
+  const [serverSkewMs, setServerSkewMs] = useState(0);
+
+  // Sync cluster time offset via HTTP response headers to eliminate client clock drift
   useEffect(() => {
-    if (orderId) {
-      fetchOrderAndEdition();
-    }
-  }, [orderId]);
-
-  async function fetchOrderAndEdition() {
-    try {
-      setLoading(true);
-      const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
-      let ord: any = null;
-
-      // 1. Check chain order by ID or signature
-      if (isSignedIn) {
-        try {
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-          if (uuidRegex.test(orderId!)) {
-            const chainRes = await backendApi.getChainOrderById(orderId!);
-            if (chainRes?.order) ord = chainRes.order;
-          } else {
-            // It could be a Solana transaction signature; find in getMyChainOrders
-            const chainRes = await backendApi.getMyChainOrders();
-            if (chainRes?.orders) {
-              ord = chainRes.orders.find((o) => o.purchase_signature === orderId || o.id === orderId);
-            }
+    const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+    fetch(`${BASE}/api/batches?limit=1`, { method: 'HEAD' })
+      .then((res) => {
+        const dateHeader = res.headers.get('date');
+        if (dateHeader) {
+          const serverTime = Date.parse(dateHeader);
+          if (!isNaN(serverTime)) {
+            setServerSkewMs(serverTime - Date.now());
           }
-        } catch (chainErr) {
-          console.warn('Chain order lookup notice:', chainErr);
         }
-      }
+      })
+      .catch(() => {});
+  }, []);
 
-      // 2. If not found, query DB orders by tx signature or ID
-      if (!ord) {
-        try {
-          const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(orderId!)}`);
-          if (res.ok) {
-            ord = await res.json();
-          }
-        } catch {}
-      }
-
-      // 3. Check local storage fallback
-      if (!ord && typeof window !== 'undefined') {
-        try {
-          const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-          ord = localOrders.find((o: any) => o.tx_signature === orderId || o.id === orderId);
-        } catch {}
-      }
-
-      if (!ord) throw new Error('Order not found');
-
-      setOrder(ord);
-
-      // Now resolve Batch & Edition metadata
-      let batchData: backendApi.Batch | null = null;
-      if (ord.batch_id) {
-        try {
-          const bRes = await backendApi.getPublicBatchById(ord.batch_id);
-          if (bRes?.batch) {
-            batchData = bRes.batch;
-            setBatch(bRes.batch);
-          }
-        } catch {}
-      }
-
-      // Resolve Edition: either directly from ord.drop_id, or from batchData.edition_id!
-      const editionId = ord.drop_id || batchData?.edition_id;
-      if (editionId) {
-        try {
-          const ed = await getEditionById(editionId);
-          if (ed) setEdition(ed);
-        } catch {}
-      }
-    } catch (err) {
-      console.error('Error fetching dynamic passport records:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Active 24-hour individual cancellation countdown ticker
+  // Active 24-hour individual cancellation countdown ticker (cluster-synchronized)
   useEffect(() => {
     if (!order || order.cancelled) return;
     const calculateRemaining = () => {
+      const nowCluster = Date.now() + serverSkewMs;
       const cancelUntil = order.cancel_until
         ? new Date(order.cancel_until).getTime()
-        : new Date(order.created_at || Date.now()).getTime() + 86400000;
-      const diff = cancelUntil - Date.now();
+        : new Date(order.created_at || nowCluster).getTime() + 86400000;
+      
+      // 30-second on-chain confirmation safety buffer to protect user from expired txs
+      const diff = cancelUntil - nowCluster - 30000;
       if (diff <= 0) {
         setCancelCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
         return;
@@ -273,7 +379,7 @@ function PassportContent() {
     calculateRemaining();
     const interval = setInterval(calculateRemaining, 1000);
     return () => clearInterval(interval);
-  }, [order]);
+  }, [order, serverSkewMs]);
 
   if (loading) {
     return (
@@ -315,12 +421,72 @@ function PassportContent() {
       <main className="flex-1 flex flex-col py-24 md:py-32">
         <div className="section-container">
           
-          {/* Header Portal Navigation */}
-          <div className="flex justify-end mb-8 relative z-10">
-            <a href="/passport/history" className="btn-outline-circuit py-2 px-6 text-[0.65rem] border-white/10 hover:border-white/20">
-              View My Orders ➔
-            </a>
+          {/* Header & Digital Wardrobe Selector */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 relative z-10">
+            <div className="flex items-center gap-3">
+              <span className="text-[0.65rem] uppercase tracking-[0.2em] text-white/50 font-mono">Digital Wardrobe</span>
+              <span className="text-[0.6rem] font-mono px-2.5 py-0.5 rounded-full bg-white/10 text-white/90 border border-white/10">
+                {wardrobe.length} {wardrobe.length === 1 ? 'Piece' : 'Pieces'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <a href="/passport/history" className="btn-outline-circuit py-2 px-5 text-[0.65rem] border-white/10 hover:border-white/30 text-white/80 hover:text-white transition-all">
+                Full Order Archive ➔
+              </a>
+            </div>
           </div>
+
+          {/* Interactive Multi-Drop Wardrobe Switcher */}
+          {wardrobe.length > 1 && (
+            <div className="mb-10 p-3 rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-xl relative z-10">
+              <div className="text-[0.6rem] font-mono uppercase tracking-widest text-white/40 mb-2 px-1">
+                Select Garment Passport to Inspect:
+              </div>
+              <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-thin">
+                {wardrobe.map((piece) => {
+                  const isSelected = piece.id === (order?.id || orderId) || piece.order?.id === (order?.id || orderId) || piece.order?.purchase_signature === (order?.id || orderId);
+                  const isPieceMinted = ['produced', 'shipped', 'delivered'].includes(piece.status);
+                  return (
+                    <button
+                      key={piece.id}
+                      type="button"
+                      onClick={() => handleSelectPiece(piece)}
+                      className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all duration-300 shrink-0 cursor-pointer ${
+                        isSelected
+                          ? 'bg-white text-black border-white shadow-[0_0_25px_rgba(255,255,255,0.25)] scale-[1.01]'
+                          : 'bg-black/50 text-white/70 border-white/10 hover:border-white/30 hover:text-white hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-white/20 shrink-0 bg-neutral-900">
+                        <Image
+                          src={piece.thumbnail}
+                          alt={piece.displayTitle}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex flex-col min-w-0 pr-1">
+                        <span className="text-xs font-bold tracking-tight truncate max-w-[150px]">
+                          {piece.displayTitle}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[0.6rem] font-mono opacity-80">
+                          <span className={`w-1.5 h-1.5 rounded-full ${isPieceMinted ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                          <span>Size {piece.size}</span>
+                          <span>•</span>
+                          <span className="uppercase">{piece.status}</span>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="ml-1 text-[0.55rem] font-mono uppercase font-bold px-2 py-0.5 rounded-full bg-black text-white">
+                          Viewing
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
             

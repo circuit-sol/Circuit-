@@ -123,14 +123,54 @@ export default function CreatorStudioPage() {
             const res = await backendApi.getMyBatches({ editionId: ed.id });
             if (res?.batches) {
               batchMap[ed.id] = res.batches;
-              // Fetch orders for active batches
+              // Fetch orders for active batches (combining on-chain batch orders with client receipts)
               for (const b of res.batches) {
+                const batchOrdersMap = new Map<string, any>();
                 try {
                   const oRes = await backendApi.getBatchOrders(b.id);
-                  if (oRes?.orders) {
-                    setOrdersByBatch(prev => ({ ...prev, [b.id]: oRes.orders }));
+                  if (oRes?.orders && Array.isArray(oRes.orders)) {
+                    oRes.orders.forEach((o) => {
+                      const key = o.id || o.purchase_signature;
+                      if (key) batchOrdersMap.set(key, o);
+                    });
                   }
                 } catch (_) {}
+
+                // Merge local cache orders for this batch or edition
+                if (typeof window !== 'undefined') {
+                  try {
+                    const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+                    localOrders.forEach((o: any) => {
+                      if ((o.batch_id === b.id || o.drop_id === ed.id) && !o.cancelled) {
+                        const key = o.id || o.tx_signature;
+                        if (key && !batchOrdersMap.has(key)) {
+                          batchOrdersMap.set(key, {
+                            id: key,
+                            batch_id: b.id,
+                            user_id: user?.id || 'demo-user',
+                            buyer_wallet: user?.walletAddress || 'buyer.sol',
+                            order_address: o.order_address || '',
+                            vault_address: o.vault_address || '',
+                            pickup_location_id: o.pickup_location_id || '',
+                            size: o.size || 'Medium',
+                            quantity: o.quantity || 1,
+                            amount_lamports: '100000000',
+                            purchase_signature: o.tx_signature || '',
+                            purchased_at: o.created_at || new Date().toISOString(),
+                            cancel_until: new Date(Date.now() + 86400000).toISOString(),
+                            cancelled: false,
+                            refunded_lamports: '0',
+                          });
+                        }
+                      }
+                    });
+                  } catch (_) {}
+                }
+
+                if (batchOrdersMap.size > 0) {
+                  const resolvedList = Array.from(batchOrdersMap.values());
+                  setOrdersByBatch(prev => ({ ...prev, [b.id]: resolvedList }));
+                }
               }
             }
           } catch (_) {}
