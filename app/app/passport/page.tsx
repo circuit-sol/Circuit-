@@ -337,14 +337,35 @@ function PassportContent() {
     };
   }, [orderIdParam, isSignedIn, user?.walletAddress, user?.email]);
 
-  // Active 24-hour individual cancellation countdown ticker
+  const [serverSkewMs, setServerSkewMs] = useState(0);
+
+  // Sync cluster time offset via HTTP response headers to eliminate client clock drift
+  useEffect(() => {
+    const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+    fetch(`${BASE}/api/batches?limit=1`, { method: 'HEAD' })
+      .then((res) => {
+        const dateHeader = res.headers.get('date');
+        if (dateHeader) {
+          const serverTime = Date.parse(dateHeader);
+          if (!isNaN(serverTime)) {
+            setServerSkewMs(serverTime - Date.now());
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Active 24-hour individual cancellation countdown ticker (cluster-synchronized)
   useEffect(() => {
     if (!order || order.cancelled) return;
     const calculateRemaining = () => {
+      const nowCluster = Date.now() + serverSkewMs;
       const cancelUntil = order.cancel_until
         ? new Date(order.cancel_until).getTime()
-        : new Date(order.created_at || Date.now()).getTime() + 86400000;
-      const diff = cancelUntil - Date.now();
+        : new Date(order.created_at || nowCluster).getTime() + 86400000;
+      
+      // 30-second on-chain confirmation safety buffer to protect user from expired txs
+      const diff = cancelUntil - nowCluster - 30000;
       if (diff <= 0) {
         setCancelCountdown({ hours: 0, minutes: 0, seconds: 0, isExpired: true });
         return;
@@ -358,7 +379,7 @@ function PassportContent() {
     calculateRemaining();
     const interval = setInterval(calculateRemaining, 1000);
     return () => clearInterval(interval);
-  }, [order]);
+  }, [order, serverSkewMs]);
 
   if (loading) {
     return (
