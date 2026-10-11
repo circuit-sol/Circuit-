@@ -55,6 +55,18 @@ export default function CreatorStudioPage() {
   const [editingBatchRevision, setEditingBatchRevision] = useState<number>(1);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
+  // Launch Schedule Mode: 'immediate' (Opens in 15 mins) | 'scheduled' (Custom future date)
+  const [scheduleMode, setScheduleMode] = useState<'immediate' | 'scheduled'>('immediate');
+  const [scheduleWarningModal, setScheduleWarningModal] = useState<{
+    isOpen: boolean;
+    pastTimeStr: string;
+    onAutoAdjustAndPublish: () => void;
+  }>({
+    isOpen: false,
+    pastTimeStr: '',
+    onAutoAdjustAndPublish: () => {},
+  });
+
   // Step 1: Edition Design Form
   const [editionForm, setEditionForm] = useState({
     id: '',
@@ -525,7 +537,7 @@ export default function CreatorStudioPage() {
   };
 
   // 3-Step Wizard Execution: Deploy Preorder Vault to Solana
-  const handleDeployToSolana = async () => {
+  const deployWithOpeningTime = async (safeOpensMs: number) => {
     const activeBrand = await ensureValidBrand();
     if (!activeBrand) {
       showToast('Brand Required', 'Please connect and sign in with your creator wallet to initialize your atelier brand.');
@@ -547,10 +559,6 @@ export default function CreatorStudioPage() {
       return;
     }
 
-    // Date validations with safe future buffer for Solana clock
-    const rawOpensMs = new Date(batchForm.opens_at).getTime();
-    const MIN_OPEN_BUFFER_MS = 600000;
-    const safeOpensMs = Math.max(isNaN(rawOpensMs) ? Date.now() + MIN_OPEN_BUFFER_MS : rawOpensMs, Date.now() + MIN_OPEN_BUFFER_MS);
     const closesMs = Math.max(new Date(batchForm.closes_at).getTime(), safeOpensMs + 86400000);
     const prodMs = Math.max(new Date(batchForm.production_starts_at).getTime(), closesMs + 48 * 3600000 + 3600000);
     const relMs = Math.max(new Date(batchForm.release_at).getTime(), prodMs + 86400000);
@@ -748,6 +756,38 @@ export default function CreatorStudioPage() {
       setIsDeploying(false);
       setDeployStepText('');
     }
+  };
+
+  const handleDeployToSolana = async () => {
+    const nowMs = Date.now();
+    let rawOpensMs = new Date(batchForm.opens_at).getTime();
+
+    // In immediate mode: deploy with safe 15-minute future buffer automatically
+    if (scheduleMode === 'immediate') {
+      const immediateOpensMs = nowMs + 900000; // 15 mins
+      deployWithOpeningTime(immediateOpensMs);
+      return;
+    }
+
+    // In scheduled mode: check if the selected launch time has passed or is < 10 mins away
+    const minBufferMs = 600000; // 10 minutes
+    if (isNaN(rawOpensMs) || rawOpensMs < nowMs + minBufferMs) {
+      const pastTimeStr = !isNaN(rawOpensMs) ? new Date(rawOpensMs).toLocaleString() : 'Selected date';
+      setScheduleWarningModal({
+        isOpen: true,
+        pastTimeStr,
+        onAutoAdjustAndPublish: () => {
+          setScheduleWarningModal(prev => ({ ...prev, isOpen: false }));
+          setScheduleMode('immediate');
+          const autoOpens = new Date(Date.now() + 900000);
+          setBatchForm(prev => ({ ...prev, opens_at: autoOpens.toISOString().slice(0, 16) }));
+          deployWithOpeningTime(autoOpens.getTime());
+        },
+      });
+      return;
+    }
+
+    deployWithOpeningTime(rawOpensMs);
   };
 
   // Creator Escrow Payout Claim (Advance 30% / Balance 70%)
@@ -1179,18 +1219,90 @@ export default function CreatorStudioPage() {
                   />
                 </div>
 
+                {/* Launch Timing Dual-Mode Control */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-white font-mono">Launch Timing</label>
+                    <span className="text-[10px] text-[#777] font-mono">Choose when orders open</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScheduleMode('immediate');
+                        const safeOpens = new Date(Date.now() + 900000);
+                        setBatchForm(prev => ({
+                          ...prev,
+                          opens_at: safeOpens.toISOString().slice(0, 16)
+                        }));
+                      }}
+                      className={`p-4 rounded-2xl border text-left flex flex-col gap-1.5 transition-all ${
+                        scheduleMode === 'immediate'
+                          ? 'bg-white/[0.08] border-white text-white shadow-xl ring-1 ring-white/20'
+                          : 'bg-[#0D0D0D] border-white/10 text-white/60 hover:border-white/20 hover:text-white/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono uppercase tracking-wider text-white">⚡ Launch Imminently</span>
+                        {scheduleMode === 'immediate' && (
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Selected</span>
+                        )}
+                      </div>
+                      <p className="text-[0.65rem] text-[#888] leading-relaxed">
+                        Preorder opens ~15 minutes after deployment. Perfect for launching your drop right away.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setScheduleMode('scheduled')}
+                      className={`p-4 rounded-2xl border text-left flex flex-col gap-1.5 transition-all ${
+                        scheduleMode === 'scheduled'
+                          ? 'bg-white/[0.08] border-white text-white shadow-xl ring-1 ring-white/20'
+                          : 'bg-[#0D0D0D] border-white/10 text-white/60 hover:border-white/20 hover:text-white/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold font-mono uppercase tracking-wider text-white">📅 Schedule Ahead</span>
+                        {scheduleMode === 'scheduled' && (
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Selected</span>
+                        )}
+                      </div>
+                      <p className="text-[0.65rem] text-[#888] leading-relaxed">
+                        Pick an exact future date and time for a planned marketing launch (e.g. tomorrow or next week).
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Timeline Matrix */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">1. Orders Open</label>
-                    <input
-                      type="datetime-local"
-                      value={batchForm.opens_at}
-                      min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                      onChange={(e) => setBatchForm(prev => ({ ...prev, opens_at: e.target.value }))}
-                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none"
-                    />
-                  </div>
+                  {scheduleMode === 'scheduled' ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">1. Orders Open (Scheduled)</label>
+                        {new Date(batchForm.opens_at).getTime() > Date.now() + 600000 ? (
+                          <span className="text-[10px] text-emerald-400 font-mono">🟢 Future launch set</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-400 font-mono">⚠️ Time is very close or past</span>
+                        )}
+                      </div>
+                      <input
+                        type="datetime-local"
+                        value={batchForm.opens_at}
+                        onChange={(e) => setBatchForm(prev => ({ ...prev, opens_at: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 justify-center p-3.5 rounded-xl bg-white/[0.02] border border-white/10">
+                      <span className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">1. Orders Open</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-emerald-400 font-mono font-bold">⚡ Opens ~15 mins post-publish</span>
+                      </div>
+                      <span className="text-[10px] text-[#666]">Vault initializes immediately; checkout opens 15 mins later.</span>
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-2">
                     <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">2. Orders Close</label>
@@ -1338,7 +1450,12 @@ export default function CreatorStudioPage() {
                     <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Order Timeline</span>
                     <div className="text-xs font-mono space-y-1.5 text-white/90">
                       <div><span className="text-[#666]">Drop Name:</span> {batchForm.name}</div>
-                      <div><span className="text-[#666]">Orders Open:</span> {new Date(batchForm.opens_at).toLocaleString()}</div>
+                      <div>
+                        <span className="text-[#666]">Orders Open:</span>{' '}
+                        {scheduleMode === 'immediate'
+                          ? 'Opens ~15 mins after publishing (Immediate Launch)'
+                          : new Date(batchForm.opens_at).toLocaleString()}
+                      </div>
                       <div><span className="text-[#666]">Orders Close:</span> {new Date(batchForm.closes_at).toLocaleString()}</div>
                       <div><span className="text-[#666]">Production starts:</span> {new Date(batchForm.production_starts_at).toLocaleString()}</div>
                       <div><span className="text-[#666]">Ready for Pickup:</span> {new Date(batchForm.release_at).toLocaleString()}</div>
@@ -1757,6 +1874,52 @@ export default function CreatorStudioPage() {
                   );
                 })
               )}
+            </div>
+          </div>
+        )}
+        {/* Schedule Adjustment Modal */}
+        {scheduleWarningModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+            <div className="card-glass p-6 sm:p-8 max-w-lg w-full rounded-3xl border-white/20 bg-[#0E0E0E]/95 shadow-2xl flex flex-col gap-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-lg">
+                  ⏰
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Scheduled Launch Time Passed</h3>
+                  <p className="text-xs text-[#888]">Preorder vaults require opening in the future.</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 text-xs text-[#aaa] space-y-2 leading-relaxed">
+                <p>
+                  Your chosen launch time (<span className="text-white font-mono font-bold">{scheduleWarningModal.pastTimeStr}</span>) was reached while completing the draft.
+                </p>
+                <p>
+                  On Solana, on-chain preorder escrow vaults cannot be initialized with a timestamp in the past.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScheduleWarningModal(prev => ({ ...prev, isOpen: false }));
+                    setWizardStep(2);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl text-xs font-mono uppercase tracking-wider text-[#aaa] hover:text-white border border-white/10 hover:border-white/20 bg-white/[0.02]"
+                >
+                  Adjust Schedule Manually
+                </button>
+
+                <button
+                  type="button"
+                  onClick={scheduleWarningModal.onAutoAdjustAndPublish}
+                  className="flex-1 btn-circuit py-3 px-5 text-xs font-bold uppercase tracking-wider justify-center"
+                >
+                  <span>Launch in 15 Minutes →</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
