@@ -69,15 +69,9 @@ export default function LandingPage() {
             <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-8 px-4 py-1.5 border border-white/10 rounded-full">
               Made to order
             </span>
-            <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-[0.95] mb-4 max-w-5xl">
+            <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-[0.95] mb-12 max-w-5xl">
               Scale fashion without trapped capital
             </h1>
-            <p className="text-sm md:text-base text-[#aaa] italic mb-8">
-              Fashion made for you
-            </p>
-            <p className="text-base md:text-xl text-[#888] leading-relaxed max-w-2xl mb-12">
-              We only make your piece after you order it. No waste.
-            </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <a href="#collections-slider" className="btn-circuit py-4 px-10 text-xs w-full sm:w-auto justify-center">
@@ -94,8 +88,8 @@ export default function LandingPage() {
         <section id="collections-slider" className="py-20 border-t border-white/[0.05] relative overflow-hidden bg-white/[0.01]">
           <div className="section-container relative z-10">
             <div className="text-center mb-12">
-              <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666] mb-4 block">
-                Available Now
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-[#888] mb-4 block">
+                Fashion made for you
               </span>
               <h2 className="text-4xl md:text-6xl font-bold tracking-tight">
                 Select Your Edition.
