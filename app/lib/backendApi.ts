@@ -113,8 +113,8 @@ export interface PickupLocation {
   id?: string;
   name: string;
   address: string;
-  city: string;
-  country: string;
+  city?: string;
+  country?: string;
   postal_code?: string;
   instructions?: string;
 }
@@ -307,6 +307,14 @@ export function saveUserEmail(email: string) {
 export function getMyBrands() {
   return request<{ brands: Brand[] }>('/api/brands/me', {
     method: 'GET',
+  }, true);
+}
+
+/** Create a new atelier brand and assign authenticated user as owner */
+export function createBrand(payload: { name: string; slug?: string; payment_wallet_address?: string }) {
+  return request<{ brand: Brand }>('/api/brands', {
+    method: 'POST',
+    body: JSON.stringify(payload),
   }, true);
 }
 

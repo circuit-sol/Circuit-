@@ -87,6 +87,49 @@ export default function CreatorStudioPage() {
     pickup_instructions: 'Please present your digital passport reference upon collection.',
   });
 
+  // Ensure the creator has an active, valid brand in Supabase brand_memberships
+  const ensureValidBrand = async (): Promise<backendApi.Brand | null> => {
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (selectedBrand && uuidPattern.test(selectedBrand.id)) {
+      return selectedBrand;
+    }
+
+    if (!user?.walletAddress) return null;
+
+    // Check if user already owns any brands in database
+    try {
+      const brandsRes = await backendApi.getMyBrands();
+      const existing = (brandsRes.brands || []).find(b => uuidPattern.test(b.id));
+      if (existing) {
+        setSelectedBrand(existing);
+        setBrands(brandsRes.brands);
+        return existing;
+      }
+    } catch (_) {}
+
+    // Auto-provision brand for this creator
+    try {
+      const shortWallet = user.walletAddress.slice(0, 6).toLowerCase();
+      const brandName = 'Circuit Atelier Studio';
+      const baseSlug = 'circuit-atelier';
+      const slug = `${baseSlug}-${shortWallet}`;
+
+      const created = await backendApi.createBrand({
+        name: brandName,
+        slug,
+        payment_wallet_address: user.walletAddress,
+      });
+      if (created?.brand && uuidPattern.test(created.brand.id)) {
+        setSelectedBrand(created.brand);
+        setBrands(prev => [created.brand, ...prev.filter(b => b.id !== created.brand.id)]);
+        return created.brand;
+      }
+    } catch (err) {
+      console.error('Failed to provision atelier brand:', err);
+    }
+    return null;
+  };
+
   // Load brands and managed data
   useEffect(() => {
     async function loadCreatorData() {
@@ -98,19 +141,39 @@ export default function CreatorStudioPage() {
       setLoading(true);
       try {
         const brandsRes = await backendApi.getMyBrands().catch(() => ({ brands: [] }));
-        const userBrands = brandsRes.brands || [];
-        setBrands(userBrands);
+        let userBrands = brandsRes.brands || [];
 
-        const currentBrand: backendApi.Brand = userBrands.length > 0
-          ? (selectedBrand || userBrands[0])
-          : {
-              id: 'circuit-atelier-brand',
-              name: 'Circuit Atelier Design Studio',
-              slug: 'circuit-atelier',
-              payment_wallet_address: user?.walletAddress || '',
-              role: 'owner',
-            };
-        setSelectedBrand(currentBrand);
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let validBrand = userBrands.find(b => uuidPattern.test(b.id));
+
+        // If this creator doesn't have a brand registered yet, automatically create one in Supabase
+        if (!validBrand && user?.walletAddress) {
+          try {
+            const shortWallet = user.walletAddress.slice(0, 6).toLowerCase();
+            const brandName = 'Circuit Atelier Studio';
+            const baseSlug = 'circuit-atelier';
+            const slug = `${baseSlug}-${shortWallet}`;
+
+            const createdRes = await backendApi.createBrand({
+              name: brandName,
+              slug,
+              payment_wallet_address: user.walletAddress,
+            });
+            if (createdRes?.brand && uuidPattern.test(createdRes.brand.id)) {
+              validBrand = createdRes.brand;
+              userBrands = [createdRes.brand, ...userBrands];
+            }
+          } catch (createErr) {
+            console.warn('Auto-create brand notice:', createErr);
+          }
+        }
+
+        setBrands(userBrands);
+        if (validBrand) {
+          setSelectedBrand(validBrand);
+        } else if (userBrands.length > 0) {
+          setSelectedBrand(userBrands[0]);
+        }
 
         // Fetch managed editions
         const managedList = await getEditions(false);
@@ -307,8 +370,9 @@ export default function CreatorStudioPage() {
   };
 
   const handleSaveDraft = async () => {
-    if (!selectedBrand) {
-      showToast('Brand Required', 'Please select or register a brand before saving.');
+    const activeBrand = await ensureValidBrand();
+    if (!activeBrand) {
+      showToast('Brand Required', 'Please connect your creator wallet to initialize your atelier brand.');
       return;
     }
     if (!editionForm.name.trim()) {
@@ -346,7 +410,7 @@ export default function CreatorStudioPage() {
       } else {
         await backendApi.createEdition({
           id: slugId,
-          brand_id: selectedBrand.id,
+          brand_id: activeBrand.id,
           name: editionForm.name.trim(),
           description: editionForm.description.trim(),
           price_usd: Number(editionForm.price_usd),
@@ -416,8 +480,6 @@ export default function CreatorStudioPage() {
             {
               name: batchForm.pickup_name.trim() || 'Circuit Atelier Station',
               address: fullAddress,
-              city: batchForm.pickup_city.trim() || 'Lagos',
-              country: batchForm.pickup_country.trim() || 'Nigeria',
               instructions: batchForm.pickup_instructions.trim(),
             },
           ],
@@ -464,8 +526,9 @@ export default function CreatorStudioPage() {
 
   // 3-Step Wizard Execution: Deploy Preorder Vault to Solana
   const handleDeployToSolana = async () => {
-    if (!selectedBrand) {
-      showToast('Brand Required', 'Please select or register a brand before publishing.');
+    const activeBrand = await ensureValidBrand();
+    if (!activeBrand) {
+      showToast('Brand Required', 'Please connect and sign in with your creator wallet to initialize your atelier brand.');
       return;
     }
 
@@ -484,17 +547,16 @@ export default function CreatorStudioPage() {
       return;
     }
 
-    // Date validations
-    const opensMs = new Date(batchForm.opens_at).getTime();
+    // Date validations with safe future buffer for Solana clock
+    const rawOpensMs = new Date(batchForm.opens_at).getTime();
     const closesMs = new Date(batchForm.closes_at).getTime();
     const prodMs = new Date(batchForm.production_starts_at).getTime();
     const relMs = new Date(batchForm.release_at).getTime();
 
-    if (isNaN(opensMs) || opensMs <= Date.now() + 35000) {
-      showToast('Invalid Opening Time', 'Batch opening time must be at least 1 minute in the future so the Solana vault can initialize.');
-      return;
-    }
-    if (closesMs <= opensMs) {
+    // Ensure opens_at is comfortably in the future so Phantom confirmation never lags behind cluster time
+    const safeOpensMs = Math.max(isNaN(rawOpensMs) ? Date.now() + 120000 : rawOpensMs, Date.now() + 90000);
+
+    if (closesMs <= safeOpensMs) {
       showToast('Invalid Dates', 'Preorder closing date must be after opening date.');
       return;
     }
@@ -532,7 +594,7 @@ export default function CreatorStudioPage() {
       } else {
         await backendApi.createEdition({
           id: slugId,
-          brand_id: selectedBrand.id,
+          brand_id: activeBrand.id,
           name: editionForm.name.trim(),
           description: editionForm.description.trim(),
           price_usd: Number(editionForm.price_usd),
@@ -567,7 +629,7 @@ export default function CreatorStudioPage() {
       // Step C: Create or Update Preorder Batch Draft
       setDeployStepText('3/4 Creating preorder batch terms...');
       const fullAddress = `${batchForm.pickup_address}, ${batchForm.pickup_city}, ${batchForm.pickup_country}`.slice(0, 500);
-      const safeOpens = new Date(opensMs);
+      const safeOpens = new Date(safeOpensMs);
       safeOpens.setMilliseconds(0);
       const safeCloses = new Date(closesMs);
       safeCloses.setMilliseconds(0);
@@ -586,8 +648,6 @@ export default function CreatorStudioPage() {
           {
             name: batchForm.pickup_name.trim() || 'Circuit Atelier Station',
             address: fullAddress,
-            city: batchForm.pickup_city.trim() || 'Lagos',
-            country: batchForm.pickup_country.trim() || 'Nigeria',
             instructions: batchForm.pickup_instructions.trim(),
           },
         ],
@@ -625,7 +685,8 @@ export default function CreatorStudioPage() {
       showToast('Phantom Approval Required', 'Please confirm the on-chain vault creation transaction in Phantom.');
 
       // Convert USD price to approximate lamports (using ~$150 SOL reference rate, 0.2 SOL for $30)
-      const unitLamports = String(Math.floor((editionForm.price_usd / 150) * 1e9));
+      const rawLamports = Math.floor((Number(editionForm.price_usd || 30) / 150) * 1e9);
+      const unitLamports = String(Math.max(rawLamports, 1000000));
 
       const initResult = await executeBatchInitialize(
         targetBatchId,
