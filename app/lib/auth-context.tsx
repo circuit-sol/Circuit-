@@ -32,6 +32,9 @@ interface AuthContextType {
   isAuthenticating: boolean;
   /** Granular status text during auth, e.g. 'Connecting...', 'Confirm in Phantom...', 'Verifying...' */
   authStatusText: string | null;
+  /** Detailed error message if wallet connection or SIWS failed */
+  authError: string | null;
+  clearAuthError: () => void;
   /** True if client is on a mobile browser outside Phantom app */
   isMobileDevice: boolean;
   /** True if user has connected but hasn't provided their email yet */
@@ -47,6 +50,8 @@ const AuthContext = createContext<AuthContextType>({
   signOut: () => {},
   isAuthenticating: false,
   authStatusText: null,
+  authError: null,
+  clearAuthError: () => {},
   isMobileDevice: false,
   needsEmail: false,
   saveEmail: async () => {},
@@ -120,9 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]                       = useState<UserSession | null>(null);
   const [isAuthenticating, setAuthenticating] = useState(false);
   const [authStatusText, setAuthStatusText]   = useState<string | null>(null);
+  const [authError, setAuthError]             = useState<string | null>(null);
   const [isInitializing, setIsInitializing]   = useState(true);
   const [needsEmail, setNeedsEmail]           = useState(false);
   const [isMobileDevice, setIsMobileDevice]   = useState(false);
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   // ── Detect mobile device on mount ──────────────────────────────────
   useEffect(() => {
@@ -184,6 +194,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsInitializing(false);
   }, []);
 
+  // ── SIWS Authentication Engine ───────────────────────────────────────
+  const authenticateWallet = useCallback(async (
+    targetAddress: string,
+    signFn: (msg: Uint8Array) => Promise<any>
+  ) => {
+    setAuthenticating(true);
+    setAuthError(null);
+    try {
+      setAuthStatusText('Preparing challenge...');
+      const challenge = await backendApi.getChallenge(targetAddress);
+
+      setAuthStatusText('Confirm sign-in in Phantom...');
+      const messageBytes = new TextEncoder().encode(challenge.message);
+
+      // 25s timeout so user is never frozen indefinitely on mobile
+      const signPromise = signFn(messageBytes);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Sign-in request timed out in Phantom. Please tap Continue with Phantom to try again.')), 25000)
+      );
+      const sigResult = await Promise.race([signPromise, timeoutPromise]);
+
+      setAuthStatusText('Verifying on Circuit...');
+      const rawSig = (sigResult as any)?.signature instanceof Uint8Array
+        ? (sigResult as any).signature
+        : sigResult instanceof Uint8Array
+        ? sigResult
+        : (sigResult as any)?.signature || sigResult;
+
+      const signatureBs58 = utils.bytes.bs58.encode(rawSig);
+      const authData = await backendApi.verifySignature(targetAddress, signatureBs58, challenge.nonce);
+
+      backendApi.setSessionToken(authData.token);
+      setStoredSession(authData.token, targetAddress, authData.user.email);
+
+      setUser({
+        id: authData.user.id,
+        walletAddress: targetAddress,
+        email: authData.user.email,
+        isSignedIn: true,
+      });
+
+      // Prompt for email ONLY if user has never provided one before
+      if (!authData.user.email) {
+        setNeedsEmail(true);
+      } else {
+        setNeedsEmail(false);
+      }
+
+      console.log(`%c⚡ Circuit: Authenticated via SIWS — ${targetAddress}`, 'color: #D1D1D1; font-weight: bold;');
+    } catch (err: any) {
+      console.error('SIWS authentication failed:', err);
+      const rawMsg = err?.message || 'Authentication failed. Please try again.';
+      const isReject = /reject|cancel|denied/i.test(rawMsg);
+      setAuthError(isReject ? 'Sign-in cancelled in Phantom. Tap to retry.' : rawMsg);
+      try {
+        await disconnect();
+      } catch (_) {}
+    } finally {
+      setAuthenticating(false);
+      setAuthStatusText(null);
+    }
+  }, [disconnect]);
+
   // ── SIWS: sign & verify once wallet connects or changes ───────────────
   useEffect(() => {
     if (!connected || !publicKey || !signMessage) return;
@@ -221,61 +294,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Case 4: Authenticate with backend via SIWS
-    async function authenticate() {
-      setAuthenticating(true);
-      try {
-        setAuthStatusText('Signing you in...');
-        // Step 1: Get one-time challenge containing the exact message to sign
-        const challenge = await backendApi.getChallenge(address);
-
-        setAuthStatusText('Sign in Phantom...');
-        // Step 2: Sign the exact backend message
-        const messageBytes = new TextEncoder().encode(challenge.message);
-        const signatureBytes = await signMessage!(messageBytes);
-
-        setAuthStatusText('Verifying on Circuit...');
-        // Step 3: Base58 encode the signature to match backend bs58 verification
-        const signatureBs58 = utils.bytes.bs58.encode(signatureBytes);
-
-        // Step 4: Verify on backend → receive JWT & user profile
-        const authData = await backendApi.verifySignature(address, signatureBs58, challenge.nonce);
-
-        // Step 5: Store persistent session
-        backendApi.setSessionToken(authData.token);
-        setStoredSession(authData.token, address, authData.user.email);
-
-        setUser({
-          id: authData.user.id,
-          walletAddress: address,
-          email: authData.user.email,
-          isSignedIn: true,
-        });
-
-        // Prompt for email if not yet set
-        if (!authData.user.email) {
-          setNeedsEmail(true);
-        }
-
-        console.log(
-          `%c⚡ Circuit: Authenticated via SIWS — ${address}`,
-          'color: #D1D1D1; font-weight: bold;'
-        );
-      } catch (err) {
-        console.error('SIWS authentication failed:', err);
-        // If user cancelled signing, disconnect wallet so retry is clean
-        await disconnect();
-      } finally {
-        setAuthenticating(false);
-        setAuthStatusText(null);
-      }
-    }
-
-    authenticate();
-  }, [connected, publicKey, signMessage, user, disconnect]);
+    authenticateWallet(address, (msg) => signMessage!(msg));
+  }, [connected, publicKey, signMessage, user, disconnect, authenticateWallet]);
 
   // ── Trigger wallet modal or mobile deep link ─────────────────────────
   const triggerConnect = useCallback(async () => {
-    // Explicit user action to connect: clear disconnected flag
+    setAuthError(null);
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('circuit_user_disconnected');
@@ -283,11 +307,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const isMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const hasInjected = typeof window !== 'undefined' && Boolean(
-      (window as any).phantom?.solana?.isPhantom || (window as any).solana?.isPhantom
+    const injectedProvider = typeof window !== 'undefined' && (
+      (window as any).phantom?.solana || (window as any).solana
     );
+    const hasInjected = Boolean(injectedProvider?.isPhantom);
 
-    // 1. If browsing on Mobile outside Phantom app, deep link directly into Phantom mobile app
+    // 1. If browsing on Mobile browser outside Phantom app, deep link directly into Phantom mobile app
     if (isMobile && !hasInjected) {
       const currentUrl = window.location.href;
       const origin = window.location.origin;
@@ -296,36 +321,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // 2. Desktop browser extension or inside Phantom Mobile in-app browser
+    // 2. If already connected with active key, but not yet authenticated with Circuit backend:
+    // (Crucial for mobile webviews where background useEffect sign requests are suppressed without user tap)
+    if (connected && publicKey && signMessage && !user) {
+      await authenticateWallet(publicKey.toBase58(), (msg) => signMessage(msg));
+      return;
+    }
+
+    // 3. Connect via wallet adapter
     const phantom = wallets.find((w: { adapter: { name: string } }) => w.adapter.name === 'Phantom') || wallets[0];
     if (phantom) {
       select(phantom.adapter.name as any);
-      if (!connected) {
-        try {
-          setAuthStatusText('Connecting to Phantom...');
-          if (wallet?.adapter?.name === phantom.adapter.name) {
-            await connect();
-          } else {
-            // Allow adapter state setter tick to apply selection
-            setTimeout(async () => {
-              try {
-                await connect();
-              } catch (cErr: any) {
-                if (cErr?.name !== 'WalletNotSelectedError') {
-                  console.warn('Phantom connect notice:', cErr?.message || cErr);
-                }
+      try {
+        setAuthStatusText('Connecting to Phantom...');
+        if (wallet?.adapter?.name === phantom.adapter.name) {
+          await connect();
+        } else {
+          setTimeout(async () => {
+            try {
+              await connect();
+            } catch (cErr: any) {
+              if (cErr?.name !== 'WalletNotSelectedError') {
+                console.warn('Phantom connect notice:', cErr?.message || cErr);
               }
-            }, 60);
-          }
-        } catch (err: any) {
-          if (err?.name !== 'WalletNotSelectedError') {
-            console.warn('Phantom connect notice:', err?.message || err);
-          }
-          setAuthStatusText(null);
+            }
+          }, 60);
         }
+      } catch (err: any) {
+        // Fallback for direct injected provider in Phantom mobile in-app browser
+        if (hasInjected && injectedProvider.connect) {
+          try {
+            const resp = await injectedProvider.connect();
+            const addr = resp?.publicKey ? resp.publicKey.toBase58() : injectedProvider.publicKey?.toBase58();
+            if (addr && injectedProvider.signMessage) {
+              await authenticateWallet(addr, async (msg: Uint8Array) => {
+                const res = await injectedProvider.signMessage(msg, 'utf8');
+                return res.signature || res;
+              });
+              return;
+            }
+          } catch (pErr: any) {
+            console.error('Direct Phantom connect failed:', pErr);
+          }
+        }
+        if (err?.name !== 'WalletNotSelectedError') {
+          setAuthError(err?.message || 'Could not connect to Phantom. Please ensure Phantom is unlocked.');
+        }
+        setAuthStatusText(null);
       }
     }
-  }, [wallets, select, connect, connected, wallet]);
+  }, [wallets, select, connect, connected, wallet, publicKey, signMessage, user, authenticateWallet]);
 
   // ── Save notification email ──────────────────────────────────────────
   const saveEmail = useCallback(async (email: string) => {
@@ -372,6 +417,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         isAuthenticating,
         authStatusText,
+        authError,
+        clearAuthError,
         isMobileDevice,
         needsEmail,
         saveEmail,
