@@ -160,16 +160,47 @@ function DropPageContent() {
           setComputedPrice(Number(activeEdition.price_usd));
         }
 
-        // Fetch exact supply count from backend silently
-        try {
-          const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
-          const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
-          if (countRes.ok && isMounted) {
-            const { count } = await countRes.json();
-            setMintedCount(count);
+        // Helper to resolve accurate booked count across on-chain escrow, local cache, and API
+        async function resolveMintedCount(edId: string, b: backendApi.Batch | null) {
+          let count = 0;
+          // 1. Check on-chain batch escrow vault directly
+          if (b?.id && b.chain_status === 'initialized') {
+            try {
+              const escRes = await backendApi.getBatchEscrow(b.id);
+              if (escRes?.escrow?.total_deposited) {
+                const netDeposited = BigInt(escRes.escrow.total_deposited) - BigInt(escRes.escrow.total_cancelled || 0);
+                const unitLamports = b.pricing?.unit_price_lamports ? BigInt(b.pricing.unit_price_lamports) : BigInt(0);
+                if (unitLamports > BigInt(0)) {
+                  const chainUnits = Number(netDeposited / unitLamports);
+                  if (chainUnits > count) count = chainUnits;
+                }
+              }
+            } catch (_) {}
           }
-        } catch (e) {
-          console.error('Error fetching supply count:', e);
+
+          // 2. Aggregate local cache orders
+          if (typeof window !== 'undefined') {
+            try {
+              const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+              const matchedLocal = localOrders.filter((o: any) =>
+                (o.drop_id === edId || o.batch_id === b?.id) && !o.cancelled
+              );
+              const localUnits = matchedLocal.reduce((acc: number, curr: any) => acc + (curr.quantity || 1), 0);
+              if (localUnits > count) count = localUnits;
+            } catch (_) {}
+          }
+
+          // 3. Fallback to API endpoint if available
+          try {
+            const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+            const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(edId)}`);
+            if (countRes.ok) {
+              const { count: apiCount } = await countRes.json();
+              if (apiCount > count) count = apiCount;
+            }
+          } catch (_) {}
+
+          return count;
         }
 
         // Fetch Live SOL Price silently
@@ -184,11 +215,13 @@ function DropPageContent() {
         }
 
         // Fetch batches for this edition
+        let resolvedBatch: backendApi.Batch | null = null;
         try {
           const batchRes = await backendApi.getPublicBatches(activeEdition.id);
           if (!isMounted) return;
           if (batchRes?.batches && batchRes.batches.length > 0) {
             setBatches(batchRes.batches);
+            resolvedBatch = batchRes.batches[0];
             setSelectedBatch(batchRes.batches[0]);
             if (batchRes.batches[0].pickup_locations?.length > 0) {
               setSelectedLocationId(batchRes.batches[0].pickup_locations[0].id || 'loc-1');
@@ -200,17 +233,20 @@ function DropPageContent() {
               if (!isMounted) return;
               if (myBatchRes?.batches && myBatchRes.batches.length > 0) {
                 setBatches(myBatchRes.batches);
+                resolvedBatch = myBatchRes.batches[0];
                 setSelectedBatch(myBatchRes.batches[0]);
                 if (myBatchRes.batches[0].pickup_locations?.length > 0) {
                   setSelectedLocationId(myBatchRes.batches[0].pickup_locations[0].id || 'loc-1');
                 }
               } else {
                 setBatches(defaultFallbackBatches);
+                resolvedBatch = defaultFallbackBatches[0];
                 setSelectedBatch(defaultFallbackBatches[0]);
                 setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
               }
             } catch {
               setBatches(defaultFallbackBatches);
+              resolvedBatch = defaultFallbackBatches[0];
               setSelectedBatch(defaultFallbackBatches[0]);
               setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
             }
@@ -218,9 +254,14 @@ function DropPageContent() {
         } catch (e) {
           console.warn('Could not fetch batches for edition, using default fallback:', e);
           setBatches(defaultFallbackBatches);
+          resolvedBatch = defaultFallbackBatches[0];
           setSelectedBatch(defaultFallbackBatches[0]);
           setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
         }
+
+        // Now resolve supply count using the batch and local orders
+        const initialCount = await resolveMintedCount(activeEdition.id, resolvedBatch);
+        if (isMounted) setMintedCount(initialCount);
       } catch (err) {
         console.error('Error fetching dynamic drop details:', err);
         setEdition(fallbackEdition);
@@ -239,11 +280,31 @@ function DropPageContent() {
       const currentId = requestedEditionId || edition?.id || fallbackEdition.id;
       if (!currentId) return;
       try {
-        const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
-        const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(currentId)}`);
-        if (countRes.ok && isMounted) {
-          const { count } = await countRes.json();
-          setMintedCount(count);
+        let count = 0;
+        if (selectedBatch?.id && selectedBatch.chain_status === 'initialized') {
+          try {
+            const escRes = await backendApi.getBatchEscrow(selectedBatch.id);
+            if (escRes?.escrow?.total_deposited) {
+              const netDeposited = BigInt(escRes.escrow.total_deposited) - BigInt(escRes.escrow.total_cancelled || 0);
+              const unitLamports = selectedBatch.pricing?.unit_price_lamports ? BigInt(selectedBatch.pricing.unit_price_lamports) : BigInt(0);
+              if (unitLamports > BigInt(0)) {
+                count = Math.max(count, Number(netDeposited / unitLamports));
+              }
+            }
+          } catch (_) {}
+        }
+        if (typeof window !== 'undefined') {
+          try {
+            const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+            const matchedLocal = localOrders.filter((o: any) =>
+              (o.drop_id === currentId || o.batch_id === selectedBatch?.id) && !o.cancelled
+            );
+            const localUnits = matchedLocal.reduce((acc: number, curr: any) => acc + (curr.quantity || 1), 0);
+            count = Math.max(count, localUnits);
+          } catch (_) {}
+        }
+        if (isMounted && count > 0) {
+          setMintedCount(prev => Math.max(prev, count));
         }
       } catch {
         // Silent error
