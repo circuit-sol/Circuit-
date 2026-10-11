@@ -46,6 +46,8 @@ export async function saveOrder(orderData: {
   amount_usd: number;
   size?: string;
   quantity?: number;
+  garment_serial?: string;
+  order_number?: number;
 }) {
   try {
     const res = await fetch(`${BASE}/api/db/orders`, {

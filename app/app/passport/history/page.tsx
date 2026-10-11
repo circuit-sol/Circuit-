@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { getUserOrders, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
-import { solscanTxUrl, solanaExplorerTxUrl, formatSerialNumber } from '@/lib/utils';
+import { solscanTxUrl, solanaExplorerTxUrl, formatSerialNumber, resolveUniqueOrderSerials } from '@/lib/utils';
 import * as backendApi from '@/lib/backendApi';
 import SignInModal from '@/components/SignInModal';
 import { showToast } from '@/components/Toast';
@@ -81,7 +81,7 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
               <span className="text-[0.6rem] text-[#444] uppercase block mb-1">Edition</span>
               <strong className="text-xs font-semibold text-amber-400">
-                {order.garment_serial ? formatSerialNumber(order.garment_serial, activeEdition.max_supply) : 'Pending Tailoring'}
+                {formatSerialNumber(order.garment_serial || order.order_number, activeEdition.max_supply)}
               </strong>
             </div>
           </div>
@@ -275,6 +275,9 @@ export default function HistoryPage() {
         addOrMergeHistoryOrder(loc);
       }
 
+      // Assign unique chronological serials for all history orders
+      resolveUniqueOrderSerials(rawHistoryOrders);
+
       setEditionsMap(em);
       const combined = rawHistoryOrders.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -427,7 +430,7 @@ export default function HistoryPage() {
                           <div className="flex justify-between">
                             <span>Edition:</span>
                             <span className="text-[#aaa] font-semibold">
-                              {order.garment_serial ? formatSerialNumber(order.garment_serial, activeEdition.max_supply) : 'Pending Tailoring'}
+                              {formatSerialNumber(order.garment_serial || order.order_number, activeEdition.max_supply)}
                             </span>
                           </div>
                         </div>

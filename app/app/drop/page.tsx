@@ -413,6 +413,7 @@ function DropPageContent() {
           });
 
           // Persist order in database for order lookup and supply counter
+          const assignedPieceNum = (mintedCount || 0) + 1;
           try {
             await saveOrder({
               email: user.email,
@@ -422,6 +423,8 @@ function DropPageContent() {
               amount_usd: totalUsd,
               size: selectedSize,
               quantity: quantity,
+              garment_serial: String(assignedPieceNum),
+              order_number: assignedPieceNum,
             });
           } catch (dbErr) {
             console.warn('DB order save notice:', dbErr);
@@ -446,6 +449,8 @@ function DropPageContent() {
               edition_name: activeEdition.name,
               release_at: selectedBatch.release_at,
               pickup_location_id: pickupLocId,
+              order_number: assignedPieceNum,
+              garment_serial: String(assignedPieceNum),
             };
             const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
             localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
@@ -507,6 +512,7 @@ function DropPageContent() {
       // 2. Simulation fallback (only if NEXT_PUBLIC_SIMULATION_MODE is true)
       if (process.env.NEXT_PUBLIC_SIMULATION_MODE === 'true') {
         const result = await initializeEscrow(edition.id, totalSol, user.walletAddress);
+        const simPieceNum = result.orderNumber || (mintedCount || 0) + 1;
         await saveOrder({
           email: user.email,
           drop_id: edition.id,
@@ -515,10 +521,31 @@ function DropPageContent() {
           amount_usd: totalUsd,
           size: selectedSize,
           quantity: quantity,
+          garment_serial: String(simPieceNum),
+          order_number: simPieceNum,
         });
 
         if (typeof window !== 'undefined') {
           localStorage.setItem('circuit_last_order_tx', result.txSignature);
+          const richOrder = {
+            id: result.orderNumber ? String(result.orderNumber) : result.txSignature,
+            drop_id: edition.id,
+            tx_signature: result.txSignature,
+            vault_address: result.escrowPDA,
+            order_address: result.escrowPDA,
+            amount_usd: totalUsd,
+            amount_sol: totalSol,
+            quantity,
+            size: selectedSize,
+            created_at: new Date().toISOString(),
+            edition_name: activeEdition.name,
+            release_at: selectedBatch?.release_at,
+            pickup_location_id: selectedLocationId,
+            order_number: simPieceNum,
+            garment_serial: String(simPieceNum),
+          };
+          const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+          localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
         }
 
         setMintedCount((prev) => prev + quantity);
@@ -1225,13 +1252,14 @@ function DropPageContent() {
                   setTxState('signing');
                   setTimeout(() => {
                     const simSig = 'fiat-sim-' + Date.now().toString(36);
+                    const assignedFiatNum = (mintedCount || 0) + 1;
                     setShowFiatModal(false);
                     setTxState('success');
                     setMintedCount((prev) => prev + quantity);
                     setTxResult({
                       txSignature: simSig,
                       solscanUrl: `https://explorer.solana.com/tx/${simSig}?cluster=devnet`,
-                      orderNumber: (mintedCount || 0) + 1,
+                      orderNumber: assignedFiatNum,
                       orderId: simSig,
                       amountSol: totalSol,
                       amountUsd: totalUsd,
@@ -1242,6 +1270,29 @@ function DropPageContent() {
                       releaseAt: selectedBatch?.release_at,
                       pickupLocation: selectedBatch?.pickup_locations?.find((l) => (l.id || '') === selectedLocationId)?.name || 'Official Atelier Station',
                     });
+
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('circuit_last_order_tx', simSig);
+                      localStorage.setItem('circuit_last_order_id', simSig);
+                      const richOrder = {
+                        id: simSig,
+                        drop_id: activeEdition.id,
+                        batch_id: selectedBatch?.id,
+                        tx_signature: simSig,
+                        amount_usd: totalUsd,
+                        amount_sol: totalSol,
+                        quantity,
+                        size: selectedSize,
+                        created_at: new Date().toISOString(),
+                        edition_name: activeEdition.name,
+                        release_at: selectedBatch?.release_at,
+                        pickup_location_id: selectedLocationId,
+                        order_number: assignedFiatNum,
+                        garment_serial: String(assignedFiatNum),
+                      };
+                      const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+                      localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
+                    }
                     showToast('✓ Card Payment Secured', 'Payment verified and escrow record generated.');
                     setTimeout(() => {
                       document.getElementById('drop-tx')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

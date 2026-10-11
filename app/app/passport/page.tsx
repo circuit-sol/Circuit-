@@ -8,7 +8,7 @@ import { getEditionById, getUserOrders, updateOrderStatusLifecycle, DEFAULT_CIRC
 import { useAuth } from '@/lib/auth-context';
 import * as backendApi from '@/lib/backendApi';
 import { executeVerifiedCancel } from '@/lib/solana-service';
-import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl, formatSerialNumber } from '@/lib/utils';
+import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl, formatSerialNumber, resolveUniqueOrderSerials } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
@@ -296,6 +296,29 @@ function PassportContent() {
           return;
         }
 
+        // Guarantee unique chronological serials for all orders across collections
+        resolveUniqueOrderSerials(rawOrders);
+
+        // Update local storage cache with resolved unique serials
+        if (typeof window !== 'undefined') {
+          try {
+            const stored = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
+            if (Array.isArray(stored) && stored.length > 0) {
+              const updatedStored = stored.map((so: any) => {
+                const match = rawOrders.find((ro: any) => 
+                  (ro.id && ro.id === so.id) || 
+                  (ro.tx_signature && ro.tx_signature === so.tx_signature)
+                );
+                if (match?.garment_serial) {
+                  return { ...so, garment_serial: match.garment_serial, order_number: match.order_number };
+                }
+                return so;
+              });
+              localStorage.setItem('circuit_orders', JSON.stringify(updatedStored));
+            }
+          } catch {}
+        }
+
         // 5. Build Wardrobe Pieces with cached batch & edition metadata resolution
         const batchCache = new Map<string, backendApi.Batch | null>();
         const editionCache = new Map<string, any>();
@@ -569,11 +592,16 @@ function PassportContent() {
                           </span>
                         </div>
 
-                        {piece.garmentSerial && (
-                          <span className={`text-[0.6rem] font-mono mt-1 ${isSelected ? 'text-black/60' : 'text-white/40'}`}>
-                            Serial #{piece.garmentSerial}
+                        <div className="flex items-center justify-between text-[0.62rem] font-mono mt-1 pt-1 border-t border-white/[0.06]">
+                          <span className={isSelected ? 'text-black/80 font-bold' : 'text-amber-400 font-semibold'}>
+                            Edition #{String(piece.garmentSerial || 1).padStart(2, '0')} of {piece.edition?.max_supply || 50}
                           </span>
-                        )}
+                          {piece.quantity > 1 && (
+                            <span className={isSelected ? 'text-black/50' : 'text-white/40'}>
+                              {piece.quantity} Units
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </button>
                   );
@@ -601,13 +629,13 @@ function PassportContent() {
                     <span className={`w-1.5 h-1.5 rounded-full ${isMinted ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse'}`} />
                     {activeEdition.name}
                   </div>
-                  {order.garment_serial ? (
-                    <span className="text-[0.6rem] font-mono text-white/50 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                  {order?.garment_serial ? (
+                    <span className="text-[0.6rem] font-mono text-white/90 bg-white/10 border border-white/20 px-3 py-1.5 rounded-full font-bold">
                       Edition: {formatSerialNumber(order.garment_serial, activeEdition.max_supply)}
                     </span>
                   ) : (
-                    <span className="text-[0.6rem] font-mono text-white/50 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full animate-pulse">
-                      Edition: Pending Tailoring
+                    <span className="text-[0.6rem] font-mono text-white/50 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      Edition: #{String(order?.order_number || 1).padStart(2, '0')} of {activeEdition.max_supply || 50}
                     </span>
                   )}
                 </div>
@@ -689,11 +717,9 @@ function PassportContent() {
                 {[
                   {
                     label: 'Edition',
-                    value: order.garment_serial
-                      ? formatSerialNumber(order.garment_serial, activeEdition.max_supply)
-                      : `#01 of ${activeEdition.max_supply || 50} (Reserved)`,
+                    value: formatSerialNumber(order?.garment_serial || order?.order_number, activeEdition.max_supply) + (status === 'pending' ? ' (Reserved)' : ''),
                   },
-                  { label: 'Size', value: order.size || 'Medium' },
+                  { label: 'Size', value: order?.size || 'Medium' },
                   { label: 'Collection Cap', value: `${activeEdition.max_supply || 50} Units` },
                   { label: 'Origin', value: 'Nigeria' },
                 ].map((stat, i) => (

@@ -149,6 +149,7 @@ router.post("/db/orders", async (req, res) => {
     const payload = { email, drop_id, tx_signature, escrow_pda, amount_usd };
     if (req.body.size !== undefined) payload.size = req.body.size;
     if (req.body.quantity !== undefined) payload.quantity = req.body.quantity;
+    if (req.body.garment_serial !== undefined) payload.garment_serial = req.body.garment_serial;
 
     const { data, error } = await supabase
       .from("orders")
