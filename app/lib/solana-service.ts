@@ -627,6 +627,15 @@ export function parseError(err: unknown): string {
   if (code === 'DropNotActive') return 'This drop is no longer active.';
 
   // Batch & Verified Chain errors
+  if (code === 'BATCH_OPENING_HAS_PASSED' || msg.includes('BATCH_OPENING_HAS_PASSED') || msg.includes('OpeningMustBeFuture') || msg.includes('BATCH_OPENING_TOO_SOON')) {
+    return 'The preorder opening time has passed or was scheduled too soon. The schedule has been refreshed to 10 minutes from now. Please retry publishing.';
+  }
+  if (code === 'BLOCKHASH_EXPIRED' || msg.includes('BLOCKHASH_EXPIRED')) {
+    return 'Transaction approval window timed out. Please retry and confirm promptly in Phantom.';
+  }
+  if (code === 'BATCH_NOT_EDITABLE' || msg.includes('BATCH_NOT_EDITABLE')) {
+    return 'This batch draft was locked from a previous attempt. A fresh draft is being prepared for publishing.';
+  }
   if (code === 'PREPARE_RATE_LIMIT' || msg.includes('PREPARE_RATE_LIMIT')) {
     return 'Rate limit reached. Please wait a minute before creating a new checkout attempt.';
   }
@@ -665,6 +674,8 @@ export function parseError(err: unknown): string {
 
   return msg || 'Transaction failed. Please try again.';
 }
+
+export const parseSolanaError = parseError;
 
 // ── Demo Controls ────────────────────────────────────────────────────
 

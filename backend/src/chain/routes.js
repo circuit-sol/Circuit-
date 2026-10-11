@@ -100,7 +100,8 @@ module.exports=function createChainRoutes(db,options={}) {
     await chain.readiness();
     // Validate the payment key before reserving/locking the draft.
     const before=await batch(req.params.id);await managed(before,req.auth);
-    const brand=await result(db.from('brands').select('payment_wallet_address').eq('id',before.edition.brand_id).single());
+    const brand=await result(db.from('brands').select('payment_wallet_address').eq('id',before.edition.brand_id).maybeSingle());
+    ensure(brand,'BRAND_NOT_FOUND',404);
     pub(brand.payment_wallet_address);
     const row=await rpc('reserve_chain_batch',{p_user_id:req.auth.userId,p_wallet:req.auth.walletAddress,
       p_batch_id:uuid(req.params.id),p_revision:req.body.expected_revision,p_pricing:pricing(req.body)});

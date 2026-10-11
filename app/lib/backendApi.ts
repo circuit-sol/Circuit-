@@ -142,7 +142,7 @@ export interface Batch {
   };
   chain_vault_address?: string;
   chain_batch_address?: string;
-  chain_status?: 'pending' | 'initialized' | 'failed';
+  chain_status?: 'pending' | 'initializing' | 'initialized' | 'failed';
   initialization_tx_signature?: string;
   is_active?: boolean;
   revision?: number;

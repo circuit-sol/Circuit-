@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useWallet } from '@solana/wallet-adapter-react';
 import * as backendApi from '@/lib/backendApi';
 import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks } from '@/lib/db';
-import { executeBatchInitialize } from '@/lib/solana-service';
+import { executeBatchInitialize, parseSolanaError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
 import { solscanTxUrl } from '@/lib/utils';
@@ -76,7 +76,7 @@ export default function CreatorStudioPage() {
   const now = Date.now();
   const [batchForm, setBatchForm] = useState({
     name: 'Inaugural Atelier Run — 01',
-    opens_at: new Date(now + 60000).toISOString().slice(0, 16), // +1 minute
+    opens_at: new Date(now + 600000).toISOString().slice(0, 16), // +10 minutes safe future opening
     closes_at: new Date(now + 86400000 * 7).toISOString().slice(0, 16), // +7 days
     production_starts_at: new Date(now + 86400000 * 10).toISOString().slice(0, 16), // +10 days (>= closes + 48h)
     release_at: new Date(now + 86400000 * 25).toISOString().slice(0, 16), // +25 days
@@ -549,12 +549,11 @@ export default function CreatorStudioPage() {
 
     // Date validations with safe future buffer for Solana clock
     const rawOpensMs = new Date(batchForm.opens_at).getTime();
-    const closesMs = new Date(batchForm.closes_at).getTime();
-    const prodMs = new Date(batchForm.production_starts_at).getTime();
-    const relMs = new Date(batchForm.release_at).getTime();
-
-    // Ensure opens_at is comfortably in the future so Phantom confirmation never lags behind cluster time
-    const safeOpensMs = Math.max(isNaN(rawOpensMs) ? Date.now() + 120000 : rawOpensMs, Date.now() + 90000);
+    const MIN_OPEN_BUFFER_MS = 600000;
+    const safeOpensMs = Math.max(isNaN(rawOpensMs) ? Date.now() + MIN_OPEN_BUFFER_MS : rawOpensMs, Date.now() + MIN_OPEN_BUFFER_MS);
+    const closesMs = Math.max(new Date(batchForm.closes_at).getTime(), safeOpensMs + 86400000);
+    const prodMs = Math.max(new Date(batchForm.production_starts_at).getTime(), closesMs + 48 * 3600000 + 3600000);
+    const relMs = Math.max(new Date(batchForm.release_at).getTime(), prodMs + 86400000);
 
     if (closesMs <= safeOpensMs) {
       showToast('Invalid Dates', 'Preorder closing date must be after opening date.');
@@ -659,13 +658,43 @@ export default function CreatorStudioPage() {
       if (editingBatchId) {
         // Fetch fresh revision to avoid BATCH_REVISION_CONFLICT
         let currentRev = targetBatchRevision;
+        let canUpdate = true;
         try {
           const fresh = await backendApi.getMyBatchById(editingBatchId);
-          if (fresh?.batch?.revision) currentRev = fresh.batch.revision;
+          if (fresh?.batch) {
+            currentRev = fresh.batch.revision ?? targetBatchRevision;
+            // If the batch was previously locked in 'initializing' but never deployed, updateDraft will fail with BATCH_NOT_EDITABLE.
+            // In that case, we should create a fresh batch draft rather than crashing on the dead batch.
+            if (fresh.batch.chain_status === 'initializing' && !fresh.batch.chain_batch_address) {
+              canUpdate = false;
+            }
+          }
         } catch (_) {}
-        const updatedBatchRes = await backendApi.updateBatchDraft(editingBatchId, batchPayload, currentRev);
-        if (updatedBatchRes?.batch?.revision) {
-          targetBatchRevision = updatedBatchRes.batch.revision ?? targetBatchRevision;
+
+        if (canUpdate) {
+          try {
+            const updatedBatchRes = await backendApi.updateBatchDraft(editingBatchId, batchPayload, currentRev);
+            if (updatedBatchRes?.batch?.revision) {
+              targetBatchRevision = updatedBatchRes.batch.revision ?? targetBatchRevision;
+            }
+          } catch (updateErr: any) {
+            if (updateErr?.message?.includes('BATCH_NOT_EDITABLE') || updateErr?.error?.includes('BATCH_NOT_EDITABLE')) {
+              canUpdate = false;
+            } else {
+              throw updateErr;
+            }
+          }
+        }
+
+        if (!canUpdate) {
+          const batchRes = await backendApi.createBatchDraft({
+            edition_id: slugId,
+            ...batchPayload,
+          });
+          targetBatchId = batchRes.batch.id;
+          targetBatchRevision = batchRes.batch.revision || 1;
+          setEditingBatchId(targetBatchId);
+          setEditingBatchRevision(targetBatchRevision);
         }
       } else {
         const batchRes = await backendApi.createBatchDraft({
@@ -674,6 +703,8 @@ export default function CreatorStudioPage() {
         });
         targetBatchId = batchRes.batch.id;
         targetBatchRevision = batchRes.batch.revision || 1;
+        setEditingBatchId(targetBatchId);
+        setEditingBatchRevision(targetBatchRevision);
       }
 
       if (!targetBatchId) {
@@ -711,7 +742,8 @@ export default function CreatorStudioPage() {
       setEditions(updatedList);
     } catch (err: any) {
       console.error('Deployment failure:', err);
-      showToast('✗ Deployment Error', err?.message || 'Failed to deploy on-chain vault.');
+      const userMsg = parseSolanaError(err);
+      showToast('✗ Deployment Notice', userMsg);
     } finally {
       setIsDeploying(false);
       setDeployStepText('');

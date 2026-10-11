@@ -488,11 +488,26 @@ class ChainService {
       400,
     );
     ensure(tx.verifySignatures(), "MISSING_OR_INVALID_SIGNATURE", 400);
-    return this.connection.sendRawTransaction(tx.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-      maxRetries: 3,
-    });
+    try {
+      return await this.connection.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+        maxRetries: 3,
+      });
+    } catch (e) {
+      const logs = Array.isArray(e.logs) ? e.logs.join(" ") : (e.message || "");
+      if (logs.includes("OpeningMustBeFuture") || logs.includes("0x1779") || logs.includes("6009")) {
+        fail("BATCH_OPENING_HAS_PASSED", 409);
+      }
+      if (logs.includes("BlockhashNotFound")) {
+        fail("BLOCKHASH_EXPIRED", 409);
+      }
+      if (logs.includes("Insufficient funds") || logs.includes("insufficient lamports") || logs.includes("custom program error: 0x1")) {
+        fail("INSUFFICIENT_FUNDS", 400);
+      }
+      const eMsg = e.message ? String(e.message).replace(/^Transaction simulation failed:\s*/, "") : "TRANSACTION_SUBMISSION_FAILED";
+      fail(eMsg || "TRANSACTION_SUBMISSION_FAILED", 400);
+    }
   }
   async simple(row, wallet, kind, input = {}) {
     const { addresses: a, vault } = await this.validateBatch(row);
