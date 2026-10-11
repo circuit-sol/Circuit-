@@ -273,14 +273,19 @@ function DropPageContent() {
   const isSoldOut = mintedCount >= maxSupply;
   const fillPercent = Math.min(100, (mintedCount / maxSupply) * 100);
 
-  // Prices: Primary in SOL, secondary in USD
-  const unitSol = selectedBatch?.pricing?.unit_price_lamports
-    ? Number(selectedBatch.pricing.unit_price_lamports) / 1e9
+  // Authoritative Pricing: Primary in SOL from on-chain batch lamports, secondary in USD
+  const batchLamports = (selectedBatch?.pricing?.prices_by_size_lamports && selectedSize && selectedBatch.pricing.prices_by_size_lamports[selectedSize])
+    || selectedBatch?.pricing?.unit_price_lamports;
+
+  const unitSol = batchLamports
+    ? Number(BigInt(batchLamports)) / 1e9
     : solPrice
       ? Number((computedPrice / solPrice).toFixed(3))
       : Number((computedPrice / 150).toFixed(3));
   const totalSol = Number((unitSol * quantity).toFixed(3));
-  const totalUsd = Number((computedPrice * quantity).toFixed(2));
+  const totalUsd = solPrice && batchLamports
+    ? Number((totalSol * solPrice).toFixed(2))
+    : Number((computedPrice * quantity).toFixed(2));
 
   const handleOrder = async () => {
     if (processingRef.current) return;
