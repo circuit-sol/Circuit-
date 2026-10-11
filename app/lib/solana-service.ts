@@ -7,11 +7,13 @@
  * In SIMULATION mode, realistic mock data is returned with latency.
  * When disabled, stubs are ready for Anchor RPC replacement.
  *
- * Source of Truth: Circuit-/INTEGRATION.md
+ * Source of Truth: Circuit-/INTEGRATION.md & programs/circuit-escrow
  *
- * PDA Seeds:
- *   Escrow:  ["escrow", dropId, buyerPubkey]
- *   Drop:    ["drop", dropId]
+ * Current V2 PDA Seeds:
+ *   Batch Vault:   ["batch-vault", batchPubkey]
+ *   Order Receipt: ["order", vaultPubkey, orderIdUUID]
+ *   Circuit Config: ["circuit-config"]
+ *   Drop/Batch:    ["batch", batchId] / ["drop", dropId]
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -222,9 +224,8 @@ let _currentCount = DEMO_START_COUNT;
 // ── PDA Derivation Stubs ─────────────────────────────────────────────
 
 /**
- * Derive Escrow PDA address.
- * Seeds: ["escrow", dropId, buyerPubkey]
- * See INTEGRATION.md §7
+ * @deprecated Legacy V1 POC method. In V2, each batch uses a unique BatchVault PDA,
+ * and individual orders are minted as OrderReceipt PDAs with UUID seeds via executeVerifiedPurchase.
  */
 export function deriveEscrowPDA(dropId: string, buyerPubkey: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
@@ -248,9 +249,8 @@ export function deriveDropPDA(dropId: string): [PublicKey, number] {
 // ── Core Transactions ────────────────────────────────────────────────
 
 /**
- * Lock buyer's payment in the on-chain escrow via the backend wallet service.
- * Creates a custodial wallet for userId on first call (idempotent).
- * Maps to INTEGRATION.md §4.1: initialize_escrow.
+ * @deprecated Legacy V1 custodial route. In V2, buyers sign non-custodially via Phantom
+ * using executeVerifiedPurchase and backend-signed batch intents.
  */
 export async function initializeEscrow(
   dropId: string,

@@ -32,8 +32,12 @@ export async function loginAdmin(identifier: string, passwordHash: string) {
 
 // Note: User mapping is handled by auth-context via SIWS (/api/auth/verify) and /api/user/email
 
-// ── Order Management ────────────────────────────────────────────────
+// ── Order Management (Legacy V1 Fallbacks) ──────────────────────────
 
+/**
+ * @deprecated Legacy V1 order persistence. Verified on-chain purchases are automatically
+ * stored in the database by confirmChainIntent and queried via backendApi.getMyChainOrders.
+ */
 export async function saveOrder(orderData: {
   email: string;
   drop_id: string;
@@ -49,14 +53,11 @@ export async function saveOrder(orderData: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(orderData)
     });
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error('Save order error:', errData.error);
-    } else {
+    if (res.ok) {
       return await res.json();
     }
-  } catch (err) {
-    console.error('saveOrder Fetch Error:', err);
+  } catch (_) {
+    // Legacy route may be disabled in verified chain mode; fall through to local cache
   }
 
   // Fallback: Local Storage
@@ -69,6 +70,10 @@ export async function saveOrder(orderData: {
   }
 }
 
+/**
+ * @deprecated Legacy V1 status update. On-chain orders update status via Solana programs
+ * (e.g. executeVerifiedCancel and recordOrderCollected).
+ */
 export async function updateOrderStatus(txSignature: string, status: 'delivered' | 'cancelled') {
   try {
     const res = await fetch(`${BASE}/api/db/orders/${txSignature}/status`, {
@@ -76,14 +81,11 @@ export async function updateOrderStatus(txSignature: string, status: 'delivered'
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error('Update order status error:', errData.error);
-    } else {
+    if (res.ok) {
       return await res.json();
     }
-  } catch (err) {
-    console.error('updateOrderStatus Fetch Error:', err);
+  } catch (_) {
+    // Silently fall through to local cache update
   }
 
   // Fallback: Local Storage
@@ -96,6 +98,9 @@ export async function updateOrderStatus(txSignature: string, status: 'delivered'
   }
 }
 
+/**
+ * @deprecated Legacy V1 delivery update. V2 uses on-chain pickup locations.
+ */
 export async function updateOrderDelivery(email: string, location: string, address: string) {
   try {
     const res = await fetch(`${BASE}/api/db/orders/delivery`, {
@@ -103,14 +108,11 @@ export async function updateOrderDelivery(email: string, location: string, addre
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, delivery_location: location, delivery_address: address })
     });
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error('Update delivery error:', errData.error);
-    } else {
+    if (res.ok) {
       return await res.json();
     }
-  } catch (err) {
-    console.error('updateOrderDelivery Fetch Error:', err);
+  } catch (_) {
+    // Silently fall through to local cache update
   }
 
   // Fallback: Local Storage
