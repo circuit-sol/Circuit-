@@ -135,31 +135,54 @@ export default function SignInModal({ isOpen, onClose, mode = 'signin' }: SignIn
               </p>
             </div>
 
-            <button
-              id="phantom-connect-btn"
-              onClick={triggerConnect}
-              disabled={isAuthenticating}
-              className="btn-circuit w-full justify-center"
-            >
-              <span>
-                {authStatusText || (
-                  isAuthenticating
-                    ? 'Verifying wallet...'
-                    : (isMobileDevice ? 'Open in Phantom App' : 'Continue with Phantom')
-                )}
-              </span>
-              <span className="btn-arrow" aria-hidden="true">
-                {isAuthenticating ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center" />
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                )}
-              </span>
-            </button>
+            {isMobileDevice ? (
+              <div className="flex flex-col gap-3">
+                <a
+                  href={typeof window !== 'undefined' ? `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}?ref=${encodeURIComponent(window.location.origin)}` : 'https://phantom.app'}
+                  id="phantom-deep-link-btn"
+                  className="btn-circuit w-full justify-center text-center py-3.5"
+                >
+                  <span>Open in Phantom App</span>
+                  <span className="btn-arrow" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  onClick={triggerConnect}
+                  disabled={isAuthenticating}
+                  className="btn-outline-circuit justify-center py-2.5 text-xs text-[#A3A3A3] hover:text-white border-white/10 hover:border-white/30"
+                >
+                  <span>
+                    {authStatusText || (isAuthenticating ? 'Connecting...' : 'Connect in Current Browser')}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <button
+                id="phantom-connect-btn"
+                onClick={triggerConnect}
+                disabled={isAuthenticating}
+                className="btn-circuit w-full justify-center"
+              >
+                <span>
+                  {authStatusText || (isAuthenticating ? 'Verifying wallet...' : 'Continue with Phantom')}
+                </span>
+                <span className="btn-arrow" aria-hidden="true">
+                  {isAuthenticating ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2a10 10 0 010 20 10 10 0 010-20" strokeLinecap="round" className="animate-spin origin-center" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+            )}
 
             <p className="text-center text-[0.65rem] text-[#555]">
               One tap. Cryptographically signed with your Solana key.

@@ -224,21 +224,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function authenticate() {
       setAuthenticating(true);
       try {
-        setAuthStatusText('Signing you in...');
-        // Step 1: Get one-time challenge containing the exact message to sign
-        const challenge = await backendApi.getChallenge(address);
+        setAuthStatusText('Preparing challenge...');
+        
+        // Timeout helper to prevent infinite hanging on mobile app switches
+        const withTimeout = <T,>(p: Promise<T>, ms: number, msg: string): Promise<T> =>
+          Promise.race([
+            p,
+            new Promise<T>((_, reject) => setTimeout(() => reject(new Error(msg)), ms)),
+          ]);
 
-        setAuthStatusText('Sign in Phantom...');
+        // Step 1: Get one-time challenge containing the exact message to sign
+        const challenge = await withTimeout(
+          backendApi.getChallenge(address),
+          15000,
+          'Network timeout requesting sign-in challenge. Please check your connection and try again.'
+        );
+
+        setAuthStatusText('Confirm in Phantom...');
         // Step 2: Sign the exact backend message
         const messageBytes = new TextEncoder().encode(challenge.message);
-        const signatureBytes = await signMessage!(messageBytes);
+        const signatureBytes = await withTimeout(
+          signMessage!(messageBytes),
+          45000,
+          'Wallet signature request timed out or was dismissed in Phantom.'
+        );
 
         setAuthStatusText('Verifying on Circuit...');
         // Step 3: Base58 encode the signature to match backend bs58 verification
         const signatureBs58 = utils.bytes.bs58.encode(signatureBytes);
 
         // Step 4: Verify on backend → receive JWT & user profile
-        const authData = await backendApi.verifySignature(address, signatureBs58, challenge.nonce);
+        const authData = await withTimeout(
+          backendApi.verifySignature(address, signatureBs58, challenge.nonce),
+          15000,
+          'Verification request timed out. Please try signing in again.'
+        );
 
         // Step 5: Store persistent session
         backendApi.setSessionToken(authData.token);
@@ -260,10 +280,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           `%c⚡ Circuit: Authenticated via SIWS — ${address}`,
           'color: #D1D1D1; font-weight: bold;'
         );
-      } catch (err) {
-        console.error('SIWS authentication failed:', err);
-        // If user cancelled signing, disconnect wallet so retry is clean
-        await disconnect();
+      } catch (err: any) {
+        console.error('SIWS authentication failed:', err?.message || err);
+        // If user cancelled or request timed out, disconnect wallet cleanly so retry works immediately
+        try {
+          await disconnect();
+        } catch (_) {}
       } finally {
         setAuthenticating(false);
         setAuthStatusText(null);
