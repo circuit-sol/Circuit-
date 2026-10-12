@@ -283,9 +283,11 @@ export default function HistoryPage() {
       resolveUniqueOrderSerials(rawHistoryOrders);
 
       setEditionsMap(em);
-      const combined = rawHistoryOrders.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+      const combined = rawHistoryOrders.sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
       setOrders(combined);
     } catch (err) {
       console.error('Error fetching dynamic history records:', err);
@@ -425,7 +427,9 @@ export default function HistoryPage() {
                       <div className="space-y-3">
                         <div className="flex justify-between items-baseline">
                           <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.15em] font-mono">
-                            {new Date(order.created_at).toLocaleDateString()}
+                            {order.created_at && !isNaN(new Date(order.created_at).getTime())
+                              ? new Date(order.created_at).toLocaleDateString()
+                              : 'Recent'}
                           </span>
                           <span className="text-xs text-[#888] font-mono">Size: {order.size || 'M'}</span>
                         </div>

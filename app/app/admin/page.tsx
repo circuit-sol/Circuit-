@@ -957,8 +957,19 @@ export default function AdminDashboard() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {editions.map((ed) => {
+              {editions.length === 0 ? (
+                <div className="card-glass p-12 text-center rounded-2xl border-white/10 flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-xl text-[#888]">
+                    📭
+                  </div>
+                  <span className="text-sm font-bold text-white">No Submitted Collections Found</span>
+                  <p className="text-xs text-[#888] max-w-sm leading-relaxed">
+                    No designer collections are currently awaiting review. As creators submit made-to-order runway drops, they will appear here for 1-click approval.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {editions.map((ed) => {
                   const isApproved = approvedDropIds.includes(ed.id) || Boolean(ed.published);
                   const isBrandSuspended = ed.brand_id ? suspendedBrandIds.includes(ed.brand_id) : false;
                   const edBatches = batchesByEdition[ed.id] || [];
@@ -1085,6 +1096,7 @@ export default function AdminDashboard() {
                   );
                 })}
               </div>
+            )}
             </div>
 
             {/* Atelier & Brand Directory Moderation */}

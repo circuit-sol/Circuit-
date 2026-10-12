@@ -227,14 +227,14 @@ export default function CreatorStudioPage() {
                           batchOrdersMap.set(key, {
                             id: key,
                             batch_id: b.id,
-                            user_id: user?.id || 'demo-user',
-                            buyer_wallet: user?.walletAddress || 'buyer.sol',
+                            user_id: o.user_id || user?.id || 'anonymous',
+                            buyer_wallet: o.buyer_wallet || o.wallet_address || user?.walletAddress || 'anonymous.sol',
                             order_address: o.order_address || '',
                             vault_address: o.vault_address || '',
                             pickup_location_id: o.pickup_location_id || '',
                             size: o.size || 'Medium',
                             quantity: o.quantity || 1,
-                            amount_lamports: '100000000',
+                            amount_lamports: o.amount_lamports || '0',
                             purchase_signature: o.tx_signature || '',
                             purchased_at: o.created_at || new Date().toISOString(),
                             cancel_until: new Date(Date.now() + 86400000).toISOString(),
@@ -1006,7 +1006,7 @@ export default function CreatorStudioPage() {
                       disabled={isEditingExisting}
                       value={editionForm.id}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                      placeholder="e.g. yellow-gown"
+                      placeholder="e.g. duchess-satin-dress"
                       className={`bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30 ${
                         isEditingExisting ? 'opacity-60 cursor-not-allowed' : ''
                       }`}
@@ -1590,22 +1590,41 @@ export default function CreatorStudioPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {editions.map((ed) => {
-                const edBatches = batchesByEdition[ed.id] || [];
-                const isPublished = Boolean(ed.published);
+            {editions.length === 0 ? (
+              <div className="card-glass p-12 text-center rounded-3xl border-white/10 flex flex-col items-center gap-4 py-16">
+                <div className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-2xl text-[#888]">
+                  ✂
+                </div>
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-xl font-bold">No Drops Created Yet</h3>
+                  <p className="text-xs text-[#888] max-w-sm mx-auto leading-relaxed">
+                    You have 0 published or draft collections. Start your first made-to-order runway drop by filling out the details above.
+                  </p>
+                </div>
+                <button
+                  onClick={handleResetToNew}
+                  className="btn-circuit px-6 py-3 text-xs font-bold uppercase tracking-wider mt-2"
+                >
+                  <span>+ Start First Drop</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {editions.map((ed) => {
+                  const edBatches = batchesByEdition[ed.id] || [];
+                  const isPublished = Boolean(ed.published);
 
-                return (
-                  <div key={ed.id} className="card-glass p-6 rounded-3xl border-white/10 flex flex-col justify-between gap-5 group hover:border-white/20 transition-all">
-                    <div className="flex flex-col gap-4">
-                      {/* Image & Status Badge */}
-                      <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#0D0D0D] border border-white/10">
-                        <Image
-                          src={ed.images?.[0]?.url || '/yellow-gown.jpg'}
-                          alt={ed.name}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
+                  return (
+                    <div key={ed.id} className="card-glass p-6 rounded-3xl border-white/10 flex flex-col justify-between gap-5 group hover:border-white/20 transition-all">
+                      <div className="flex flex-col gap-4">
+                        {/* Image & Status Badge */}
+                        <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-[#0D0D0D] border border-white/10">
+                          <Image
+                            src={ed.images?.[0]?.url || ed.image_url || '/satin.png'}
+                            alt={ed.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
                         <div className="absolute top-3 left-3">
                           <span className={`text-[0.6rem] font-bold uppercase font-mono px-2.5 py-1 rounded-full ${
                             isPublished
@@ -1694,6 +1713,7 @@ export default function CreatorStudioPage() {
                 );
               })}
             </div>
+            )}
           </div>
         )}
 

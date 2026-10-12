@@ -117,7 +117,7 @@ export default function LandingPage() {
                     >
                       <div className="aspect-[4/5] relative overflow-hidden">
                         <Image
-                          src={edition.images?.[0]?.url || '/yellow-gown.jpg'}
+                          src={edition.images?.[0]?.url || edition.image_url || '/satin.png'}
                           alt={edition.name}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-105"

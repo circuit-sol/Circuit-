@@ -1154,7 +1154,7 @@ function DropPageContent() {
             {/* Main Frame */}
             <div className="relative rounded-[32px] overflow-hidden border border-white/[0.12] bg-[#0D0D0D] shadow-[0_30px_100px_rgba(0,0,0,.6)] aspect-[4/5]">
               <Image
-                src={activeEdition.images?.[activeImageIndex]?.url || '/yellow-gown.jpg'}
+                src={activeEdition.images?.[activeImageIndex]?.url || activeEdition.image_url || '/satin.png'}
                 alt={`${activeEdition.name} - ${activeEdition.images?.[activeImageIndex]?.tag || 'View'}`}
                 fill
                 className="w-full h-full object-cover scale-[1.01] transition-all duration-700 ease-in-out"

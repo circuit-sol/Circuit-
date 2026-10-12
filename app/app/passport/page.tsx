@@ -8,10 +8,12 @@ import { getEditionById, getUserOrders, updateOrderStatusLifecycle } from '@/lib
 import { useAuth } from '@/lib/auth-context';
 import * as backendApi from '@/lib/backendApi';
 import { executeVerifiedCancel } from '@/lib/solana-service';
-import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl, formatSerialNumber, resolveUniqueOrderSerials } from '@/lib/utils';
+import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl, formatSerialNumber, resolveUniqueOrderSerials, truncateAddress } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
+import Link from 'next/link';
+import SignInModal from '@/components/SignInModal';
 
 export interface WardrobePiece {
   id: string;
@@ -47,6 +49,7 @@ function PassportContent() {
   const [showComplimentModal, setShowComplimentModal] = useState(false);
   const [complimentMessage, setComplimentMessage] = useState('');
   const [isComplimented, setIsComplimented] = useState(false);
+  const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [cancelCountdown, setCancelCountdown] = useState<{ hours: number; minutes: number; seconds: number; isExpired: boolean } | null>(null);
   const { user, isSignedIn } = useAuth();
   const { signTransaction } = useWallet();
@@ -465,19 +468,90 @@ function PassportContent() {
 
   if (!order) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-black p-6 text-center">
-        <h1 className="text-2xl font-bold mb-4">No Passport Yet</h1>
-        <p className="text-[#666] max-w-sm mb-8 leading-relaxed">
-          Order a piece and your Passport will appear here. It's your proof that the garment is yours.
-        </p>
-        <div className="flex gap-4">
-          <a href="/passport/history" className="btn-circuit py-4 px-10 text-xs">
-            <span>View My Orders</span>
-          </a>
-          <a href="/drop" className="btn-outline-circuit py-4 px-10 text-xs border-white/10 hover:border-white/30">
-            Browse the Shop
-          </a>
-        </div>
+      <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center p-6 bg-black text-white selection:bg-white selection:text-black">
+        {!isSignedIn ? (
+          <div className="card-glass max-w-lg w-full p-8 md:p-12 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl">
+              🔐
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-amber-400 font-mono">
+                Authentication Required
+              </span>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Sign In to View Wardrobe</h1>
+              <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
+                Sign in with your email or connect your Solana wallet to decrypt and inspect your on-chain garment passports.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+              <button 
+                onClick={() => setIsSignInOpen(true)}
+                className="btn-circuit py-3.5 px-6 text-xs justify-center flex-1"
+              >
+                <span>Connect / Sign In</span>
+              </button>
+              <Link href="/drop" className="btn-outline-circuit py-3.5 px-6 text-xs justify-center flex-1 border-white/15 hover:border-white/30 text-white/80 hover:text-white">
+                <span>Browse Active Drops</span>
+              </Link>
+            </div>
+          </div>
+        ) : orderIdParam && !wardrobe.some((w) => w.id === orderIdParam || w.order?.id === orderIdParam || w.order?.tx_signature === orderIdParam) ? (
+          <div className="card-glass max-w-lg w-full p-8 md:p-12 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl">
+              🔍
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-red-400 font-mono">
+                Passport Record Not Found
+              </span>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Garment #{orderIdParam.slice(0, 8)}... Missing</h1>
+              <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
+                No passport matching reference <code className="text-white font-mono bg-white/10 px-1 py-0.5 rounded">{orderIdParam.slice(0, 12)}...</code> was found in your connected wardrobe. It may belong to another wallet or is awaiting indexing.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+              {wardrobe.length > 0 ? (
+                <button
+                  onClick={() => handleSelectPiece(wardrobe[0])}
+                  className="btn-circuit py-3.5 px-6 text-xs justify-center flex-1"
+                >
+                  <span>View My Wardrobe ({wardrobe.length})</span>
+                </button>
+              ) : (
+                <Link href="/drop" className="btn-circuit py-3.5 px-6 text-xs justify-center flex-1">
+                  <span>Browse Drops</span>
+                </Link>
+              )}
+              <Link href="/passport/history" className="btn-outline-circuit py-3.5 px-6 text-xs justify-center flex-1 border-white/15 hover:border-white/30 text-white/80 hover:text-white">
+                <span>Order Archive</span>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="card-glass max-w-lg w-full p-8 md:p-12 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl">
+              📭
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-white/50 font-mono">
+                Digital Wardrobe Empty (0 Garments)
+              </span>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">No Passports in Collection</h1>
+              <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
+                No active garment passports found for <strong className="text-white">{user?.email || (user?.walletAddress ? truncateAddress(user.walletAddress) : 'your wallet')}</strong>. When you reserve a piece from an active runway drop, your cryptographic digital product passport will be minted here.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+              <Link href="/drop" className="btn-circuit py-3.5 px-6 text-xs justify-center flex-1">
+                <span>Explore Active Drops</span>
+              </Link>
+              <Link href="/passport/history" className="btn-outline-circuit py-3.5 px-6 text-xs justify-center flex-1 border-white/15 hover:border-white/30 text-white/80 hover:text-white">
+                <span>Order Archive</span>
+              </Link>
+            </div>
+          </div>
+        )}
+        <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
       </div>
     );
   }

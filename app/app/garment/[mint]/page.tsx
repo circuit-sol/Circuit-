@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { fetchPassportData, type PassportData } from '@/lib/solana-service';
 import { truncateAddress, solscanTokenUrl } from '@/lib/utils';
@@ -49,6 +50,20 @@ export default function GarmentPassportPage() {
             Check the mint address or ensure you are on the correct network.
           </p>
           <code className="block w-full bg-black/40 p-3 rounded-xl font-mono text-[0.65rem] text-[#666] break-all">{mint}</code>
+          <div className="flex flex-col sm:flex-row gap-3 w-full pt-2">
+            <Link
+              href="/drop"
+              className="btn-circuit py-3.5 px-6 text-xs flex-1 justify-center"
+            >
+              <span>Browse Active Drops</span>
+            </Link>
+            <Link
+              href="/"
+              className="btn-outline-circuit py-3.5 px-6 text-xs flex-1 justify-center border-white/15 hover:border-white/30 text-white/80 hover:text-white"
+            >
+              <span>Return Home</span>
+            </Link>
+          </div>
         </div>
       </section>
     );
