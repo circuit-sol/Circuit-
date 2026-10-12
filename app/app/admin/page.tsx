@@ -16,6 +16,7 @@ import { executeBatchInitialize } from '@/lib/solana-service';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/lib/auth-context';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
+import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
 import AdminNavbar from '@/components/AdminNavbar';
 import { showToast } from '@/components/Toast';
 
@@ -539,7 +540,11 @@ export default function AdminDashboard() {
     setIsInitializingBatch(b.id);
     try {
       showToast('Initializing on Solana', 'Preparing batch and escrow vault on Devnet...');
-      const unitLamports = String(Math.floor(0.8 * 1e9));
+      const { price: liveRate } = await getLiveSolPrice();
+      const targetEd = editions.find(e => e.id === b.edition_id);
+      const usdPrice = Number(targetEd?.price_usd || 30);
+      const rawLamports = Math.floor((usdPrice / (liveRate || DEFAULT_SOL_MARKET_PRICE)) * 1e9);
+      const unitLamports = String(Math.max(rawLamports, 1000000));
       await executeBatchInitialize(
         b.id,
         {

@@ -21,6 +21,7 @@ import {
   formatSol,
   resolvePricing,
 } from '@/lib/utils';
+import { getLiveSolPrice } from '@/lib/price-service';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
@@ -201,12 +202,11 @@ function DropPageContent() {
           return count;
         }
 
-        // Fetch Live SOL Price silently
+        // Fetch Live SOL Price via resilient multi-source oracle cascade
         try {
-          const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-          const data = await res.json();
-          if (data?.solana?.usd && isMounted) {
-            setSolPrice(Number(data.solana.usd));
+          const { price: liveRate } = await getLiveSolPrice();
+          if (liveRate > 0 && isMounted) {
+            setSolPrice(liveRate);
           }
         } catch (e) {
           console.warn('Unable to fetch live SOL price, using cached/offline fallback:', e);
@@ -751,8 +751,11 @@ function DropPageContent() {
                     </span>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-white/70 text-[0.6rem] font-mono font-semibold uppercase tracking-wider whitespace-nowrap">
-                  Escrow Rate
+                <span
+                  className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-white/70 text-[0.6rem] font-mono font-semibold uppercase tracking-wider whitespace-nowrap cursor-help"
+                  title={`Live Oracle Conversion: 1 SOL ≈ $${(solPrice || 111.20).toFixed(2)} USD`}
+                >
+                  {solPrice ? `1 SOL ≈ $${solPrice.toFixed(0)}` : 'Escrow Rate'}
                 </span>
               </div>
             </div>

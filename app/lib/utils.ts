@@ -3,6 +3,7 @@
  */
 
 import { SOLSCAN_BASE, CLUSTER } from './constants';
+import { DEFAULT_SOL_MARKET_PRICE } from './price-service';
 
 // ── Address Helpers ──────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ export function resolvePricing(params: {
   }
 
   // 2. Resolve unit SOL: use on-chain batch lamports if available; else derive using reference/live rate
-  const referenceSolRate = (solRateUsd && solRateUsd > 0) ? solRateUsd : 150;
+  const referenceSolRate = (solRateUsd && solRateUsd > 0) ? solRateUsd : DEFAULT_SOL_MARKET_PRICE;
   let unitSol = 0;
 
   if (batchLamports) {

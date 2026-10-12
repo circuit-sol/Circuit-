@@ -8,9 +8,10 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import * as backendApi from '@/lib/backendApi';
 import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks } from '@/lib/db';
 import { executeBatchInitialize, parseSolanaError } from '@/lib/solana-service';
-import { showToast } from '@/components/Toast';
 import Navbar from '@/components/Navbar';
+import { showToast } from '@/components/Toast';
 import { solscanTxUrl } from '@/lib/utils';
+import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
 
 interface ApparelImage {
   url: string;
@@ -30,6 +31,7 @@ export default function CreatorStudioPage() {
   const [batchesByEdition, setBatchesByEdition] = useState<Record<string, backendApi.Batch[]>>({});
   const [ordersByBatch, setOrdersByBatch] = useState<Record<string, backendApi.ChainOrder[]>>({});
   const [loading, setLoading] = useState(true);
+  const [liveSolPrice, setLiveSolPrice] = useState<number>(DEFAULT_SOL_MARKET_PRICE);
 
   // Active View Tabs
   const [activeTab, setActiveTab] = useState<'wizard' | 'directory' | 'demand' | 'claims'>('wizard');
@@ -151,6 +153,9 @@ export default function CreatorStudioPage() {
       }
 
       setLoading(true);
+      getLiveSolPrice().then(({ price }) => {
+        if (price > 0) setLiveSolPrice(price);
+      }).catch(() => {});
       try {
         const brandsRes = await backendApi.getMyBrands().catch(() => ({ brands: [] }));
         let userBrands = brandsRes.brands || [];
@@ -723,8 +728,10 @@ export default function CreatorStudioPage() {
       setDeployStepText('4/4 Please approve vault initialization in Phantom...');
       showToast('Phantom Approval Required', 'Please confirm the on-chain vault creation transaction in Phantom.');
 
-      // Convert USD price to approximate lamports (using ~$150 SOL reference rate, 0.2 SOL for $30)
-      const rawLamports = Math.floor((Number(editionForm.price_usd || 30) / 150) * 1e9);
+      // Convert USD price to on-chain lamports using live market oracle
+      const liveOracle = await getLiveSolPrice();
+      const activeRate = liveOracle.price || liveSolPrice || DEFAULT_SOL_MARKET_PRICE;
+      const rawLamports = Math.floor((Number(editionForm.price_usd || 30) / activeRate) * 1e9);
       const unitLamports = String(Math.max(rawLamports, 1000000));
 
       const initResult = await executeBatchInitialize(
@@ -1064,6 +1071,10 @@ export default function CreatorStudioPage() {
                       onChange={(e) => setEditionForm(prev => ({ ...prev, price_usd: Number(e.target.value) }))}
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none"
                     />
+                    <div className="flex items-center justify-between text-[0.6rem] font-mono text-[#888] px-1">
+                      <span>≈ {Number(((Number(editionForm.price_usd) || 0) / (liveSolPrice || DEFAULT_SOL_MARKET_PRICE)).toFixed(4))} SOL</span>
+                      <span className="text-emerald-400/80">Oracle: 1 SOL ≈ ${liveSolPrice.toFixed(2)}</span>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Pieces Available</label>
