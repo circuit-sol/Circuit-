@@ -10,7 +10,6 @@ import * as backendApi from '@/lib/backendApi';
 import { executeVerifiedCancel } from '@/lib/solana-service';
 import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl, formatSerialNumber, resolveUniqueOrderSerials, truncateAddress } from '@/lib/utils';
 import { showToast } from '@/components/Toast';
-import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import Link from 'next/link';
 import SignInModal from '@/components/SignInModal';
@@ -557,8 +556,6 @@ function PassportContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white selection:bg-white selection:text-black overflow-x-hidden">
-      <Navbar />
-      
       <main className="flex-1 flex flex-col py-24 md:py-32">
         <div className="section-container">
           

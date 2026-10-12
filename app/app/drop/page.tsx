@@ -54,6 +54,7 @@ function DropPageContent() {
   const searchParams = useSearchParams();
   const requestedEditionId = searchParams.get('edition');
 
+  const [allEditions, setAllEditions] = useState<any[]>([]);
   const [edition, setEdition] = useState<any>(null);
   const [batches, setBatches] = useState<backendApi.Batch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<backendApi.Batch | null>(null);
@@ -83,8 +84,35 @@ function DropPageContent() {
     async function loadDropData() {
       try {
         setLoading(true);
-        let activeEdition = null;
 
+        // Fetch Live SOL Price early for both catalog and detail views
+        try {
+          const { price: liveRate } = await getLiveSolPrice();
+          if (liveRate > 0 && isMounted) {
+            setSolPrice(liveRate);
+          }
+        } catch (e) {
+          console.warn('Unable to fetch live SOL price, using fallback:', e);
+        }
+
+        // Fetch all editions for catalog grid and switcher
+        const availableEditions = await getEditions();
+        if (isMounted && availableEditions) {
+          setAllEditions(availableEditions);
+        }
+
+        // If no edition is requested, we are in Catalog Mode: display all pieces!
+        if (!requestedEditionId) {
+          if (!isMounted) return;
+          setEdition(null);
+          setBatches([]);
+          setSelectedBatch(null);
+          setSelectedLocationId('');
+          setLoading(false);
+          return;
+        }
+
+        let activeEdition = null;
         if (requestedEditionId) {
           activeEdition = await getEditionById(requestedEditionId);
           if (!activeEdition) {
@@ -96,12 +124,9 @@ function DropPageContent() {
               // fallback
             }
           }
-        }
-
-        if (!activeEdition) {
-          const allEditions = await getEditions();
-          if (allEditions && allEditions.length > 0) {
-            activeEdition = allEditions[0];
+          if (!activeEdition && availableEditions) {
+            const matched = availableEditions.find((e: any) => e.id === requestedEditionId);
+            if (matched) activeEdition = matched;
           }
         }
 
@@ -520,31 +545,138 @@ function DropPageContent() {
   }
 
   if (!activeEdition) {
-    return (
-      <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center pt-[72px] px-6 bg-black text-white selection:bg-white selection:text-black">
-        <div className="card-glass max-w-lg w-full p-10 md:p-12 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl">
-          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl">
-            ✨
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-amber-400 font-mono">
-              Atelier Vault Empty
-            </span>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">No Active Drops Scheduled</h2>
-            <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
-              There are currently no active runway drops accepting preorders. New collections are published directly by verified ateliers.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
-            <Link href="/" className="btn-circuit py-3 px-6 text-xs justify-center">
-              <span>Return Home</span>
-            </Link>
-            <Link href="/creator" className="btn-outline-circuit py-3 px-6 text-xs justify-center border-white/15 hover:border-white/30 text-white/80 hover:text-white">
-              <span>Creator Studio ↗</span>
-            </Link>
+    if (allEditions.length === 0) {
+      return (
+        <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center pt-[72px] px-6 bg-black text-white selection:bg-white selection:text-black">
+          <div className="card-glass max-w-lg w-full p-10 md:p-12 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl">
+              ✨
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-amber-400 font-mono">
+                Atelier Vault Empty
+              </span>
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight">No Active Drops Scheduled</h2>
+              <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
+                There are currently no active runway drops accepting preorders. New collections are published directly by verified ateliers.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+              <Link href="/" className="btn-circuit py-3 px-6 text-xs justify-center">
+                <span>Return Home</span>
+              </Link>
+              <Link href="/creator" className="btn-outline-circuit py-3 px-6 text-xs justify-center border-white/15 hover:border-white/30 text-white/80 hover:text-white">
+                <span>Creator Studio ↗</span>
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      );
+    }
+
+    return (
+      <section className="min-h-[calc(100vh-72px)] flex flex-col pt-8 md:pt-14 pb-24 overflow-x-hidden bg-black text-white selection:bg-white selection:text-black">
+        {/* Ambient Glow */}
+        <div className="fixed inset-0 pointer-events-none z-0" aria-hidden="true">
+          <div className="ambient-orb orb-white" />
+          <div className="ambient-orb orb-grey" />
+        </div>
+
+        <div className="section-container relative z-10">
+          {/* Catalog Editorial Header */}
+          <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#A3A3A3] font-mono">
+                Solana Escrow Vaults · Made to Order
+              </span>
+            </div>
+            <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-4">
+              Active Drops.
+            </h1>
+            <p className="text-sm md:text-base text-[#888] leading-relaxed max-w-xl mx-auto">
+              Reserve limited atelier pieces directly from the designer. Payments remain locked in smart contract escrow vaults until delivery.
+            </p>
+          </div>
+
+          {/* Drops Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {allEditions.map((ed) => {
+              const solEquivalent = solPrice && solPrice > 0 ? (Number(ed.price_usd || 0) / solPrice).toFixed(3) : null;
+              const coverImg = ed.images?.[0]?.url || ed.image_url || '/satin.png';
+
+              return (
+                <div
+                  key={ed.id}
+                  className="card-glass rounded-3xl border border-white/10 hover:border-white/25 transition-all duration-300 group overflow-hidden flex flex-col justify-between shadow-[0_15px_40px_rgba(0,0,0,0.5)]"
+                >
+                  <div>
+                    {/* Lookbook Photography */}
+                    <div className="relative aspect-[4/5] overflow-hidden bg-[#0D0D0D] border-b border-white/[0.08]">
+                      <Image
+                        src={coverImg}
+                        alt={ed.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                      />
+                      <div className="absolute top-4 left-4 z-10">
+                        <span className="px-3 py-1 rounded-full text-[0.65rem] font-bold uppercase font-mono tracking-wider bg-black/60 backdrop-blur-md border border-white/20 text-white flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Preorder Open
+                        </span>
+                      </div>
+                      <div className="absolute bottom-4 right-4 z-10">
+                        <span className="px-3 py-1 rounded-full text-[0.65rem] font-mono font-bold bg-black/80 backdrop-blur-md border border-white/10 text-emerald-400">
+                          {ed.max_supply || 50} Pieces Run
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Piece Details */}
+                    <div className="p-6 flex flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[0.65rem] uppercase tracking-widest font-mono text-[#888]">
+                          {ed.fabric || 'Atelier Collection'}
+                        </span>
+                        {ed.embroidery && (
+                          <span className="text-[0.65rem] font-mono text-white/40 truncate max-w-[120px]">
+                            {ed.embroidery}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="text-xl md:text-2xl font-bold tracking-tight text-white group-hover:text-white/90 transition-colors">
+                        {ed.name}
+                      </h3>
+
+                      <p className="text-xs text-[#888] line-clamp-2 leading-relaxed">
+                        {ed.description || 'Made-to-order runway design backed by Solana smart contract escrow.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Pricing and Action */}
+                  <div className="p-6 pt-0 border-t border-white/[0.06] mt-4 flex items-center justify-between">
+                    <div className="flex flex-col pt-3">
+                      <span className="text-base font-bold font-mono text-white">${ed.price_usd} USD</span>
+                      {solEquivalent && (
+                        <span className="text-[0.65rem] font-mono text-[#777]">≈ {solEquivalent} SOL</span>
+                      )}
+                    </div>
+
+                    <Link
+                      href={`/drop?edition=${ed.id}`}
+                      className="btn-circuit py-2.5 px-5 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 mt-3"
+                    >
+                      <span>Preorder ➔</span>
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -577,11 +709,50 @@ function DropPageContent() {
             )}
           </div>
 
-          <div className="w-full flex justify-between items-center z-10 pt-4">
-            <Link href="/" className="inline-flex items-center gap-2 text-[#888] hover:text-white transition-colors text-xs font-bold uppercase tracking-widest px-4 py-2 border border-white/10 rounded-full bg-white/[0.03]">
+          {/* Quick Breadcrumbs & Switcher */}
+          <div className="w-full flex flex-wrap justify-between items-center gap-3 z-10 pt-2">
+            <Link
+              href="/drop"
+              className="inline-flex items-center gap-2 text-[#888] hover:text-white transition-colors text-xs font-bold uppercase tracking-widest px-4 py-2 border border-white/10 rounded-full bg-white/[0.03] hover:bg-white/[0.06]"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              Explore Other Editions
+              All Drops Catalog
             </Link>
+
+            {allEditions.length > 1 && (
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-emerald-400 px-3.5 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all"
+                >
+                  <span>Switch Piece ({allEditions.length})</span>
+                  <span className="text-[10px]">▾</span>
+                </button>
+                <div className="absolute right-0 top-full pt-2 w-64 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50">
+                  <div className="p-2 border border-white/[0.12] rounded-2xl shadow-2xl backdrop-blur-2xl bg-black/95 flex flex-col gap-1 max-h-72 overflow-y-auto no-scrollbar">
+                    {allEditions.map(ed => (
+                      <Link
+                        key={ed.id}
+                        href={`/drop?edition=${ed.id}`}
+                        className={`flex items-center gap-2.5 px-3 py-2 text-xs font-bold rounded-xl transition-colors ${
+                          ed.id === activeEdition.id
+                            ? 'bg-white/10 text-white border border-white/15'
+                            : 'text-white/70 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="w-7 h-7 rounded-lg overflow-hidden bg-white/5 relative shrink-0">
+                          <Image src={ed.images?.[0]?.url || ed.image_url || '/satin.png'} alt={ed.name} fill className="object-cover" />
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="truncate">{ed.name}</span>
+                          <span className="text-[10px] font-mono text-[#888]">${ed.price_usd}</span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Title & Brand */}

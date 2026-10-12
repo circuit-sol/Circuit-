@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { getUserOrders, getEditions } from '@/lib/db';
@@ -305,8 +304,6 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white selection:bg-white selection:text-black">
-      <Navbar />
-
       <main className="flex-1 py-24 md:py-32">
         <div className="section-container">
           {/* Header */}

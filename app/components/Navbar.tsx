@@ -10,21 +10,38 @@ import SignInModal from './SignInModal';
 import { truncateAddress } from '@/lib/utils';
 import { showToast } from './Toast';
 
+import { getEditions } from '@/lib/db';
+
 const NAV_LINKS = [
-  { href: '/drop', label: 'Shop', page: 'drop' },
-  { href: '/confirm', label: 'Confirm Arrival', page: 'confirm' },
-  { href: '/passport', label: 'My Passport', page: 'passport' },
+  { href: '/drop', label: 'Drops', page: 'drop' },
+  { href: '/passport', label: 'Digital Passport', page: 'passport' },
   { href: '/creator', label: 'Creator Studio', page: 'creator' },
 ];
 
 export default function Navbar({ customEditions }: { customEditions?: any[] }) {
   const pathname = usePathname();
   const { user, isSignedIn, signOut } = useAuth();
+  const [editions, setEditions] = useState<any[]>(customEditions || []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [signInMode, setSignInMode] = useState<'signin' | 'update-email'>('signin');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // Automatically load editions for hover preview if not supplied
+  useEffect(() => {
+    if (customEditions && customEditions.length > 0) {
+      setEditions(customEditions);
+      return;
+    }
+    let isMounted = true;
+    getEditions().then((eds) => {
+      if (isMounted && eds && eds.length > 0) {
+        setEditions(eds);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, [customEditions]);
 
   // Close drawer on route change
   useEffect(() => {
@@ -60,14 +77,9 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
     }
   }, [drawerOpen]);
 
-
   const activePage = pathname.startsWith('/passport') ? 'passport' :
-    pathname.startsWith('/landing') || pathname === '/' ? 'landing' :
-    pathname.startsWith('/confirm') ? 'confirm' :
     pathname.startsWith('/creator') ? 'creator' :
     pathname.startsWith('/drop') ? 'drop' : '';
-
-
 
   const handleCopyWallet = () => {
     if (user?.walletAddress) {
@@ -87,36 +99,82 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
             <span className="font-brand text-[1.2rem] font-bold tracking-[0.05em] bg-gradient-to-b from-white to-[#A3A3A3] bg-clip-text text-transparent">Circuit</span>
           </Link>
 
-          {/* Desktop Nav - Center */}
-          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 gap-1 p-1 bg-white/[0.03] border border-white/[0.08] rounded-full">
-            {activePage === 'landing' && customEditions && customEditions.length > 0 ? (
-              <div className="relative group">
-                <button className="px-6 py-2 rounded-full text-[0.8rem] font-semibold uppercase tracking-[0.06em] transition-all text-white bg-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                  Open Drops ▾
-                </button>
-                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-56 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all z-50">
-                  <div className="card-glass p-2 border border-white/[0.1] rounded-2xl shadow-2xl flex flex-col gap-1">
-                    {customEditions.map(ed => (
-                      <Link key={ed.id} href={`/drop?edition=${ed.id}`} className="block px-4 py-2.5 text-[0.75rem] font-bold text-white/70 hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors truncate">
-                        {ed.name}
-                      </Link>
-                    ))}
+          {/* Desktop Nav - Center (Unified Luxury Bar) */}
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 p-1 bg-white/[0.03] border border-white/[0.08] rounded-full backdrop-blur-md">
+            {/* 1. Drops Link with Hover Showcase */}
+            <div className="relative group">
+              <Link
+                href="/drop"
+                className={`px-5 py-2 rounded-full text-[0.8rem] font-semibold uppercase tracking-[0.06em] transition-all flex items-center gap-1.5 ${
+                  activePage === 'drop'
+                    ? 'text-white bg-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.05)]'
+                    : 'text-[#888] hover:text-white'
+                }`}
+              >
+                <span>Drops</span>
+                {editions.length > 0 && <span className="text-[9px] text-[#666] group-hover:text-white transition-colors">▾</span>}
+              </Link>
+
+              {editions.length > 0 && (
+                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-72 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50">
+                  <div className="p-2 border border-white/[0.12] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-2xl bg-black/95 flex flex-col gap-1">
+                    <Link
+                      href="/drop"
+                      className="flex items-center justify-between px-3.5 py-2.5 text-[0.7rem] font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 hover:bg-white/[0.05] rounded-xl transition-colors border-b border-white/[0.06] mb-1"
+                    >
+                      <span>Explore All Drops</span>
+                      <span className="text-xs">→</span>
+                    </Link>
+                    <div className="flex flex-col gap-1 max-h-72 overflow-y-auto no-scrollbar">
+                      {editions.map(ed => (
+                        <Link
+                          key={ed.id}
+                          href={`/drop?edition=${ed.id}`}
+                          className="flex items-center gap-3 px-3 py-2 text-[0.75rem] font-bold text-white/80 hover:text-white hover:bg-white/[0.06] rounded-xl transition-colors group/item"
+                        >
+                          <div className="w-8 h-8 rounded-lg overflow-hidden bg-white/5 relative shrink-0 border border-white/10">
+                            <Image
+                              src={ed.images?.[0]?.url || ed.image_url || '/satin.png'}
+                              alt={ed.name}
+                              fill
+                              className="object-cover group-hover/item:scale-105 transition-transform"
+                            />
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="truncate text-white text-[0.75rem] font-semibold">{ed.name}</span>
+                            <span className="text-[0.62rem] font-mono text-[#888]">${ed.price_usd} USD</span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              NAV_LINKS.map((link) => (
-                <Link
-                  key={link.page}
-                  href={link.href}
-                  className={`px-6 py-2 rounded-full text-[0.8rem] font-semibold uppercase tracking-[0.06em] transition-all ${
-                    activePage === link.page ? 'text-white bg-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.05)]' : 'text-[#666] hover:text-white'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))
-            )}
+              )}
+            </div>
+
+            {/* 2. Digital Passport */}
+            <Link
+              href="/passport"
+              className={`px-5 py-2 rounded-full text-[0.8rem] font-semibold uppercase tracking-[0.06em] transition-all ${
+                activePage === 'passport'
+                  ? 'text-white bg-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.05)]'
+                  : 'text-[#888] hover:text-white'
+              }`}
+            >
+              Digital Passport
+            </Link>
+
+            {/* 3. Creator Studio */}
+            <Link
+              href="/creator"
+              className={`px-5 py-2 rounded-full text-[0.8rem] font-semibold uppercase tracking-[0.06em] transition-all ${
+                activePage === 'creator'
+                  ? 'text-white bg-white/[0.1] shadow-[0_0_15px_rgba(255,255,255,0.05)]'
+                  : 'text-[#888] hover:text-white'
+              }`}
+            >
+              Creator Studio
+            </Link>
           </div>
 
           {/* Actions - Right */}
@@ -233,45 +291,72 @@ export default function Navbar({ customEditions }: { customEditions?: any[] }) {
         }`}
       >
         <div className="h-full flex flex-col px-8 pt-32 pb-12">
-          <div className="flex flex-col gap-8">
-            {activePage === 'landing' && customEditions && customEditions.length > 0 ? (
-              <>
-                <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-[0.1em] mb-2">Open Drops</span>
-                {customEditions.map((ed, i) => (
+          <div className="flex flex-col gap-6">
+            {/* 01 Drops */}
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/drop"
+                onClick={() => setDrawerOpen(false)}
+                className="group flex items-baseline gap-4"
+              >
+                <span className="text-[0.7rem] font-mono text-[#444] group-hover:text-white transition-colors">01</span>
+                <span className={`text-[2.2rem] font-bold tracking-[-0.03em] ${
+                  activePage === 'drop' ? 'text-white' : 'text-[#666] hover:text-white'
+                }`}>
+                  Drops
+                </span>
+              </Link>
+              {editions.length > 0 && (
+                <div className="flex flex-col gap-2 pl-9 pt-1 border-l border-white/[0.08] ml-2">
                   <Link
-                    key={ed.id}
-                    href={`/drop?edition=${ed.id}`}
+                    href="/drop"
                     onClick={() => setDrawerOpen(false)}
-                    className="group flex items-baseline gap-4"
+                    className="text-[0.75rem] font-bold uppercase tracking-wider text-emerald-400 py-1"
                   >
-                    <span className="text-[0.7rem] font-mono text-[#444] group-hover:text-white transition-colors">
-                      0{i + 1}
-                    </span>
-                    <span className="text-[2rem] font-bold tracking-[-0.03em] text-white hover:text-white/80 line-clamp-1">
-                      {ed.name}
-                    </span>
+                    View All Drops Catalog →
                   </Link>
-                ))}
-              </>
-            ) : (
-              NAV_LINKS.map((link, i) => (
-                <Link
-                  key={link.page}
-                  href={link.href}
-                  onClick={() => setDrawerOpen(false)}
-                  className="group flex items-baseline gap-4"
-                >
-                  <span className="text-[0.7rem] font-mono text-[#444] group-hover:text-white transition-colors">
-                    0{i + 1}
-                  </span>
-                  <span className={`text-[2.5rem] font-bold tracking-[-0.03em] ${
-                    activePage === link.page ? 'text-white' : 'text-[#666] hover:text-white'
-                  }`}>
-                    {link.label}
-                  </span>
-                </Link>
-              ))
-            )}
+                  {editions.slice(0, 5).map((ed) => (
+                    <Link
+                      key={ed.id}
+                      href={`/drop?edition=${ed.id}`}
+                      onClick={() => setDrawerOpen(false)}
+                      className="text-xs text-white/70 hover:text-white truncate flex items-center justify-between py-1"
+                    >
+                      <span>{ed.name}</span>
+                      <span className="font-mono text-[10px] text-white/40">${ed.price_usd}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 02 Digital Passport */}
+            <Link
+              href="/passport"
+              onClick={() => setDrawerOpen(false)}
+              className="group flex items-baseline gap-4"
+            >
+              <span className="text-[0.7rem] font-mono text-[#444] group-hover:text-white transition-colors">02</span>
+              <span className={`text-[2.2rem] font-bold tracking-[-0.03em] ${
+                activePage === 'passport' ? 'text-white' : 'text-[#666] hover:text-white'
+              }`}>
+                Digital Passport
+              </span>
+            </Link>
+
+            {/* 03 Creator Studio */}
+            <Link
+              href="/creator"
+              onClick={() => setDrawerOpen(false)}
+              className="group flex items-baseline gap-4"
+            >
+              <span className="text-[0.7rem] font-mono text-[#444] group-hover:text-white transition-colors">03</span>
+              <span className={`text-[2.2rem] font-bold tracking-[-0.03em] ${
+                activePage === 'creator' ? 'text-white' : 'text-[#666] hover:text-white'
+              }`}>
+                Creator Studio
+              </span>
+            </Link>
           </div>
 
           <div className="mt-auto pt-12 border-t border-white/[0.08] flex flex-col gap-8">

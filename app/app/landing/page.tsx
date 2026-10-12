@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import Navbar from '@/components/Navbar';
 import NewsletterForm from '@/components/NewsletterForm';
 import { getEditions } from '@/lib/db';
 import { formatUsd } from '@/lib/utils';
@@ -58,8 +57,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white selection:bg-white selection:text-black">
-      <Navbar customEditions={editions} />
-
       <main className="flex-1">
         {/* HERO SECTION */}
         <section className="section-container pt-32 pb-16 md:pt-44 md:pb-8 text-center relative overflow-hidden">

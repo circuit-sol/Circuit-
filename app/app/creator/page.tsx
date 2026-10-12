@@ -8,7 +8,6 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import * as backendApi from '@/lib/backendApi';
 import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks } from '@/lib/db';
 import { executeBatchInitialize, parseSolanaError } from '@/lib/solana-service';
-import Navbar from '@/components/Navbar';
 import { showToast } from '@/components/Toast';
 import { solscanTxUrl } from '@/lib/utils';
 import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
@@ -873,7 +872,6 @@ export default function CreatorStudioPage() {
   if (!isSignedIn) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col selection:bg-white selection:text-black">
-        <Navbar />
         <main className="flex-1 flex items-center justify-center px-6 pt-24 pb-12">
           <div className="card-glass max-w-lg w-full p-8 md:p-12 flex flex-col items-center text-center gap-6 border-white/10 rounded-3xl animate-fade-in">
             <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl shadow-inner">
@@ -903,8 +901,6 @@ export default function CreatorStudioPage() {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col selection:bg-white selection:text-black">
-      <Navbar />
-
       <main className="flex-1 section-container pt-28 pb-20">
         {/* Studio Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/[0.08] mb-10">
