@@ -1326,18 +1326,40 @@ export default function CreatorStudioPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {editionForm.images.map((img, idx) => (
                       <div key={idx} className="relative aspect-[4/5] rounded-xl overflow-hidden border border-white/15 bg-white/[0.02] group">
-                        <Image src={img.url} alt={img.tag} fill className="object-cover" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                        <Image src={img.url} alt={img.tag || `Look ${idx + 1}`} fill className="object-cover" />
+                        
+                        {/* Top action: Delete button */}
+                        <div className="absolute top-2 right-2 z-10">
                           <button
                             type="button"
                             onClick={() => removeImage(idx)}
-                            className="self-end p-1 rounded-full bg-red-500/80 text-white text-[10px]"
+                            className="p-1 rounded-full bg-red-500/90 hover:bg-red-500 text-white text-[11px] leading-none shadow-lg transition-transform hover:scale-110 flex items-center justify-center w-5 h-5"
+                            title="Remove photo"
                           >
                             ✕
                           </button>
-                          <span className="text-[0.6rem] font-mono text-white/80 bg-black/60 px-1.5 py-0.5 rounded truncate">
-                            {img.tag}
-                          </span>
+                        </div>
+
+                        {/* Bottom action: Editable Look Tag / Label */}
+                        <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end z-10">
+                          <div className="flex items-center gap-1.5 bg-black/80 hover:bg-black/95 focus-within:bg-black backdrop-blur-md border border-white/20 focus-within:border-white/60 rounded-lg px-2 py-1 transition-all">
+                            <input
+                              type="text"
+                              value={img.tag}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditionForm(prev => ({
+                                  ...prev,
+                                  images: prev.images.map((item, i) => (i === idx ? { ...item, tag: val } : item)),
+                                }));
+                              }}
+                              placeholder={idx === 0 ? 'Front View' : `Look ${idx + 1}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="bg-transparent text-[0.65rem] font-mono text-white focus:outline-none w-full placeholder:text-white/40"
+                              title="Click to edit photo tag (e.g. Front View, Back View, Detail Shot)"
+                            />
+                            <span className="text-[10px] text-white/40 select-none pointer-events-none">✎</span>
+                          </div>
                         </div>
                       </div>
                     ))}
