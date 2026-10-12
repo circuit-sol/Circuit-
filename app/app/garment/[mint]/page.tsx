@@ -93,7 +93,9 @@ export default function GarmentPassportPage() {
           
           <div className="flex flex-col items-center gap-2">
             <span className="text-[0.65rem] font-bold text-[#444] uppercase tracking-[0.2em]">Garment Edition</span>
-            <span className="text-xl font-bold text-white">{passport.edition} of {MAX_SUPPLY}</span>
+            <span className="text-xl font-bold text-white">
+              {passport.edition?.includes('of') ? passport.edition : `Edition #${passport.edition || '01'}`}
+            </span>
           </div>
         </div>
 

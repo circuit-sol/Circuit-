@@ -33,6 +33,7 @@ import {
   BRAND,
   DEMO_START_COUNT,
   RPC_ENDPOINT,
+  CLUSTER,
 } from './constants';
 
 
@@ -666,10 +667,12 @@ export function parseError(err: unknown): string {
     return 'Transaction cancelled. You can try again when ready.';
   }
   if (msg.includes('insufficient') || msg.includes('Insufficient')) {
-    return 'Insufficient funds. Get devnet SOL from faucet.solana.com';
+    return CLUSTER === 'mainnet-beta' || CLUSTER === 'mainnet'
+      ? 'Insufficient funds in your Solana wallet to complete this purchase.'
+      : 'Insufficient funds. Get devnet SOL from faucet.solana.com';
   }
   if (msg.includes('Network') || msg.includes('fetch') || msg.includes('timeout')) {
-    return 'Unable to reach Solana devnet. Please check your connection.';
+    return 'Unable to reach the Solana network. Please check your connection.';
   }
 
   return msg || 'Transaction failed. Please try again.';

@@ -26,6 +26,7 @@ import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
 import { saveOrder, getEditionById, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
+import { CLUSTER } from '@/lib/constants';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error' | 'soldout';
 type TxStep = 'idle' | 'prepare' | 'sign' | 'submit' | 'confirm';
@@ -106,7 +107,7 @@ function DropPageContent() {
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState('Medium');
   const [quantity, setQuantity] = useState(1);
-  const [computedPrice, setComputedPrice] = useState(120);
+  const [computedPrice, setComputedPrice] = useState(fallbackEdition?.price_usd || 0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'fiat' | 'crypto'>('crypto');
   const [solPrice, setSolPrice] = useState<number | null>(null);
@@ -1077,13 +1078,15 @@ function DropPageContent() {
                     <span className="text-xs font-bold uppercase tracking-wider text-white">Payment Secured in Escrow</span>
                   </div>
                   <span className="text-[0.65rem] font-mono text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20">
-                    Solana Devnet
+                    {txResult.txSignature?.startsWith('CRCT-FIAT-') ? 'Card Settlement' : (CLUSTER === 'mainnet-beta' ? 'Solana Mainnet' : 'Solana Devnet')}
                   </span>
                 </div>
 
                 {/* Subtitle Reassurance */}
                 <p className="text-[0.72rem] text-[#aaa] leading-relaxed">
-                  Your funds are secured in on-chain escrow. Review your transaction proof below or open your Digital Product Passport whenever you are ready.
+                  {txResult.txSignature?.startsWith('CRCT-FIAT-') 
+                    ? 'Your card payment receipt has been verified. Review your order record below or open your Digital Product Passport.'
+                    : 'Your funds are secured in on-chain escrow. Review your transaction proof below or open your Digital Product Passport whenever you are ready.'}
                 </p>
 
                 {/* Garment & Edition stats */}
@@ -1116,18 +1119,26 @@ function DropPageContent() {
                   </div>
                 </div>
 
-                {/* On-Chain Explorer Proofs */}
+                {/* Verifications & Receipts */}
                 <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.08]">
-                  <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#666]">On-Chain Blockchain Verifications</span>
+                  <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#666]">
+                    {txResult.txSignature?.startsWith('CRCT-FIAT-') ? 'Order Receipt & Proof' : 'On-Chain Blockchain Verifications'}
+                  </span>
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-mono">
-                    <a
-                      href={solanaExplorerTxUrl(txResult.txSignature)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/12 border border-white/15 text-white font-medium transition-all flex items-center gap-1.5 hover:border-emerald-500/40"
-                    >
-                      <span>View on Solana Explorer ↗</span>
-                    </a>
+                    {!txResult.txSignature?.startsWith('CRCT-FIAT-') ? (
+                      <a
+                        href={solanaExplorerTxUrl(txResult.txSignature)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/12 border border-white/15 text-white font-medium transition-all flex items-center gap-1.5 hover:border-emerald-500/40"
+                      >
+                        <span>View on Solana Explorer ↗</span>
+                      </a>
+                    ) : (
+                      <div className="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/15 text-emerald-400 font-mono text-[0.7rem] flex items-center gap-1.5">
+                        <span>Receipt ID: {txResult.txSignature}</span>
+                      </div>
+                    )}
                     {txResult.vaultAddress && (
                       <a
                         href={solanaExplorerAccountUrl(txResult.vaultAddress)}
@@ -1323,16 +1334,15 @@ function DropPageContent() {
                 onClick={() => {
                   setTxState('signing');
                   setTimeout(() => {
-                    const simSig = 'fiat-sim-' + Date.now().toString(36);
+                    const fiatReceiptId = 'CRCT-FIAT-' + Date.now().toString(36).toUpperCase();
                     const assignedFiatNum = (mintedCount || 0) + 1;
                     setShowFiatModal(false);
                     setTxState('success');
                     setMintedCount((prev) => prev + quantity);
                     setTxResult({
-                      txSignature: simSig,
-                      solscanUrl: `https://explorer.solana.com/tx/${simSig}?cluster=devnet`,
+                      txSignature: fiatReceiptId,
                       orderNumber: assignedFiatNum,
-                      orderId: simSig,
+                      orderId: fiatReceiptId,
                       amountSol: totalSol,
                       amountUsd: totalUsd,
                       quantity,
@@ -1344,13 +1354,13 @@ function DropPageContent() {
                     });
 
                     if (typeof window !== 'undefined') {
-                      localStorage.setItem('circuit_last_order_tx', simSig);
-                      localStorage.setItem('circuit_last_order_id', simSig);
+                      localStorage.setItem('circuit_last_order_tx', fiatReceiptId);
+                      localStorage.setItem('circuit_last_order_id', fiatReceiptId);
                       const richOrder = {
-                        id: simSig,
+                        id: fiatReceiptId,
                         drop_id: activeEdition.id,
                         batch_id: selectedBatch?.id,
-                        tx_signature: simSig,
+                        tx_signature: fiatReceiptId,
                         amount_usd: totalUsd,
                         amount_sol: totalSol,
                         quantity,

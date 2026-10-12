@@ -10,6 +10,7 @@ import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 import { formatSerialNumber } from '@/lib/utils';
+import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
 import * as backendApi from '@/lib/backendApi';
 
 type TxState = 'idle' | 'loading' | 'signing' | 'success' | 'error';
@@ -64,13 +65,15 @@ export default function ConfirmPage() {
           const chainRes = await backendApi.getMyChainOrders();
           if (chainRes?.orders && chainRes.orders.length > 0) {
             const c = chainRes.orders[0];
+            const { price: livePrice } = await getLiveSolPrice().catch(() => ({ price: DEFAULT_SOL_MARKET_PRICE }));
+            const rate = livePrice > 0 ? livePrice : DEFAULT_SOL_MARKET_PRICE;
             latest = {
               id: c.id,
               drop_id: c.batch_id,
               batch_id: c.batch_id,
               tx_signature: c.purchase_signature,
               escrow_pda: c.vault_address || c.order_address,
-              amount_usd: c.amount_lamports ? (Number(c.amount_lamports) / 1e9 * 150).toFixed(2) : '150.00',
+              amount_usd: c.amount_lamports ? (Number(c.amount_lamports) / 1e9 * rate).toFixed(2) : ((c as any).amount_usd ? Number((c as any).amount_usd).toFixed(2) : '0.00'),
               size: c.size || 'M',
               quantity: c.quantity || 1,
               status: c.cancelled ? 'cancelled' : (c.collected_at ? 'delivered' : 'pending'),

@@ -5,7 +5,7 @@
  */
 
 // ── Environment Flags ────────────────────────────────────────────────
-export const SIMULATION_MODE = process.env.NEXT_PUBLIC_SIMULATION_MODE !== 'false';
+export const SIMULATION_MODE = process.env.NEXT_PUBLIC_SIMULATION_MODE === 'true';
 
 // ── Program IDs (from INTEGRATION.md & .env) ─────────────────────────
 export const ESCROW_PROGRAM_ID = 
@@ -18,9 +18,10 @@ export const GARMENT_MINT =
   process.env.NEXT_PUBLIC_GARMENT_MINT || 'G17eNpsCn4S2Xtr4f9t9fmgyf6ZVFEpdXnpqJBiBCFEo';
 
 // ── Solana Network ───────────────────────────────────────────────────
-export const CLUSTER = 'devnet';
+export const CLUSTER = process.env.NEXT_PUBLIC_CLUSTER || 'devnet';
 export const SOLSCAN_BASE = 'https://solscan.io';
-export const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+export const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 
+  (CLUSTER === 'mainnet-beta' || CLUSTER === 'mainnet' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com');
 
 // ── Drop Configuration ───────────────────────────────────────────────
 export const DROP_ID = 'drop-zero';

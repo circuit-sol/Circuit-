@@ -751,21 +751,27 @@ function PassportContent() {
                   <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[0.6rem] uppercase tracking-wider text-[#777] block mb-1">Total Deposit</span>
                     <span className="text-lg font-bold text-emerald-400">
-                      {order.amount_lamports ? `${(Number(order.amount_lamports) / 1e9).toFixed(3)} SOL` : '0.800 SOL'}
+                      {order.amount_lamports ? `${(Number(order.amount_lamports) / 1e9).toFixed(3)} SOL` : (order.amount_sol ? `${Number(order.amount_sol).toFixed(3)} SOL` : '—')}
                     </span>
-                    <span className="block text-[0.65rem] text-[#666]">~${order.amount_usd || 120} USD</span>
+                    <span className="block text-[0.65rem] text-[#666]">
+                      {order.amount_usd ? `~$${Number(order.amount_usd).toFixed(2)} USD` : '—'}
+                    </span>
                   </div>
                   <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[0.6rem] uppercase tracking-wider text-[#777] block mb-1">Atelier Advance (30%)</span>
                     <span className="text-base font-bold text-white">
-                      {order.amount_lamports ? `${((Number(order.amount_lamports) * 0.3) / 1e9).toFixed(3)} SOL` : '0.240 SOL'}
+                      {order.amount_lamports 
+                        ? `${((Number(order.amount_lamports) * 0.3) / 1e9).toFixed(3)} SOL` 
+                        : (order.amount_sol ? `${(Number(order.amount_sol) * 0.3).toFixed(3)} SOL` : '—')}
                     </span>
                     <span className="block text-[0.65rem] text-[#666]">Materials procurement</span>
                   </div>
                   <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[0.6rem] uppercase tracking-wider text-[#777] block mb-1">Balance in Vault (70%)</span>
                     <span className="text-base font-bold text-emerald-400">
-                      {order.amount_lamports ? `${((Number(order.amount_lamports) * 0.7) / 1e9).toFixed(3)} SOL` : '0.560 SOL'}
+                      {order.amount_lamports 
+                        ? `${((Number(order.amount_lamports) * 0.7) / 1e9).toFixed(3)} SOL` 
+                        : (order.amount_sol ? `${(Number(order.amount_sol) * 0.7).toFixed(3)} SOL` : '—')}
                     </span>
                     <span className="block text-[0.65rem] text-[#666]">Locked until delivery</span>
                   </div>

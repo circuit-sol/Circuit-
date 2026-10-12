@@ -95,6 +95,7 @@ export default function AdminDashboard() {
   // Core Data States
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [liveSolPrice, setLiveSolPrice] = useState<number>(DEFAULT_SOL_MARKET_PRICE);
   const [orders, setOrders] = useState<Order[]>([]);
   const [editions, setEditions] = useState<Edition[]>([]);
   const [brands, setBrands] = useState<backendApi.Brand[]>([]);
@@ -171,6 +172,7 @@ export default function AdminDashboard() {
       // 3. Multi-Source Orders Aggregation (DB, Chain Orders, Batch Orders, and Local Storage)
       const allOrdersMap = new Map<string, Order>();
 
+      const priceRate = liveSolPrice > 0 ? liveSolPrice : DEFAULT_SOL_MARKET_PRICE;
       const addAdminOrder = (o: any, fallbackDropId?: string) => {
         if (!o) return;
         const key = o.id || o.purchase_signature || o.tx_signature;
@@ -178,12 +180,12 @@ export default function AdminDashboard() {
         allOrdersMap.set(key, {
           id: key,
           email: o.email || (o.buyer_wallet ? `${(o.buyer_wallet || '').slice(0, 4)}...${(o.buyer_wallet || '').slice(-4)}@sol.wallet` : 'buyer@circuit.sol'),
-          drop_id: o.drop_id || fallbackDropId || 'circuit-demo-drop-001',
+          drop_id: o.drop_id || fallbackDropId || '',
           status: o.status || (o.cancelled ? 'cancelled' : 'confirmed'),
           tx_signature: o.purchase_signature || o.tx_signature || key,
           created_at: o.purchased_at || o.created_at || new Date().toISOString(),
           size: o.size || 'Medium',
-          amount_usd: o.amount_usd || (o.amount_lamports ? Number(BigInt(o.amount_lamports)) / 1e9 * 150 : 120),
+          amount_usd: o.amount_usd ? Number(o.amount_usd) : (o.amount_lamports ? Number(BigInt(o.amount_lamports)) / 1e9 * priceRate : 0),
           garment_serial: o.garment_serial,
           delivery_location: o.delivery_location,
           delivery_address: o.delivery_address,
@@ -280,7 +282,7 @@ export default function AdminDashboard() {
             id: `disp-${i + 1}`,
             order_id: r.order_id,
             user_email: r.user_id || 'buyer@circuit.sol',
-            drop_id: 'circuit-demo-drop-001',
+            drop_id: (r as any).drop_id || (r as any).batch_id || '',
             reason: r.message,
             status: 'active',
             is_frozen: true,
@@ -319,20 +321,8 @@ export default function AdminDashboard() {
         } catch (_) {}
       }
     }
-    // Baseline dispute sample adhering to Section 4
-    const initialDisputes: DisputeItem[] = [
-      {
-        id: 'disp-001',
-        order_id: 'ord-8832-lagos',
-        user_email: 'collector.lagos@circuit.fashion',
-        drop_id: 'circuit-demo-drop-001',
-        reason: 'Pickup station at Victoria Island had delayed delivery; buyer requested status clarification.',
-        status: 'active',
-        is_frozen: true,
-        created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
-      },
-    ];
-    setDisputes(initialDisputes);
+    // Clean initial state: no mock disputes injected
+    setDisputes([]);
   };
 
   useEffect(() => {

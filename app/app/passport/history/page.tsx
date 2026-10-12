@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { getUserOrders, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
 import { solscanTxUrl, solanaExplorerTxUrl, formatSerialNumber, resolveUniqueOrderSerials } from '@/lib/utils';
 import * as backendApi from '@/lib/backendApi';
+import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
 import SignInModal from '@/components/SignInModal';
 import { showToast } from '@/components/Toast';
 
@@ -226,6 +227,9 @@ export default function HistoryPage() {
         rawHistoryOrders.push(normalized);
       };
 
+      const { price: livePrice } = await getLiveSolPrice().catch(() => ({ price: DEFAULT_SOL_MARKET_PRICE }));
+      const rate = livePrice > 0 ? livePrice : DEFAULT_SOL_MARKET_PRICE;
+
       // Chain orders first (most authoritative on-chain data)
       for (const c of chainOrders) {
         let mappedEditionId = c.batch_id;
@@ -247,8 +251,8 @@ export default function HistoryPage() {
           batch_id: c.batch_id,
           tx_signature: c.purchase_signature,
           escrow_pda: c.vault_address || c.order_address,
-          amount_usd: c.amount_lamports ? (Number(c.amount_lamports) / 1e9 * 150).toFixed(2) : '150.00',
-          amount_sol: c.amount_lamports ? (Number(c.amount_lamports) / 1e9).toFixed(3) : '0.800',
+          amount_usd: c.amount_lamports ? (Number(c.amount_lamports) / 1e9 * rate).toFixed(2) : ((c as any).amount_usd ? Number((c as any).amount_usd).toFixed(2) : '0.00'),
+          amount_sol: c.amount_lamports ? (Number(c.amount_lamports) / 1e9).toFixed(3) : ((c as any).amount_usd ? (Number((c as any).amount_usd) / rate).toFixed(3) : '0.000'),
           size: c.size || 'M',
           quantity: c.quantity || 1,
           status: c.cancelled ? 'cancelled' : (c.collected_at ? 'delivered' : 'pending'),

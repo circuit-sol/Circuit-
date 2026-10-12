@@ -19,14 +19,8 @@ export async function loginAdmin(identifier: string, passwordHash: string) {
     console.warn('Admin Auth notice:', err);
   }
 
-  // Fallback for demo when backend route is 410 USE_ADMIN_WALLET_AUTH
-  if (identifier && passwordHash) {
-    return {
-      id: 'admin-session',
-      username: identifier,
-      role: 'admin',
-    };
-  }
+  // Password-based admin login is retired (backend 410 USE_ADMIN_WALLET_AUTH).
+  // Production requires authenticated Solana wallet signature.
   return null;
 }
 
