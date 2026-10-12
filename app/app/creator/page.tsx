@@ -69,12 +69,38 @@ export default function CreatorStudioPage() {
     onAutoAdjustAndPublish: () => {},
   });
 
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+
+  // Helper to slugify a name for collection URLs
+  const slugify = (text: string) => {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+  };
+
   // Step 1: Edition Design Form
-  const [editionForm, setEditionForm] = useState({
+  const [editionForm, setEditionForm] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    price_usd: string | number;
+    max_supply: string | number;
+    fabric: string;
+    headpiece: string;
+    embroidery: string;
+    instagram: string;
+    twitter: string;
+    whatsapp: string;
+    support_email: string;
+    images: ApparelImage[];
+  }>({
     id: '',
     name: '',
     description: '',
-    price_usd: 0,
+    price_usd: '',
     max_supply: 50,
     fabric: '',
     headpiece: '',
@@ -309,11 +335,12 @@ export default function CreatorStudioPage() {
     setEditingEditionId('');
     setEditingBatchId(null);
     setEditingBatchRevision(1);
+    setIsSlugManuallyEdited(false);
     setEditionForm({
       id: '',
       name: '',
       description: '',
-      price_usd: 0,
+      price_usd: '',
       max_supply: 50,
       fabric: '',
       headpiece: '',
@@ -333,6 +360,7 @@ export default function CreatorStudioPage() {
   const handleEditEdition = (ed: any) => {
     setIsEditingExisting(true);
     setEditingEditionId(ed.id);
+    setIsSlugManuallyEdited(true);
 
     const socials = ed.social_links || getEditionSocialLinks(ed.id, ed.brand_id) || {};
 
@@ -340,8 +368,8 @@ export default function CreatorStudioPage() {
       id: ed.id,
       name: ed.name || '',
       description: ed.description || '',
-      price_usd: Number(ed.price_usd || 30),
-      max_supply: Number(ed.max_supply || 50),
+      price_usd: ed.price_usd != null ? String(ed.price_usd) : '',
+      max_supply: ed.max_supply != null ? String(ed.max_supply) : 50,
       fabric: ed.fabric || '',
       headpiece: ed.headpiece || '',
       embroidery: ed.embroidery || '',
@@ -412,8 +440,8 @@ export default function CreatorStudioPage() {
         await backendApi.updateEditionDraft(editingEditionId, {
           name: editionForm.name.trim(),
           description: editionForm.description.trim(),
-          price_usd: Number(editionForm.price_usd),
-          max_supply: Number(editionForm.max_supply),
+          price_usd: Number(editionForm.price_usd) || 0,
+          max_supply: Number(editionForm.max_supply) || 50,
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
@@ -430,8 +458,8 @@ export default function CreatorStudioPage() {
           brand_id: activeBrand.id,
           name: editionForm.name.trim(),
           description: editionForm.description.trim(),
-          price_usd: Number(editionForm.price_usd),
-          max_supply: Number(editionForm.max_supply),
+          price_usd: Number(editionForm.price_usd) || 0,
+          max_supply: Number(editionForm.max_supply) || 50,
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
@@ -554,10 +582,32 @@ export default function CreatorStudioPage() {
       return;
     }
 
+    if (!editionForm.name.trim()) {
+      showToast('Drop Name Required', 'Please enter a name for your collection.');
+      return;
+    }
+
+    const priceUsd = Number(editionForm.price_usd);
+    if (!priceUsd || priceUsd <= 0) {
+      showToast('Price Required', 'Please set a valid price in USD for your piece.');
+      return;
+    }
+
+    const maxSupply = Number(editionForm.max_supply);
+    if (!maxSupply || maxSupply <= 0) {
+      showToast('Supply Required', 'Please specify the available pieces.');
+      return;
+    }
+
+    if (editionForm.images.length === 0) {
+      showToast('Photos Required', 'Please upload at least 1 lookbook photo before publishing.');
+      return;
+    }
+
     // Slug validation
     const slugId = (isEditingExisting && editingEditionId)
       ? editingEditionId
-      : (editionForm.id.trim() || editionForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')).slice(0, 32);
+      : (editionForm.id.trim() || slugify(editionForm.name)).slice(0, 32);
 
     if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slugId)) {
       showToast('Invalid ID', 'Collection ID must be lowercase alphanumeric words separated by hyphens (max 32 chars).');
@@ -591,8 +641,8 @@ export default function CreatorStudioPage() {
         await backendApi.updateEditionDraft(editingEditionId, {
           name: editionForm.name.trim(),
           description: editionForm.description.trim(),
-          price_usd: Number(editionForm.price_usd),
-          max_supply: Number(editionForm.max_supply),
+          price_usd: priceUsd,
+          max_supply: maxSupply,
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
@@ -609,8 +659,8 @@ export default function CreatorStudioPage() {
           brand_id: activeBrand.id,
           name: editionForm.name.trim(),
           description: editionForm.description.trim(),
-          price_usd: Number(editionForm.price_usd),
-          max_supply: Number(editionForm.max_supply),
+          price_usd: priceUsd,
+          max_supply: maxSupply,
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
@@ -989,31 +1039,75 @@ export default function CreatorStudioPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Drop Name</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Drop Name <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="text"
                       value={editionForm.name}
-                      onChange={(e) => setEditionForm(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        setEditionForm(prev => {
+                          const updated = { ...prev, name: newName };
+                          if (!isEditingExisting && !isSlugManuallyEdited) {
+                            updated.id = slugify(newName);
+                          }
+                          return updated;
+                        });
+                        setBatchForm(prev => {
+                          if (prev.name === 'Inaugural Atelier Run — 01' || prev.name.endsWith('— Run 01')) {
+                            return {
+                              ...prev,
+                              name: newName.trim() ? `${newName.trim()} — Run 01` : 'Inaugural Atelier Run — 01'
+                            };
+                          }
+                          return prev;
+                        });
+                      }}
                       placeholder="e.g. Yellow Gown"
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30"
                     />
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Drop Link</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                        Drop Link <span className="text-red-400 font-bold ml-1">*</span>
+                      </label>
+                      {!isEditingExisting && editionForm.id && (
+                        <span className="text-[0.6rem] font-mono text-emerald-400/80">
+                          {isSlugManuallyEdited ? 'Customized' : 'Auto-derived'}
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       disabled={isEditingExisting}
                       value={editionForm.id}
-                      onChange={(e) => setEditionForm(prev => ({ ...prev, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                      placeholder="e.g. duchess-satin-dress"
+                      onChange={(e) => {
+                        const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32);
+                        if (!cleaned) {
+                          setIsSlugManuallyEdited(false);
+                          setEditionForm(prev => ({ ...prev, id: slugify(prev.name) }));
+                        } else {
+                          setIsSlugManuallyEdited(true);
+                          setEditionForm(prev => ({ ...prev, id: cleaned }));
+                        }
+                      }}
+                      placeholder="e.g. yellow-gown"
                       className={`bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30 ${
                         isEditingExisting ? 'opacity-60 cursor-not-allowed' : ''
                       }`}
                     />
-                    {isEditingExisting && (
-                      <span className="text-[0.6rem] font-mono text-[#666]">Drop link is immutable once created.</span>
-                    )}
+                    <div className="flex items-center justify-between text-[0.6rem] font-mono px-1 text-[#666]">
+                      {isEditingExisting ? (
+                        <span>Drop link is immutable once created.</span>
+                      ) : (
+                        <span>
+                          Storefront link: <strong className="text-emerald-400 font-mono">/drop?edition={editionForm.id || 'your-link'}</strong>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1063,13 +1157,20 @@ export default function CreatorStudioPage() {
                 {/* Price and Cap */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Price (USD)</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Price (USD) <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={editionForm.price_usd}
-                      onChange={(e) => setEditionForm(prev => ({ ...prev, price_usd: Number(e.target.value) }))}
-                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditionForm(prev => ({ ...prev, price_usd: val }));
+                      }}
+                      placeholder="0.00"
+                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30"
                     />
                     <div className="flex items-center justify-between text-[0.6rem] font-mono text-[#888] px-1">
                       <span>≈ {Number(((Number(editionForm.price_usd) || 0) / (liveSolPrice || DEFAULT_SOL_MARKET_PRICE)).toFixed(4))} SOL</span>
@@ -1077,12 +1178,19 @@ export default function CreatorStudioPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Pieces Available</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Pieces Available <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="number"
+                      min="1"
                       value={editionForm.max_supply}
-                      onChange={(e) => setEditionForm(prev => ({ ...prev, max_supply: Number(e.target.value) }))}
-                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditionForm(prev => ({ ...prev, max_supply: val }));
+                      }}
+                      placeholder="50"
+                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30"
                     />
                   </div>
                 </div>
@@ -1147,7 +1255,9 @@ export default function CreatorStudioPage() {
                 {/* Media Uploader */}
                 <div className="flex flex-col gap-3">
                   <div className="flex justify-between items-center">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Photos ({editionForm.images.length}/10)</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Photos ({editionForm.images.length}/10) <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <span className="text-[0.6rem] text-[#666] font-mono">Your first photo is the cover image in the shop</span>
                   </div>
 
@@ -1199,7 +1309,19 @@ export default function CreatorStudioPage() {
                   <button
                     onClick={() => {
                       if (!editionForm.name.trim()) {
-                        showToast('Required Field', 'Please enter a collection title.');
+                        showToast('Required Field', 'Please enter a drop name.');
+                        return;
+                      }
+                      if (!editionForm.id.trim()) {
+                        showToast('Required Field', 'Please provide or generate a drop link slug.');
+                        return;
+                      }
+                      if (!editionForm.price_usd || Number(editionForm.price_usd) <= 0) {
+                        showToast('Required Field', 'Please enter a valid price in USD.');
+                        return;
+                      }
+                      if (!editionForm.max_supply || Number(editionForm.max_supply) <= 0) {
+                        showToast('Required Field', 'Please specify the available pieces.');
                         return;
                       }
                       setWizardStep(2);
@@ -1221,7 +1343,9 @@ export default function CreatorStudioPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Drop Name</label>
+                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                    Preorder Run Name <span className="text-red-400 font-bold ml-1">*</span>
+                  </label>
                   <input
                     type="text"
                     value={batchForm.name}
@@ -1291,7 +1415,9 @@ export default function CreatorStudioPage() {
                   {scheduleMode === 'scheduled' ? (
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center">
-                        <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">1. Orders Open (Scheduled)</label>
+                        <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                          1. Orders Open (Scheduled) <span className="text-red-400 font-bold ml-1">*</span>
+                        </label>
                         {new Date(batchForm.opens_at).getTime() > Date.now() + 600000 ? (
                           <span className="text-[10px] text-emerald-400 font-mono">🟢 Future launch set</span>
                         ) : (
@@ -1316,7 +1442,9 @@ export default function CreatorStudioPage() {
                   )}
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">2. Orders Close</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      2. Orders Close <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="datetime-local"
                       value={batchForm.closes_at}
@@ -1326,7 +1454,9 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-amber-400 font-mono">3. Production starts</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-amber-400 font-mono flex items-center">
+                      3. Production starts <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="datetime-local"
                       value={batchForm.production_starts_at}
@@ -1336,7 +1466,9 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">4. Pickup Date</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      4. Pickup Date <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="datetime-local"
                       value={batchForm.release_at}
@@ -1358,7 +1490,9 @@ export default function CreatorStudioPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] font-mono text-[#777] uppercase">Location Name</label>
+                      <label className="text-[0.6rem] font-mono text-[#777] uppercase flex items-center">
+                        Location Name <span className="text-red-400 font-bold ml-1">*</span>
+                      </label>
                       <input
                         type="text"
                         value={batchForm.pickup_name}
@@ -1367,7 +1501,9 @@ export default function CreatorStudioPage() {
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] font-mono text-[#777] uppercase">City</label>
+                      <label className="text-[0.6rem] font-mono text-[#777] uppercase flex items-center">
+                        City <span className="text-red-400 font-bold ml-1">*</span>
+                      </label>
                       <input
                         type="text"
                         value={batchForm.pickup_city}
@@ -1376,7 +1512,9 @@ export default function CreatorStudioPage() {
                       />
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] font-mono text-[#777] uppercase">Country</label>
+                      <label className="text-[0.6rem] font-mono text-[#777] uppercase flex items-center">
+                        Country <span className="text-red-400 font-bold ml-1">*</span>
+                      </label>
                       <input
                         type="text"
                         value={batchForm.pickup_country}
@@ -1387,7 +1525,9 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[0.6rem] font-mono text-[#777] uppercase">Street Address</label>
+                    <label className="text-[0.6rem] font-mono text-[#777] uppercase flex items-center">
+                      Street Address <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="text"
                       value={batchForm.pickup_address}
@@ -1426,7 +1566,21 @@ export default function CreatorStudioPage() {
                     </button>
                   </div>
                   <button
-                    onClick={() => setWizardStep(3)}
+                    onClick={() => {
+                      if (!batchForm.name.trim()) {
+                        showToast('Required Field', 'Please enter a preorder run name.');
+                        return;
+                      }
+                      if (!batchForm.closes_at || !batchForm.production_starts_at || !batchForm.release_at) {
+                        showToast('Required Field', 'Please specify all preorder, production and pickup dates.');
+                        return;
+                      }
+                      if (!batchForm.pickup_name.trim() || !batchForm.pickup_city.trim() || !batchForm.pickup_country.trim() || !batchForm.pickup_address.trim()) {
+                        showToast('Required Field', 'Please enter all required pickup station details.');
+                        return;
+                      }
+                      setWizardStep(3);
+                    }}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
                   >
                     <span>Review & Publish →</span>
@@ -1452,8 +1606,8 @@ export default function CreatorStudioPage() {
                     <div className="text-sm font-bold text-white">{editionForm.name || 'Name your drop'}</div>
                     <div className="text-xs text-[#888] leading-relaxed">{editionForm.description || 'Add a short description'}</div>
                     <div className="flex gap-4 pt-2 font-mono text-xs">
-                      <div><span className="text-[#666]">Price:</span> ${editionForm.price_usd} each</div>
-                      <div><span className="text-[#666]">Limit:</span> {editionForm.max_supply} pieces</div>
+                      <div><span className="text-[#666]">Price:</span> ${Number(editionForm.price_usd) || 0} each</div>
+                      <div><span className="text-[#666]">Limit:</span> {Number(editionForm.max_supply) || 50} pieces</div>
                     </div>
                   </div>
 
