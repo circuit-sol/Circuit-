@@ -568,6 +568,117 @@ export default function CreatorStudioPage() {
     }
   };
 
+  // Validation for Step 1: Garment Design
+  const validateStep1 = (): boolean => {
+    if (!editionForm.name.trim()) {
+      showToast('Drop Name Required', 'Please enter a name for your garment.');
+      return false;
+    }
+    const slugId = (isEditingExisting && editingEditionId)
+      ? editingEditionId
+      : (editionForm.id.trim() || slugify(editionForm.name)).slice(0, 32);
+    if (!slugId || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slugId)) {
+      showToast('Drop Link Required', 'Please enter a valid lowercase drop link (e.g. yellow-gown).');
+      return false;
+    }
+    if (!editionForm.description.trim()) {
+      showToast('Description Required', 'Please add a description of your garment and inspiration.');
+      return false;
+    }
+    if (!editionForm.fabric.trim()) {
+      showToast('Main Fabric Required', 'Please specify the main fabric used (e.g. Duchess Satin).');
+      return false;
+    }
+    if (!editionForm.headpiece.trim()) {
+      showToast('Headpiece / Accent Required', 'Please specify the headpiece or accent detail.');
+      return false;
+    }
+    if (!editionForm.embroidery.trim()) {
+      showToast('Finishing Details Required', 'Please describe the finishing & details (e.g. Hand-sewn trim).');
+      return false;
+    }
+    const priceUsd = Number(editionForm.price_usd);
+    if (!editionForm.price_usd || isNaN(priceUsd) || priceUsd <= 0) {
+      showToast('Price Required', 'Please enter a valid price in USD (greater than $0).');
+      return false;
+    }
+    const maxSupply = Number(editionForm.max_supply);
+    if (!editionForm.max_supply || isNaN(maxSupply) || maxSupply <= 0) {
+      showToast('Pieces Available Required', 'Please specify the available pieces cap (at least 1).');
+      return false;
+    }
+    if (!editionForm.images || editionForm.images.length === 0) {
+      showToast('Photos Required', 'Please upload at least 1 photo for your garment before continuing.');
+      return false;
+    }
+    return true;
+  };
+
+  // Validation for Step 2: Preorder Terms & Pickup
+  const validateStep2 = (): boolean => {
+    if (!batchForm.name.trim()) {
+      showToast('Preorder Run Name Required', 'Please enter a preorder run name.');
+      return false;
+    }
+    if (scheduleMode === 'scheduled' && !batchForm.opens_at) {
+      showToast('Orders Open Required', 'Please specify when orders should open.');
+      return false;
+    }
+    if (!batchForm.closes_at) {
+      showToast('Orders Close Required', 'Please specify when orders should close.');
+      return false;
+    }
+    if (!batchForm.production_starts_at) {
+      showToast('Production Start Required', 'Please specify when production starts.');
+      return false;
+    }
+    if (!batchForm.release_at) {
+      showToast('Pickup Date Required', 'Please specify when garments will be ready for collection.');
+      return false;
+    }
+
+    const opensMs = scheduleMode === 'immediate' ? Date.now() + 900000 : new Date(batchForm.opens_at).getTime();
+    const closesMs = new Date(batchForm.closes_at).getTime();
+    const prodMs = new Date(batchForm.production_starts_at).getTime();
+    const relMs = new Date(batchForm.release_at).getTime();
+
+    if (closesMs <= opensMs) {
+      showToast('Invalid Dates', 'Orders closing date must be after opening date.');
+      return false;
+    }
+    if (prodMs < closesMs + 48 * 3600000) {
+      showToast('Invalid Dates', 'Production start must be at least 48 hours after orders close.');
+      return false;
+    }
+    if (relMs <= prodMs) {
+      showToast('Invalid Dates', 'Pickup date must be after production starts.');
+      return false;
+    }
+
+    if (!batchForm.pickup_name.trim()) {
+      showToast('Pickup Location Name Required', 'Please enter the pickup location name.');
+      return false;
+    }
+    if (!batchForm.pickup_city.trim()) {
+      showToast('City Required', 'Please specify the pickup city.');
+      return false;
+    }
+    if (!batchForm.pickup_country.trim()) {
+      showToast('Country Required', 'Please specify the pickup country.');
+      return false;
+    }
+    if (!batchForm.pickup_address.trim()) {
+      showToast('Street Address Required', 'Please enter the physical street address for pickup.');
+      return false;
+    }
+    if (!batchForm.pickup_instructions.trim()) {
+      showToast('Note for Buyers Required', 'Please provide instructions or notes for buyers collecting the piece.');
+      return false;
+    }
+
+    return true;
+  };
+
   // 3-Step Wizard Execution: Deploy Preorder Vault to Solana
   const deployWithOpeningTime = async (safeOpensMs: number) => {
     const activeBrand = await ensureValidBrand();
@@ -581,37 +692,21 @@ export default function CreatorStudioPage() {
       return;
     }
 
-    if (!editionForm.name.trim()) {
-      showToast('Drop Name Required', 'Please enter a name for your collection.');
+    if (!validateStep1()) {
+      setWizardStep(1);
+      return;
+    }
+
+    if (!validateStep2()) {
+      setWizardStep(2);
       return;
     }
 
     const priceUsd = Number(editionForm.price_usd);
-    if (!priceUsd || priceUsd <= 0) {
-      showToast('Price Required', 'Please set a valid price in USD for your piece.');
-      return;
-    }
-
     const maxSupply = Number(editionForm.max_supply);
-    if (!maxSupply || maxSupply <= 0) {
-      showToast('Supply Required', 'Please specify the available pieces.');
-      return;
-    }
-
-    if (editionForm.images.length === 0) {
-      showToast('Photos Required', 'Please upload at least 1 lookbook photo before publishing.');
-      return;
-    }
-
-    // Slug validation
     const slugId = (isEditingExisting && editingEditionId)
       ? editingEditionId
       : (editionForm.id.trim() || slugify(editionForm.name)).slice(0, 32);
-
-    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slugId)) {
-      showToast('Invalid ID', 'Collection ID must be lowercase alphanumeric words separated by hyphens (max 32 chars).');
-      return;
-    }
 
     const closesMs = Math.max(new Date(batchForm.closes_at).getTime(), safeOpensMs + 86400000);
     const prodMs = Math.max(new Date(batchForm.production_starts_at).getTime(), closesMs + 48 * 3600000 + 3600000);
@@ -815,6 +910,15 @@ export default function CreatorStudioPage() {
   };
 
   const handleDeployToSolana = async () => {
+    if (!validateStep1()) {
+      setWizardStep(1);
+      return;
+    }
+    if (!validateStep2()) {
+      setWizardStep(2);
+      return;
+    }
+
     const nowMs = Date.now();
     let rawOpensMs = new Date(batchForm.opens_at).getTime();
 
@@ -984,7 +1088,16 @@ export default function CreatorStudioPage() {
               ].map((s) => (
                 <div
                   key={s.num}
-                  onClick={() => !isDeploying && setWizardStep(s.num as any)}
+                  onClick={() => {
+                    if (isDeploying) return;
+                    if (s.num === 1) {
+                      setWizardStep(1);
+                    } else if (s.num === 2) {
+                      if (validateStep1()) setWizardStep(2);
+                    } else if (s.num === 3) {
+                      if (validateStep1() && validateStep2()) setWizardStep(3);
+                    }
+                  }}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                     wizardStep === s.num
                       ? 'bg-white/[0.04] border-white/30'
@@ -1108,7 +1221,9 @@ export default function CreatorStudioPage() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Description</label>
+                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                    Description <span className="text-red-400 font-bold ml-1">*</span>
+                  </label>
                   <textarea
                     rows={3}
                     value={editionForm.description}
@@ -1121,25 +1236,33 @@ export default function CreatorStudioPage() {
                 {/* Specs Matrix */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Main Fabric</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Main Fabric <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="text"
+                      placeholder="e.g. Duchess Satin"
                       value={editionForm.fabric}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, fabric: e.target.value }))}
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Headpiece / Accent</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Headpiece / Accent <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="text"
+                      placeholder="e.g. Velvet flower accent"
                       value={editionForm.headpiece}
                       onChange={(e) => setEditionForm(prev => ({ ...prev, headpiece: e.target.value }))}
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono">Finishing & Details</label>
+                    <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
+                      Finishing & Details <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. Hand-sewn trim, raw hem, metallic accents..."
@@ -1188,63 +1311,6 @@ export default function CreatorStudioPage() {
                       placeholder="50"
                       className="bg-[#0D0D0D] border border-white/10 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-white/30"
                     />
-                  </div>
-                </div>
-
-                {/* Brand Presence & Direct Customer Support */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-[0.65rem] font-bold uppercase tracking-wider text-white font-mono">
-                        Brand Presence & Customer Care
-                      </label>
-                      <span className="text-[10px] text-white/40 font-mono font-normal">Optional Trust Signals</span>
-                    </div>
-                    <p className="text-[0.65rem] text-[#888] mt-0.5">
-                      Direct contact points displayed to buyers on your drop page for authentication, sizing guidance, and pickup assistance.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">Instagram Handle / URL</label>
-                      <input
-                        type="text"
-                        placeholder="@atelier or https://instagram.com/..."
-                        value={editionForm.instagram}
-                        onChange={(e) => setEditionForm(prev => ({ ...prev, instagram: e.target.value }))}
-                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">Twitter / X Handle</label>
-                      <input
-                        type="text"
-                        placeholder="@atelier or https://x.com/..."
-                        value={editionForm.twitter}
-                        onChange={(e) => setEditionForm(prev => ({ ...prev, twitter: e.target.value }))}
-                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">WhatsApp Support Number</label>
-                      <input
-                        type="text"
-                        placeholder="+234 800 000 0000"
-                        value={editionForm.whatsapp}
-                        onChange={(e) => setEditionForm(prev => ({ ...prev, whatsapp: e.target.value }))}
-                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono">Customer Support Email</label>
-                      <input
-                        type="email"
-                        placeholder="care@atelier.com"
-                        value={editionForm.support_email}
-                        onChange={(e) => setEditionForm(prev => ({ ...prev, support_email: e.target.value }))}
-                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none placeholder:text-white/20"
-                      />
-                    </div>
                   </div>
                 </div>
 
@@ -1304,23 +1370,9 @@ export default function CreatorStudioPage() {
 
                   <button
                     onClick={() => {
-                      if (!editionForm.name.trim()) {
-                        showToast('Required Field', 'Please enter a drop name.');
-                        return;
+                      if (validateStep1()) {
+                        setWizardStep(2);
                       }
-                      if (!editionForm.id.trim()) {
-                        showToast('Required Field', 'Please provide or generate a drop link slug.');
-                        return;
-                      }
-                      if (!editionForm.price_usd || Number(editionForm.price_usd) <= 0) {
-                        showToast('Required Field', 'Please enter a valid price in USD.');
-                        return;
-                      }
-                      if (!editionForm.max_supply || Number(editionForm.max_supply) <= 0) {
-                        showToast('Required Field', 'Please specify the available pieces.');
-                        return;
-                      }
-                      setWizardStep(2);
                     }}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
                   >
@@ -1533,7 +1585,9 @@ export default function CreatorStudioPage() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[0.6rem] font-mono text-[#777] uppercase">Note for Buyers</label>
+                    <label className="text-[0.6rem] font-mono text-[#777] uppercase flex items-center">
+                      Note for Buyers <span className="text-red-400 font-bold ml-1">*</span>
+                    </label>
                     <input
                       type="text"
                       value={batchForm.pickup_instructions}
@@ -1563,19 +1617,9 @@ export default function CreatorStudioPage() {
                   </div>
                   <button
                     onClick={() => {
-                      if (!batchForm.name.trim()) {
-                        showToast('Required Field', 'Please enter a preorder run name.');
-                        return;
+                      if (validateStep2()) {
+                        setWizardStep(3);
                       }
-                      if (!batchForm.closes_at || !batchForm.production_starts_at || !batchForm.release_at) {
-                        showToast('Required Field', 'Please specify all preorder, production and pickup dates.');
-                        return;
-                      }
-                      if (!batchForm.pickup_name.trim() || !batchForm.pickup_city.trim() || !batchForm.pickup_country.trim() || !batchForm.pickup_address.trim()) {
-                        showToast('Required Field', 'Please enter all required pickup station details.');
-                        return;
-                      }
-                      setWizardStep(3);
                     }}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
                   >
@@ -1646,29 +1690,6 @@ export default function CreatorStudioPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* Brand Social & Customer Care Channels */}
-                  <div className="flex flex-col gap-2 pt-4 border-t border-white/10 md:col-span-2">
-                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Brand Trust & Care Signals</span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
-                        <span className="text-[0.6rem] text-[#777] uppercase">Instagram</span>
-                        <span className="text-white truncate">{editionForm.instagram || '@circuit.fashion'}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
-                        <span className="text-[0.6rem] text-[#777] uppercase">Twitter / X</span>
-                        <span className="text-white truncate">{editionForm.twitter || '@circuit_fashion'}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
-                        <span className="text-[0.6rem] text-[#777] uppercase">WhatsApp</span>
-                        <span className="text-emerald-400 truncate">{editionForm.whatsapp || '+234 800 000 0000'}</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
-                        <span className="text-[0.6rem] text-[#777] uppercase">Support Email</span>
-                        <span className="text-white truncate">{editionForm.support_email || 'care@circuit.fashion'}</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Deployment Results Card */}
