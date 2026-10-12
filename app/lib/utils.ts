@@ -49,6 +49,92 @@ export function solscanTokenUrl(mint: string): string {
 
 // ── Formatting ───────────────────────────────────────────────────────
 
+export function formatUsd(amount: number | string | undefined | null, opts: { includeCode?: boolean; prefix?: string } = {}): string {
+  const val = Number(amount || 0);
+  const formatted = val.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const prefix = opts.prefix !== undefined ? opts.prefix : '$';
+  const code = opts.includeCode ? ' USD' : '';
+  return `${prefix}${formatted}${code}`;
+}
+
+export function formatSol(amount: number | string | undefined | null, maxDecimals = 3): string {
+  const val = Number(amount || 0);
+  if (!val || isNaN(val)) return '0';
+  if (val < 0.001) {
+    return Number(val.toFixed(4)).toString();
+  }
+  return Number(val.toFixed(maxDecimals)).toString();
+}
+
+export interface PricingResolution {
+  unitUsd: number;
+  totalUsd: number;
+  unitSol: number;
+  totalSol: number;
+  unitUsdFormatted: string;
+  totalUsdFormatted: string;
+  unitSolFormatted: string;
+  totalSolFormatted: string;
+}
+
+export function resolvePricing(params: {
+  editionPriceUsd?: number | string | null;
+  batchLamports?: string | number | null;
+  quantity?: number;
+  selectedSize?: string;
+  pricesBySize?: Record<string, number | string>;
+  solRateUsd?: number | null;
+}): PricingResolution {
+  const {
+    editionPriceUsd,
+    batchLamports,
+    quantity = 1,
+    selectedSize,
+    pricesBySize,
+    solRateUsd,
+  } = params;
+
+  // 1. Resolve unit USD price: check variable size pricing first, then base edition price
+  let unitUsd = 0;
+  if (selectedSize && pricesBySize && pricesBySize[selectedSize] !== undefined && Number(pricesBySize[selectedSize]) > 0) {
+    unitUsd = Number(pricesBySize[selectedSize]);
+  } else if (editionPriceUsd !== undefined && editionPriceUsd !== null && Number(editionPriceUsd) > 0) {
+    unitUsd = Number(editionPriceUsd);
+  }
+
+  // 2. Resolve unit SOL: use on-chain batch lamports if available; else derive using reference/live rate
+  const referenceSolRate = (solRateUsd && solRateUsd > 0) ? solRateUsd : 150;
+  let unitSol = 0;
+
+  if (batchLamports) {
+    unitSol = Number(BigInt(batchLamports)) / 1e9;
+    // If unitUsd was not set on the edition, derive it from batch lamports
+    if (unitUsd === 0) {
+      unitUsd = Number((unitSol * referenceSolRate).toFixed(2));
+    }
+  } else if (unitUsd > 0) {
+    unitSol = Number((unitUsd / referenceSolRate).toFixed(3));
+  }
+
+  const safeQuantity = Math.max(1, quantity || 1);
+  const totalUsd = Number((unitUsd * safeQuantity).toFixed(2));
+  const totalSol = Number((unitSol * safeQuantity).toFixed(4));
+
+  return {
+    unitUsd,
+    totalUsd,
+    unitSol,
+    totalSol,
+    unitUsdFormatted: formatUsd(unitUsd, { includeCode: true }),
+    totalUsdFormatted: formatUsd(totalUsd, { includeCode: true }),
+    unitSolFormatted: formatSol(unitSol),
+    totalSolFormatted: formatSol(totalSol),
+  };
+}
+
 export function formatEdition(n: number, total: number): string {
   return `${String(n).padStart(2, '0')} of ${total}`;
 }

@@ -13,7 +13,14 @@ import {
   resetState,
   executeVerifiedPurchase,
 } from '@/lib/solana-service';
-import { solscanTxUrl, solanaExplorerTxUrl, solanaExplorerAccountUrl } from '@/lib/utils';
+import {
+  solscanTxUrl,
+  solanaExplorerTxUrl,
+  solanaExplorerAccountUrl,
+  formatUsd,
+  formatSol,
+  resolvePricing,
+} from '@/lib/utils';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
@@ -325,19 +332,22 @@ function DropPageContent() {
   const isSoldOut = mintedCount >= maxSupply;
   const fillPercent = Math.min(100, (mintedCount / maxSupply) * 100);
 
-  // Authoritative Pricing: Primary in SOL from on-chain batch lamports, secondary in USD
+  // Authoritative Unified Pricing across entire app
   const batchLamports = (selectedBatch?.pricing?.prices_by_size_lamports && selectedSize && selectedBatch.pricing.prices_by_size_lamports[selectedSize])
     || selectedBatch?.pricing?.unit_price_lamports;
 
-  const unitSol = batchLamports
-    ? Number(BigInt(batchLamports)) / 1e9
-    : solPrice
-      ? Number((computedPrice / solPrice).toFixed(3))
-      : Number((computedPrice / 150).toFixed(3));
-  const totalSol = Number((unitSol * quantity).toFixed(3));
-  const totalUsd = solPrice && batchLamports
-    ? Number((totalSol * solPrice).toFixed(2))
-    : Number((computedPrice * quantity).toFixed(2));
+  const pricing = resolvePricing({
+    editionPriceUsd: computedPrice || activeEdition.price_usd,
+    batchLamports,
+    quantity,
+    selectedSize,
+    pricesBySize: activeEdition.prices_by_size,
+    solRateUsd: solPrice,
+  });
+
+  const unitSol = pricing.unitSol;
+  const totalSol = pricing.totalSol;
+  const totalUsd = pricing.totalUsd;
 
   const handleOrder = async () => {
     if (processingRef.current) return;
@@ -696,28 +706,85 @@ function DropPageContent() {
             {activeEdition.description}
           </p>
 
-          {/* Metadata Matrix */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-0 border border-white/[0.08] rounded-3xl overflow-hidden bg-white/[0.02] backdrop-blur-sm">
-            <div className="p-4 md:p-5 border-r border-b sm:border-b-0 border-white/[0.08]">
-              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Availability</span>
-              <span className="text-sm font-semibold">{maxSupply - mintedCount} Left</span>
+          {/* Atelier Specifications Matrix */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-md overflow-hidden transition-all duration-300 hover:border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
+            {/* Primary Metrics: Availability & Unit Price */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] border-b border-white/[0.08] bg-white/[0.015]">
+              {/* Availability Metric */}
+              <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[#888]">
+                      Availability
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-base sm:text-lg font-bold text-white tracking-tight">
+                      {maxSupply - mintedCount} Left
+                    </span>
+                    <span className="text-[0.65rem] font-mono text-[#666]">
+                      / {maxSupply} Units
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[0.6rem] font-mono font-semibold uppercase tracking-wider whitespace-nowrap">
+                  {isSoldOut ? 'Sold Out' : 'Active Batch'}
+                </span>
+              </div>
+
+              {/* Unit Price Metric */}
+              <div className="p-4 sm:p-5 flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[#888]">
+                      Unit Price
+                    </span>
+                    <span className="text-[0.6rem] font-mono text-white/40">• per piece</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-base sm:text-lg font-bold font-mono text-emerald-400 tracking-tight">
+                      {pricing.unitSolFormatted} SOL
+                    </span>
+                    <span className="text-[0.68rem] font-mono text-[#888]">
+                      (~{pricing.unitUsdFormatted})
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-white/70 text-[0.6rem] font-mono font-semibold uppercase tracking-wider whitespace-nowrap">
+                  Escrow Rate
+                </span>
+              </div>
             </div>
-            <div className="p-4 md:p-5 border-r border-b sm:border-b-0 border-white/[0.08]">
-              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Unit Price</span>
-              <span className="text-sm font-semibold text-emerald-400">{unitSol} SOL</span>
-              <span className="block text-[0.6rem] text-[#666]">~${computedPrice} USD</span>
-            </div>
-            <div className="p-4 md:p-5 border-r border-white/[0.08]">
-              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Main Fabric</span>
-              <span className="text-sm font-semibold">{activeEdition.fabric || 'Duchess satin'}</span>
-            </div>
-            <div className="p-4 md:p-5 border-r border-white/[0.08]">
-              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Headpiece</span>
-              <span className="text-sm font-semibold">{activeEdition.headpiece || 'Velvet'}</span>
-            </div>
-            <div className="p-4 md:p-5">
-              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.12em] text-[#666] mb-1.5">Embroidery</span>
-              <span className="text-sm font-semibold">{activeEdition.embroidery || 'Metallic thread'}</span>
+
+            {/* Artisanal Specifications: Main Fabric, Headpiece, Embroidery */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] p-3.5 sm:p-4 bg-black/30">
+              <div className="px-3 py-2 sm:py-1">
+                <span className="block text-[0.58rem] font-bold uppercase tracking-[0.14em] text-[#666] mb-1">
+                  Main Fabric
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-white/90 block truncate" title={activeEdition.fabric || 'Duchess satin'}>
+                  {activeEdition.fabric || 'Duchess satin'}
+                </span>
+              </div>
+
+              <div className="px-3 py-2 sm:py-1">
+                <span className="block text-[0.58rem] font-bold uppercase tracking-[0.14em] text-[#666] mb-1">
+                  Headpiece
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-white/90 block truncate" title={activeEdition.headpiece || 'Velvet'}>
+                  {activeEdition.headpiece || 'Velvet'}
+                </span>
+              </div>
+
+              <div className="px-3 py-2 sm:py-1">
+                <span className="block text-[0.58rem] font-bold uppercase tracking-[0.14em] text-[#666] mb-1">
+                  Embroidery
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-white/90 block truncate" title={activeEdition.embroidery || 'Metallic thread'}>
+                  {activeEdition.embroidery || 'Metallic thread'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -923,13 +990,13 @@ function DropPageContent() {
                   onClick={() => setPaymentMethod('crypto')}
                   className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${paymentMethod === 'crypto' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
                 >
-                  Crypto ({totalSol} SOL)
+                  Crypto ({pricing.totalSolFormatted} SOL)
                 </button>
                 <button 
                   onClick={() => setPaymentMethod('fiat')}
                   className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${paymentMethod === 'fiat' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
                 >
-                  Fiat (${totalUsd} USD)
+                  Fiat ({pricing.totalUsdFormatted})
                 </button>
               </div>
             </div>
@@ -979,7 +1046,9 @@ function DropPageContent() {
                    isSoldOut ? 'Sold Out' :
                    selectedBatch?.opens_at && new Date(selectedBatch.opens_at).getTime() > Date.now() ?
                      `Opens at ${new Date(selectedBatch.opens_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` :
-                   `Pre-Order (${totalSol} SOL)`}
+                   paymentMethod === 'fiat' ?
+                     `Checkout with Card (${pricing.totalUsdFormatted})` :
+                     `Pre-Order (${pricing.totalSolFormatted} SOL)`}
                 </span>
                 <span className="btn-arrow">
                   {txState === 'signing' || isVerifyingStock ? (
@@ -1025,7 +1094,7 @@ function DropPageContent() {
                   <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                     <span className="text-[0.6rem] uppercase tracking-wider text-[#777] block mb-1">Escrow Amount</span>
                     <span className="font-bold text-emerald-400 text-sm">
-                      {txResult.amountSol} SOL <span className="text-[0.65rem] text-[#888] font-normal">(~${txResult.amountUsd} USD)</span>
+                      {txResult.amountSol ? formatSol(txResult.amountSol) : pricing.totalSolFormatted} SOL <span className="text-[0.65rem] text-[#888] font-normal">(~{formatUsd(txResult.amountUsd ?? pricing.totalUsd, { includeCode: true })})</span>
                     </span>
                   </div>
                 </div>
@@ -1228,7 +1297,7 @@ function DropPageContent() {
               
               <div className="p-4 bg-white/[0.03] rounded-xl border border-white/5 flex justify-between items-center">
                 <span className="text-sm text-[#888]">Total Amount</span>
-                <span className="text-2xl font-bold">${(computedPrice * quantity).toFixed(2)}</span>
+                <span className="text-2xl font-bold">{pricing.totalUsdFormatted}</span>
               </div>
 
               <div className="flex flex-col gap-4">
@@ -1302,7 +1371,7 @@ function DropPageContent() {
                 disabled={txState === 'signing'}
               >
                 <span>
-                  {txState === 'signing' ? 'Processing...' : `Pay $${(computedPrice * quantity).toFixed(2)}`}
+                  {txState === 'signing' ? 'Processing...' : `Pay ${pricing.totalUsdFormatted}`}
                 </span>
                 <span className="btn-arrow">
                   {txState === 'signing' ? (

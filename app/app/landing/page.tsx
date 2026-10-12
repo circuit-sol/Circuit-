@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import NewsletterForm from '@/components/NewsletterForm';
 import { getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
+import { formatUsd } from '@/lib/utils';
 
 interface FAQItemProps {
   question: string;
@@ -138,7 +139,7 @@ export default function LandingPage() {
 
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-white/90">
-                              {edition.has_variable_prices ? 'Variable Pricing' : `${edition.price_usd} USD`}
+                              {edition.has_variable_prices ? 'Variable Pricing' : formatUsd(edition.price_usd, { includeCode: true })}
                             </span>
                             <span className="text-xs text-white/60 group-hover:text-white transition-colors">
                               View Drop ➔
