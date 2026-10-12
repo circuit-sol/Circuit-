@@ -93,12 +93,21 @@ export default function ConfirmPage() {
         } catch {}
       }
 
-      // 3. Check local storage cache
-      if (!latest && typeof window !== 'undefined') {
+      // 3. Check local storage cache (Strictly scoped to current authenticated user)
+      if (!latest && isSignedIn && typeof window !== 'undefined') {
         try {
           const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-          if (localOrders && localOrders.length > 0) {
-            latest = localOrders[0];
+          const currentWallet = (user?.walletAddress || '').trim().toLowerCase();
+          const currentEmail = (user?.email || '').trim().toLowerCase();
+
+          if (Array.isArray(localOrders)) {
+            const matched = localOrders.find((loc: any) => {
+              const locWallet = (loc.wallet_address || loc.buyer_wallet || '').trim().toLowerCase();
+              const locEmail = (loc.email || '').trim().toLowerCase();
+              return (currentWallet && locWallet && locWallet === currentWallet) ||
+                     (currentEmail && locEmail && locEmail === currentEmail);
+            });
+            if (matched) latest = matched;
           }
         } catch {}
       }

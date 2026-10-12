@@ -174,40 +174,45 @@ export function resolveUniqueOrderSerials<T extends OrderLike>(orders: T[]): T[]
   });
 
   byDrop.forEach((dropOrders) => {
-    const usedSerials = new Set<number>();
-
-    // 1. Collect already assigned numeric serials
-    dropOrders.forEach((o) => {
-      const existing = o.garment_serial || o.order_number;
-      if (existing !== undefined && existing !== null && existing !== '') {
-        const parsed = parseInt(String(existing), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-          usedSerials.add(parsed);
-          o.garment_serial = String(parsed);
-          o.order_number = parsed;
-        }
-      }
-    });
-
-    // 2. Sort chronologically (oldest first) to assign sequential numbers
-    const sorted = [...dropOrders].sort((a, b) => {
+    // 1. Sort chronologically (oldest first) so established prior purchases retain their assigned serials
+    dropOrders.sort((a, b) => {
       const tA = new Date(a.created_at || a.purchased_at || 0).getTime();
       const tB = new Date(b.created_at || b.purchased_at || 0).getTime();
-      return tA - tB;
+      const validA = isNaN(tA) ? 0 : tA;
+      const validB = isNaN(tB) ? 0 : tB;
+      return validA - validB;
     });
 
-    // 3. Assign next available positive serial to orders lacking one
+    const usedSerials = new Set<number>();
+    const pendingOrders: T[] = [];
+
+    // 2. Identify legitimate serials and flag duplicates / missing for sequential reassignment
+    dropOrders.forEach((o) => {
+      const existing = o.garment_serial || o.order_number;
+      const parsed = existing !== undefined && existing !== null && existing !== '' ? parseInt(String(existing), 10) : NaN;
+
+      if (!isNaN(parsed) && parsed > 0 && !usedSerials.has(parsed)) {
+        usedSerials.add(parsed);
+        o.garment_serial = String(parsed);
+        o.order_number = parsed;
+      } else {
+        // Clear collision or missing serial so it receives a unique sequential number
+        o.garment_serial = undefined;
+        o.order_number = undefined;
+        pendingOrders.push(o);
+      }
+    });
+
+    // 3. Assign next available non-conflicting positive serial to pending orders
     let nextCandidate = 1;
-    sorted.forEach((o) => {
-      if (!o.garment_serial) {
-        while (usedSerials.has(nextCandidate)) {
-          nextCandidate++;
-        }
-        o.garment_serial = String(nextCandidate);
-        o.order_number = nextCandidate;
-        usedSerials.add(nextCandidate);
+    pendingOrders.forEach((o) => {
+      while (usedSerials.has(nextCandidate)) {
         nextCandidate++;
       }
+      o.garment_serial = String(nextCandidate);
+      o.order_number = nextCandidate;
+      usedSerials.add(nextCandidate);
+      nextCandidate++;
     });
   });
 

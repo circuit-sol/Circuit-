@@ -274,8 +274,11 @@ export default function HistoryPage() {
       for (const loc of localOrders) {
         const locWallet = (loc.wallet_address || loc.buyer_wallet || '').trim().toLowerCase();
         const locEmail = (loc.email || '').trim().toLowerCase();
-        if (currentWallet && locWallet && locWallet !== currentWallet) continue;
-        if (currentEmail && locEmail && locEmail !== currentEmail && (!locWallet || locWallet !== currentWallet)) continue;
+        // Strictly filter: MUST match active authenticated user's wallet or email
+        const matchesWallet = Boolean(currentWallet && locWallet && locWallet === currentWallet);
+        const matchesEmail = Boolean(currentEmail && locEmail && locEmail === currentEmail);
+        if (!matchesWallet && !matchesEmail) continue;
+
         addOrMergeHistoryOrder(loc);
       }
 

@@ -156,6 +156,18 @@ function PassportContent() {
     async function loadWardrobe() {
       try {
         setLoading(true);
+
+        // GATING: If user is neither signed in nor querying a specific orderId via URL parameter,
+        // they have 0 accessible wardrobe items. Immediately present the authentication state.
+        if (!isSignedIn && !orderIdParam) {
+          setWardrobe([]);
+          setOrder(null);
+          setBatch(null);
+          setEdition(null);
+          setLoading(false);
+          return;
+        }
+
         const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
         const rawOrders: any[] = [];
         const seenSignatures = new Set<string>();
@@ -246,8 +258,8 @@ function PassportContent() {
           }
         }
 
-        // 4. Local storage fallback cache (Strictly scoped to current wallet / email)
-        if (typeof window !== 'undefined') {
+        // 4. Local storage fallback cache (Strictly scoped to active authenticated account)
+        if (isSignedIn && typeof window !== 'undefined') {
           try {
             const localOrders = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
             const currentWallet = (user?.walletAddress || '').trim().toLowerCase();
@@ -258,32 +270,14 @@ function PassportContent() {
                 const locWallet = (loc.wallet_address || loc.buyer_wallet || '').trim().toLowerCase();
                 const locEmail = (loc.email || '').trim().toLowerCase();
 
-                // If logged in, filter out cached orders from different users or demo runs
-                if (currentWallet && locWallet && locWallet !== currentWallet) return;
-                if (currentEmail && locEmail && locEmail !== currentEmail && (!locWallet || locWallet !== currentWallet)) return;
+                // Strictly filter: MUST match active authenticated user's wallet or email
+                const matchesWallet = Boolean(currentWallet && locWallet && locWallet === currentWallet);
+                const matchesEmail = Boolean(currentEmail && locEmail && locEmail === currentEmail);
+
+                if (!matchesWallet && !matchesEmail) return;
 
                 addOrMergeOrder(loc);
               });
-            }
-
-            // Fallback: If no orders found yet, check cached order ids
-            if (rawOrders.length === 0) {
-              const cachedId = localStorage.getItem('circuit_last_order_id');
-              const cachedTx = localStorage.getItem('circuit_last_order_tx');
-              if (cachedId) {
-                const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedId)}`);
-                if (res.ok) {
-                  const dbOrd = await res.json();
-                  if (dbOrd) addOrMergeOrder(dbOrd);
-                }
-              }
-              if (cachedTx) {
-                const res = await fetch(`${BASE}/api/db/orders/by-tx/${encodeURIComponent(cachedTx)}`);
-                if (res.ok) {
-                  const dbOrd = await res.json();
-                  if (dbOrd) addOrMergeOrder(dbOrd);
-                }
-              }
             }
           } catch {}
         }
