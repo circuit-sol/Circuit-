@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import NewsletterForm from '@/components/NewsletterForm';
-import { getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
+import { getEditions } from '@/lib/db';
 import { formatUsd } from '@/lib/utils';
 
 interface FAQItemProps {
@@ -35,9 +35,9 @@ function FAQItem({ question, answer }: FAQItemProps) {
 }
 
 export default function LandingPage() {
-  const [editions, setEditions] = useState<any[]>([DEFAULT_CIRCUIT_EDITION]);
-  const [selectedEdition, setSelectedEdition] = useState<any>(DEFAULT_CIRCUIT_EDITION);
-  const [loading, setLoading] = useState(false);
+  const [editions, setEditions] = useState<any[]>([]);
+  const [selectedEdition, setSelectedEdition] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadEditions() {

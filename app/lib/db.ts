@@ -143,34 +143,6 @@ export async function getUserOrders(email: string) {
 
 // ── Editions / Collections ───────────────────────────────────────────
 
-export const DEFAULT_CIRCUIT_EDITION = {
-  id: 'circuit-demo-drop-001',
-  brand_id: '5d916a05-e74c-4261-8734-3e04c0a66c28',
-  name: 'Circuit Demo — Yellow Gown',
-  images: [
-    { url: '/yellow-gown.jpg', tag: 'Front View' },
-    { url: '/yellow-gown2.jpg', tag: 'Full Silhouette' },
-    { url: '/yellow.jpg', tag: 'Editorial Close-up' },
-  ],
-  description: 'An exclusive runway piece in Duchess satin, with a structured mesh bodice and hand-finished feather trim. Made only after you order.',
-  price_usd: 30,
-  has_variable_prices: false,
-  prices_by_size: { 'Small': 30, 'Medium': 30, 'Large': 30, 'Extra Large': 30 },
-  max_supply: 50,
-  fabric: 'Duchess satin & structured mesh',
-  headpiece: 'Velvet flower accent',
-  embroidery: 'Hand-sewn feather trim',
-  brand_name: 'Circuit Atelier Studio',
-  social_links: {
-    instagram: 'https://instagram.com/circuit.fashion',
-    twitter: 'https://x.com/circuit_fashion',
-    whatsapp: 'https://wa.me/2348000000000',
-    support_email: 'support@circuit.fashion',
-  },
-  is_active: true,
-  published: false,
-};
-
 export async function getEditions(activeOnly = true) {
   let editions: any[] = [];
 
@@ -234,11 +206,6 @@ export async function getEditions(activeOnly = true) {
     } catch (_) {}
   }
 
-  // 5. If still empty, fallback to the inaugural Circuit edition
-  if (editions.length === 0) {
-    editions = [DEFAULT_CIRCUIT_EDITION];
-  }
-
   return editions;
 }
 
@@ -267,7 +234,12 @@ export function getEditionSocialLinks(editionId?: string, brandId?: string) {
       }
     } catch (_) {}
   }
-  return DEFAULT_CIRCUIT_EDITION.social_links;
+  return {
+    instagram: '',
+    twitter: '',
+    whatsapp: '',
+    support_email: 'support@circuit.fashion',
+  };
 }
 
 function formatEditionImages(ed: any) {
@@ -294,7 +266,7 @@ function formatEditionImages(ed: any) {
 }
 
 export async function getEditionById(id: string) {
-  if (!id) return DEFAULT_CIRCUIT_EDITION;
+  if (!id) return null;
 
   // 1. Try public endpoint
   try {
@@ -332,11 +304,6 @@ export async function getEditionById(id: string) {
         }
       }
     } catch (_) {}
-  }
-
-  // 4. If matching circuit-demo-drop-001 or drop-zero
-  if (id === 'circuit-demo-drop-001' || id === 'drop-zero' || id === DEFAULT_CIRCUIT_EDITION.id) {
-    return DEFAULT_CIRCUIT_EDITION;
   }
 
   return null;

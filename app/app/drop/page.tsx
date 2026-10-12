@@ -8,9 +8,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/lib/auth-context';
 import * as backendApi from '@/lib/backendApi';
 import {
-  initializeEscrow,
   parseError,
-  resetState,
   executeVerifiedPurchase,
 } from '@/lib/solana-service';
 import {
@@ -25,7 +23,7 @@ import { getLiveSolPrice } from '@/lib/price-service';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
 import Selector from '@/components/Selector';
-import { saveOrder, getEditionById, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
+import { saveOrder, getEditionById, getEditions } from '@/lib/db';
 import { CLUSTER } from '@/lib/constants';
 
 type TxState = 'idle' | 'signing' | 'success' | 'error' | 'soldout';
@@ -50,64 +48,26 @@ interface TxResult {
   message?: string;
 }
 
-const defaultFallbackBatches: backendApi.Batch[] = [
-  {
-    id: 'b1000000-0000-4000-8000-000000000001',
-    edition_id: 'circuit-demo-drop-001',
-    name: 'Batch 01 — Circuit Inaugural Run',
-    opens_at: new Date(Date.now() - 3600000).toISOString(),
-    closes_at: new Date(Date.now() + 86400000 * 7).toISOString(),
-    production_starts_at: new Date(Date.now() + 86400000 * 10).toISOString(),
-    release_at: new Date(Date.now() + 86400000 * 25).toISOString(),
-    pickup_locations: [
-      {
-        id: 'c4b12345-6789-4abc-def0-123456789ab1',
-        name: 'Circuit Atelier HQ',
-        address: '14 Adeola Odeku Street, Victoria Island',
-        city: 'Lagos',
-        country: 'Nigeria',
-        instructions: 'Show your digital passport QR code at the concierge.',
-      },
-      {
-        id: 'c4b12345-6789-4abc-def0-123456789ab2',
-        name: 'Soho Design Hub',
-        address: '28 Peter Street',
-        city: 'London',
-        country: 'United Kingdom',
-        instructions: 'Counter 3, open Tuesday to Saturday 10am-6pm.',
-      },
-    ],
-    fulfillment_method: 'pickup',
-    sales_window_status: 'open',
-    checkout_enabled: true,
-    cancellation_window_hours: 24,
-    advance_payout_percent: 30,
-    balance_payout_percent: 70,
-  },
-];
-
-const fallbackEdition = DEFAULT_CIRCUIT_EDITION;
-
 function DropPageContent() {
   const { user, isSignedIn } = useAuth();
   const { signTransaction } = useWallet();
   const searchParams = useSearchParams();
   const requestedEditionId = searchParams.get('edition');
 
-  const [edition, setEdition] = useState<any>(fallbackEdition);
-  const [batches, setBatches] = useState<backendApi.Batch[]>(defaultFallbackBatches);
-  const [selectedBatch, setSelectedBatch] = useState<backendApi.Batch | null>(defaultFallbackBatches[0]);
-  const [selectedLocationId, setSelectedLocationId] = useState<string>(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+  const [edition, setEdition] = useState<any>(null);
+  const [batches, setBatches] = useState<backendApi.Batch[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<backendApi.Batch | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [mintedCount, setMintedCount] = useState(0);
   const [txState, setTxState] = useState<TxState>('idle');
   const [txStep, setTxStep] = useState<TxStep>('idle');
   const [txResult, setTxResult] = useState<TxResult>({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isVerifyingStock, setIsVerifyingStock] = useState(false);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState('Medium');
   const [quantity, setQuantity] = useState(1);
-  const [computedPrice, setComputedPrice] = useState(fallbackEdition?.price_usd || 0);
+  const [computedPrice, setComputedPrice] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'fiat' | 'crypto'>('crypto');
   const [solPrice, setSolPrice] = useState<number | null>(null);
@@ -122,9 +82,7 @@ function DropPageContent() {
 
     async function loadDropData() {
       try {
-        if (requestedEditionId && requestedEditionId !== fallbackEdition.id) {
-          setLoading(true);
-        }
+        setLoading(true);
         let activeEdition = null;
 
         if (requestedEditionId) {
@@ -144,12 +102,20 @@ function DropPageContent() {
           const allEditions = await getEditions();
           if (allEditions && allEditions.length > 0) {
             activeEdition = allEditions[0];
-          } else {
-            activeEdition = fallbackEdition;
           }
         }
 
         if (!isMounted) return;
+
+        if (!activeEdition) {
+          setEdition(null);
+          setBatches([]);
+          setSelectedBatch(null);
+          setSelectedLocationId('');
+          setLoading(false);
+          return;
+        }
+
         setEdition(activeEdition);
 
         // Calculate dynamic price based on size
@@ -157,7 +123,7 @@ function DropPageContent() {
           const priceMap = activeEdition.prices_by_size;
           setComputedPrice(Number((priceMap as Record<string, number>)[selectedSize] || activeEdition.price_usd));
         } else {
-          setComputedPrice(Number(activeEdition.price_usd));
+          setComputedPrice(Number(activeEdition.price_usd || 0));
         }
 
         // Helper to resolve accurate booked count across on-chain escrow, local cache, and API
@@ -226,7 +192,7 @@ function DropPageContent() {
               setSelectedLocationId(batchRes.batches[0].pickup_locations[0].id || 'loc-1');
             }
           } else {
-            // Check seller batches or fallback
+            // Check seller batches
             try {
               const myBatchRes = await backendApi.getMyBatches({ editionId: activeEdition.id });
               if (!isMounted) return;
@@ -238,24 +204,24 @@ function DropPageContent() {
                   setSelectedLocationId(myBatchRes.batches[0].pickup_locations[0].id || 'loc-1');
                 }
               } else {
-                setBatches(defaultFallbackBatches);
-                resolvedBatch = defaultFallbackBatches[0];
-                setSelectedBatch(defaultFallbackBatches[0]);
-                setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+                setBatches([]);
+                resolvedBatch = null;
+                setSelectedBatch(null);
+                setSelectedLocationId('');
               }
             } catch {
-              setBatches(defaultFallbackBatches);
-              resolvedBatch = defaultFallbackBatches[0];
-              setSelectedBatch(defaultFallbackBatches[0]);
-              setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+              setBatches([]);
+              resolvedBatch = null;
+              setSelectedBatch(null);
+              setSelectedLocationId('');
             }
           }
         } catch (e) {
-          console.warn('Could not fetch batches for edition, using default fallback:', e);
-          setBatches(defaultFallbackBatches);
-          resolvedBatch = defaultFallbackBatches[0];
-          setSelectedBatch(defaultFallbackBatches[0]);
-          setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+          console.warn('Could not fetch batches for edition:', e);
+          setBatches([]);
+          resolvedBatch = null;
+          setSelectedBatch(null);
+          setSelectedLocationId('');
         }
 
         // Now resolve supply count using the batch and local orders
@@ -263,10 +229,10 @@ function DropPageContent() {
         if (isMounted) setMintedCount(initialCount);
       } catch (err) {
         console.error('Error fetching dynamic drop details:', err);
-        setEdition(fallbackEdition);
-        setBatches(defaultFallbackBatches);
-        setSelectedBatch(defaultFallbackBatches[0]);
-        setSelectedLocationId(defaultFallbackBatches[0].pickup_locations[0].id || 'loc-lagos-1');
+        setEdition(null);
+        setBatches([]);
+        setSelectedBatch(null);
+        setSelectedLocationId('');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -276,7 +242,7 @@ function DropPageContent() {
 
     // ── Silent background stock sync: polls count only, NEVER reloads page ──
     const interval = setInterval(async () => {
-      const currentId = requestedEditionId || edition?.id || fallbackEdition.id;
+      const currentId = requestedEditionId || edition?.id;
       if (!currentId) return;
       try {
         let count = 0;
@@ -328,21 +294,21 @@ function DropPageContent() {
     }
   }, [selectedSize, edition]);
 
-  const activeEdition = edition || fallbackEdition;
-  const maxSupply = activeEdition.max_supply;
-  const isSoldOut = mintedCount >= maxSupply;
-  const fillPercent = Math.min(100, (mintedCount / maxSupply) * 100);
+  const activeEdition = edition;
+  const maxSupply = activeEdition?.max_supply || 0;
+  const isSoldOut = activeEdition ? mintedCount >= maxSupply : false;
+  const fillPercent = maxSupply > 0 ? Math.min(100, (mintedCount / maxSupply) * 100) : 0;
 
   // Authoritative Unified Pricing across entire app
   const batchLamports = (selectedBatch?.pricing?.prices_by_size_lamports && selectedSize && selectedBatch.pricing.prices_by_size_lamports[selectedSize])
     || selectedBatch?.pricing?.unit_price_lamports;
 
   const pricing = resolvePricing({
-    editionPriceUsd: computedPrice || activeEdition.price_usd,
+    editionPriceUsd: computedPrice || activeEdition?.price_usd || 0,
     batchLamports,
     quantity,
     selectedSize,
-    pricesBySize: activeEdition.prices_by_size,
+    pricesBySize: activeEdition?.prices_by_size,
     solRateUsd: solPrice,
   });
 
@@ -511,77 +477,18 @@ function DropPageContent() {
             return;
           }
 
-          // In verified chain mode, do not fall through to legacy custodial routes
-          if (process.env.NEXT_PUBLIC_SIMULATION_MODE !== 'true') {
-            showToast('Order Failed', errMsg || 'Could not complete on-chain purchase.');
-            setTxState('idle');
-            return;
-          }
+          showToast('Order Failed', errMsg || 'Could not complete on-chain purchase.');
+          setTxState('idle');
+          return;
         }
-      }
-
-      // 2. Simulation fallback (only if NEXT_PUBLIC_SIMULATION_MODE is true)
-      if (process.env.NEXT_PUBLIC_SIMULATION_MODE === 'true') {
-        const result = await initializeEscrow(edition.id, totalSol, user.walletAddress);
-        const simPieceNum = result.orderNumber || (mintedCount || 0) + 1;
-        await saveOrder({
-          email: user.email,
-          drop_id: edition.id,
-          tx_signature: result.txSignature,
-          escrow_pda: result.escrowPDA,
-          amount_usd: totalUsd,
-          size: selectedSize,
-          quantity: quantity,
-          garment_serial: String(simPieceNum),
-          order_number: simPieceNum,
-        });
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('circuit_last_order_tx', result.txSignature);
-          const richOrder = {
-            id: result.orderNumber ? String(result.orderNumber) : result.txSignature,
-            drop_id: edition.id,
-            tx_signature: result.txSignature,
-            vault_address: result.escrowPDA,
-            order_address: result.escrowPDA,
-            amount_usd: totalUsd,
-            amount_sol: totalSol,
-            quantity,
-            size: selectedSize,
-            created_at: new Date().toISOString(),
-            edition_name: activeEdition.name,
-            release_at: selectedBatch?.release_at,
-            pickup_location_id: selectedLocationId,
-            order_number: simPieceNum,
-            garment_serial: String(simPieceNum),
-          };
-          const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-          localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
+      } else {
+        if (!selectedBatch) {
+          showToast('Batch Required', 'A production batch must be scheduled before ordering.');
+        } else if (!signTransaction) {
+          showToast('Wallet Required', 'Please connect a Solana wallet supporting transaction signing.');
         }
-
-        setMintedCount((prev) => prev + quantity);
-        setTxState('success');
-        setTxStep('idle');
-        setTxResult({
-          txSignature: result.txSignature,
-          solscanUrl: result.solscanUrl,
-          escrowPDA: result.escrowPDA,
-          vaultAddress: result.escrowPDA,
-          orderId: result.orderNumber ? String(result.orderNumber) : result.txSignature,
-          orderNumber: result.orderNumber,
-          amountSol: totalSol,
-          amountUsd: totalUsd,
-          quantity,
-          size: selectedSize,
-          editionName: activeEdition.name,
-          batchName: selectedBatch?.name,
-          releaseAt: selectedBatch?.release_at,
-          pickupLocation: selectedBatch?.pickup_locations?.find((l) => (l.id || '') === selectedLocationId)?.name || 'Official Atelier Station',
-        });
-        showToast('✓', `Order #${result.orderNumber} confirmed`);
-        setTimeout(() => {
-          document.getElementById('drop-tx')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 100);
+        setTxState('idle');
+        return;
       }
     } catch (err: unknown) {
       const e = err as { code?: string };
@@ -605,6 +512,35 @@ function DropPageContent() {
       <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center pt-[72px] bg-black text-white">
         <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
         <span className="text-xs font-mono text-[#555] mt-4">Loading drop details...</span>
+      </div>
+    );
+  }
+
+  if (!activeEdition) {
+    return (
+      <div className="min-h-[calc(100vh-72px)] flex flex-col items-center justify-center pt-[72px] px-6 bg-black text-white selection:bg-white selection:text-black">
+        <div className="card-glass max-w-lg w-full p-10 md:p-12 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-2xl">
+            ✨
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-amber-400 font-mono">
+              Atelier Vault Empty
+            </span>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight">No Active Drops Scheduled</h2>
+            <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
+              There are currently no active runway drops accepting preorders. New collections are published directly by verified ateliers.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+            <Link href="/" className="btn-circuit py-3 px-6 text-xs justify-center">
+              <span>Return Home</span>
+            </Link>
+            <Link href="/creator" className="btn-outline-circuit py-3 px-6 text-xs justify-center border-white/15 hover:border-white/30 text-white/80 hover:text-white">
+              <span>Creator Studio ↗</span>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -802,43 +738,54 @@ function DropPageContent() {
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {batches.map((b) => {
-                const isSelected = selectedBatch?.id === b.id;
-                return (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedBatch(b);
-                      if (b.pickup_locations?.length > 0) {
-                        setSelectedLocationId(b.pickup_locations[0].id || 'loc-1');
-                      }
-                    }}
-                    className={`p-4 rounded-2xl text-left border transition-all ${
-                      isSelected
-                        ? 'border-white bg-white/[0.06] shadow-[0_0_20px_rgba(255,255,255,0.05)]'
-                        : 'border-white/[0.08] bg-white/[0.02] hover:border-white/20'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white tracking-wide">{b.name}</span>
-                      <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                        b.opens_at && new Date(b.opens_at).getTime() > Date.now()
-                          ? 'border-amber-400/30 text-amber-400 bg-amber-400/10'
-                          : 'border-emerald-400/30 text-emerald-400 bg-emerald-400/10'
-                      }`}>
-                        {b.opens_at && new Date(b.opens_at).getTime() > Date.now() ? 'Opens Soon' : (b.sales_window_status || 'Open')}
-                      </span>
-                    </div>
-                    <div className="text-[0.65rem] text-[#888] font-mono space-y-0.5">
-                      <div>Estimated Arrival: {new Date(b.release_at).toLocaleDateString()}</div>
-                      <div>{b.pickup_locations?.length || 1} Pickup Station{(b.pickup_locations?.length || 1) > 1 ? 's' : ''}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            {batches.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {batches.map((b) => {
+                  const isSelected = selectedBatch?.id === b.id;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedBatch(b);
+                        if (b.pickup_locations?.length > 0) {
+                          setSelectedLocationId(b.pickup_locations[0].id || 'loc-1');
+                        }
+                      }}
+                      className={`p-4 rounded-2xl text-left border transition-all ${
+                        isSelected
+                          ? 'border-white bg-white/[0.06] shadow-[0_0_20px_rgba(255,255,255,0.05)]'
+                          : 'border-white/[0.08] bg-white/[0.02] hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold text-white tracking-wide">{b.name}</span>
+                        <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                          b.opens_at && new Date(b.opens_at).getTime() > Date.now()
+                            ? 'border-amber-400/30 text-amber-400 bg-amber-400/10'
+                            : 'border-emerald-400/30 text-emerald-400 bg-emerald-400/10'
+                        }`}>
+                          {b.opens_at && new Date(b.opens_at).getTime() > Date.now() ? 'Opens Soon' : (b.sales_window_status || 'Open')}
+                        </span>
+                      </div>
+                      <div className="text-[0.65rem] text-[#888] font-mono space-y-0.5">
+                        <div>Estimated Arrival: {new Date(b.release_at).toLocaleDateString()}</div>
+                        <div>{b.pickup_locations?.length || 1} Pickup Station{(b.pickup_locations?.length || 1) > 1 ? 's' : ''}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] text-center flex flex-col items-center gap-1.5">
+                <span className="text-[0.6rem] font-bold uppercase tracking-widest text-amber-400 font-mono">
+                  Production Batch Pending
+                </span>
+                <p className="text-xs text-[#888] leading-relaxed max-w-sm">
+                  The atelier is finalizing production window dates and collection stations for this piece. Preorders will open once the schedule is confirmed.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Fulfillment & Delivery Method */}
@@ -1038,9 +985,9 @@ function DropPageContent() {
               )}
 
               <button
-                className={`btn-circuit w-full ${txState === 'signing' || isVerifyingStock ? 'signing' : ''} ${isSoldOut || activeEdition.published === false ? '!bg-[#111] !text-[#555] !border-white/10' : ''}`}
-                onClick={activeEdition.published !== false ? handleOrder : undefined}
-                disabled={txState === 'signing' || isVerifyingStock || isSoldOut || activeEdition.published === false}
+                className={`btn-circuit w-full ${txState === 'signing' || isVerifyingStock ? 'signing' : ''} ${isSoldOut || activeEdition.published === false || batches.length === 0 ? '!bg-[#111] !text-[#555] !border-white/10' : ''}`}
+                onClick={activeEdition.published !== false && batches.length > 0 ? handleOrder : undefined}
+                disabled={txState === 'signing' || isVerifyingStock || isSoldOut || activeEdition.published === false || batches.length === 0}
               >
                 <span>
                   {isVerifyingStock ? 'Checking stock...' :
@@ -1048,6 +995,7 @@ function DropPageContent() {
                    txState === 'success' ? '✓ Order Confirmed' :
                    activeEdition.published === false ? 'Preview Mode (Unpublished)' :
                    isSoldOut ? 'Sold Out' :
+                   batches.length === 0 ? 'Batch Scheduling In Progress' :
                    selectedBatch?.opens_at && new Date(selectedBatch.opens_at).getTime() > Date.now() ?
                      `Opens at ${new Date(selectedBatch.opens_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` :
                    paymentMethod === 'fiat' ?
@@ -1057,7 +1005,7 @@ function DropPageContent() {
                 <span className="btn-arrow">
                   {txState === 'signing' || isVerifyingStock ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M12 2a10 10 0 010 20 10 10 0 010-20"/></svg>
-                  ) : isSoldOut || activeEdition.published === false ? (
+                  ) : isSoldOut || activeEdition.published === false || batches.length === 0 ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-20"><path d="M18 6L6 18M6 6l12 12"/></svg>
                   ) : (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -1078,15 +1026,13 @@ function DropPageContent() {
                     <span className="text-xs font-bold uppercase tracking-wider text-white">Payment Secured in Escrow</span>
                   </div>
                   <span className="text-[0.65rem] font-mono text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20">
-                    {txResult.txSignature?.startsWith('CRCT-FIAT-') ? 'Card Settlement' : (CLUSTER === 'mainnet-beta' ? 'Solana Mainnet' : 'Solana Devnet')}
+                    {CLUSTER === 'mainnet-beta' ? 'Solana Mainnet' : 'Solana Devnet'}
                   </span>
                 </div>
 
                 {/* Subtitle Reassurance */}
                 <p className="text-[0.72rem] text-[#aaa] leading-relaxed">
-                  {txResult.txSignature?.startsWith('CRCT-FIAT-') 
-                    ? 'Your card payment receipt has been verified. Review your order record below or open your Digital Product Passport.'
-                    : 'Your funds are secured in on-chain escrow. Review your transaction proof below or open your Digital Product Passport whenever you are ready.'}
+                  Your funds are secured in on-chain escrow. Review your transaction proof below or open your Digital Product Passport whenever you are ready.
                 </p>
 
                 {/* Garment & Edition stats */}
@@ -1122,23 +1068,17 @@ function DropPageContent() {
                 {/* Verifications & Receipts */}
                 <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.08]">
                   <span className="text-[0.6rem] font-bold uppercase tracking-wider text-[#666]">
-                    {txResult.txSignature?.startsWith('CRCT-FIAT-') ? 'Order Receipt & Proof' : 'On-Chain Blockchain Verifications'}
+                    On-Chain Blockchain Verifications
                   </span>
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-mono">
-                    {!txResult.txSignature?.startsWith('CRCT-FIAT-') ? (
-                      <a
-                        href={solanaExplorerTxUrl(txResult.txSignature)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/12 border border-white/15 text-white font-medium transition-all flex items-center gap-1.5 hover:border-emerald-500/40"
-                      >
-                        <span>View on Solana Explorer ↗</span>
-                      </a>
-                    ) : (
-                      <div className="px-3.5 py-2 rounded-xl bg-white/[0.06] border border-white/15 text-emerald-400 font-mono text-[0.7rem] flex items-center gap-1.5">
-                        <span>Receipt ID: {txResult.txSignature}</span>
-                      </div>
-                    )}
+                    <a
+                      href={solanaExplorerTxUrl(txResult.txSignature)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/12 border border-white/15 text-white font-medium transition-all flex items-center gap-1.5 hover:border-emerald-500/40"
+                    >
+                      <span>View on Solana Explorer ↗</span>
+                    </a>
                     {txResult.vaultAddress && (
                       <a
                         href={solanaExplorerAccountUrl(txResult.vaultAddress)}
@@ -1293,107 +1233,71 @@ function DropPageContent() {
 
       <SignInModal isOpen={isSignInOpen} onClose={() => setIsSignInOpen(false)} />
 
-      {/* Fiat Checkout Mock Modal */}
+      {/* Fiat Checkout Legit Pending State Modal */}
       {showFiatModal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80 backdrop-blur-md px-4">
-          <div className="card-glass w-full max-w-md p-8 border border-white/10 rounded-3xl shadow-[0_50px_100px_rgba(0,0,0,0.8)] relative animate-fade-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/85 backdrop-blur-md px-4 animate-fade-in">
+          <div className="card-glass w-full max-w-md p-8 md:p-10 border border-white/15 rounded-3xl shadow-[0_50px_100px_rgba(0,0,0,0.9)] relative animate-scale-in">
             <button 
               onClick={() => setShowFiatModal(false)}
-              className="absolute top-4 right-4 text-[#666] hover:text-white transition-colors p-2"
+              className="absolute top-5 right-5 text-[#666] hover:text-white transition-colors p-2 text-sm"
+              aria-label="Close"
             >
               ✕
             </button>
             <div className="flex flex-col gap-6">
-              <div className="text-center">
-                <h3 className="text-xl font-bold mb-1">Card Payment</h3>
-                <p className="text-xs text-[#888]">Powered by Circuit Fiat Gateway</p>
-              </div>
-              
-              <div className="p-4 bg-white/[0.03] rounded-xl border border-white/5 flex justify-between items-center">
-                <span className="text-sm text-[#888]">Total Amount</span>
-                <span className="text-2xl font-bold">{pricing.totalUsdFormatted}</span>
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl mb-4">
+                  💳
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[0.6rem] font-bold font-mono tracking-widest uppercase text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                    Integration In Progress
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold tracking-tight">Card & Apple Pay Checkout</h3>
+                <p className="text-xs text-[#888] mt-1 max-w-xs leading-relaxed">
+                  Circuit direct-to-escrow credit card processing is finalizing compliance audit with our licensed payments partner.
+                </p>
               </div>
 
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#666]">Card Information</label>
-                  <input type="text" placeholder="Card number" className="w-full bg-transparent border border-white/10 rounded-t-xl px-4 py-3 text-sm focus:border-white/30 focus:outline-none transition-colors" />
-                  <div className="flex">
-                    <input type="text" placeholder="MM / YY" className="w-1/2 bg-transparent border-x border-b border-white/10 rounded-bl-xl px-4 py-3 text-sm focus:border-white/30 focus:outline-none transition-colors" />
-                    <input type="text" placeholder="CVC" className="w-1/2 bg-transparent border-b border-r border-white/10 rounded-br-xl px-4 py-3 text-sm focus:border-white/30 focus:outline-none transition-colors" />
-                  </div>
+              <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/10 flex flex-col gap-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#888]">Reservation Total:</span>
+                  <span className="font-bold text-white text-sm">{pricing.totalUsdFormatted}</span>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#666]">Name on Card</label>
-                  <input type="text" placeholder="Full name" className="w-full bg-transparent border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-white/30 focus:outline-none transition-colors" />
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-[#888]">Solana Equivalent:</span>
+                  <span className="font-mono text-emerald-400 font-bold">{pricing.totalSolFormatted} SOL</span>
+                </div>
+                <div className="pt-2 border-t border-white/[0.06] text-[0.7rem] text-[#aaa] leading-relaxed">
+                  💡 <strong>Instant Preorder Available:</strong> You can secure your guaranteed piece immediately with zero gas fees using your Solana wallet.
                 </div>
               </div>
 
-              <button 
-                className={`btn-circuit w-full justify-center py-4 mt-2 ${txState === 'signing' ? 'signing' : ''}`}
-                onClick={() => {
-                  setTxState('signing');
-                  setTimeout(() => {
-                    const fiatReceiptId = 'CRCT-FIAT-' + Date.now().toString(36).toUpperCase();
-                    const assignedFiatNum = (mintedCount || 0) + 1;
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  className="btn-circuit w-full justify-center py-4 text-xs"
+                  onClick={() => {
+                    setPaymentMethod('crypto');
                     setShowFiatModal(false);
-                    setTxState('success');
-                    setMintedCount((prev) => prev + quantity);
-                    setTxResult({
-                      txSignature: fiatReceiptId,
-                      orderNumber: assignedFiatNum,
-                      orderId: fiatReceiptId,
-                      amountSol: totalSol,
-                      amountUsd: totalUsd,
-                      quantity,
-                      size: selectedSize,
-                      editionName: activeEdition.name,
-                      batchName: selectedBatch?.name,
-                      releaseAt: selectedBatch?.release_at,
-                      pickupLocation: selectedBatch?.pickup_locations?.find((l) => (l.id || '') === selectedLocationId)?.name || 'Official Atelier Station',
-                    });
-
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('circuit_last_order_tx', fiatReceiptId);
-                      localStorage.setItem('circuit_last_order_id', fiatReceiptId);
-                      const richOrder = {
-                        id: fiatReceiptId,
-                        drop_id: activeEdition.id,
-                        batch_id: selectedBatch?.id,
-                        tx_signature: fiatReceiptId,
-                        amount_usd: totalUsd,
-                        amount_sol: totalSol,
-                        quantity,
-                        size: selectedSize,
-                        created_at: new Date().toISOString(),
-                        edition_name: activeEdition.name,
-                        release_at: selectedBatch?.release_at,
-                        pickup_location_id: selectedLocationId,
-                        order_number: assignedFiatNum,
-                        garment_serial: String(assignedFiatNum),
-                      };
-                      const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
-                      localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
-                    }
-                    showToast('✓ Card Payment Secured', 'Payment verified and escrow record generated.');
-                    setTimeout(() => {
-                      document.getElementById('drop-tx')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }, 100);
-                  }, 1200);
-                }}
-                disabled={txState === 'signing'}
-              >
-                <span>
-                  {txState === 'signing' ? 'Processing...' : `Pay ${pricing.totalUsdFormatted}`}
-                </span>
-                <span className="btn-arrow">
-                  {txState === 'signing' ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin"><path d="M12 2a10 10 0 010 20 10 10 0 010-20"/></svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                  )}
-                </span>
-              </button>
+                    showToast('Switched to Solana', 'Ready to checkout instantly via your Solana wallet.');
+                  }}
+                >
+                  <span>Switch to Solana Checkout (Instant)</span>
+                  <span className="btn-arrow">→</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline-circuit w-full justify-center py-3 text-xs border-white/10 text-white/70 hover:text-white"
+                  onClick={() => {
+                    setShowFiatModal(false);
+                    showToast('Notification Saved', 'We will alert you when Card / Apple Pay rails go live.');
+                  }}
+                >
+                  Notify Me When Card Rails Launch
+                </button>
+              </div>
             </div>
           </div>
         </div>

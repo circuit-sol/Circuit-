@@ -95,6 +95,7 @@ export default function AdminDashboard() {
   // Core Data States
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [liveSolPrice, setLiveSolPrice] = useState<number>(DEFAULT_SOL_MARKET_PRICE);
   const [orders, setOrders] = useState<Order[]>([]);
   const [editions, setEditions] = useState<Edition[]>([]);
@@ -326,14 +327,50 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    const session = sessionStorage.getItem('circuit_admin_session');
-    if (!session && !isSignedIn) {
-      router.push('/admin/login');
-      return;
+    let isCancelled = false;
+
+    async function checkAuthAndFetch() {
+      if (!isSignedIn || !user?.walletAddress) {
+        router.push('/admin/login');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch chain status to get registered admin authority keypair
+        const chainRes = await backendApi.getChainStatus().catch(() => null);
+        if (isCancelled) return;
+
+        if (chainRes) {
+          setChainStatus(chainRes);
+          const adminKey = chainRes.admin_wallet;
+          if (adminKey && user.walletAddress !== adminKey) {
+            setIsAuthorized(false);
+            setAuthError(
+              `Connected keypair (${user.walletAddress.slice(0, 4)}...${user.walletAddress.slice(-4)}) does not match the designated Circuit Admin Authority (${adminKey.slice(0, 4)}...${adminKey.slice(-4)}).`
+            );
+            setLoading(false);
+            return;
+          }
+        }
+
+        setIsAuthorized(true);
+        setAuthError(null);
+        await fetchData();
+      } catch (err) {
+        console.error('Admin authorization verification error:', err);
+        setIsAuthorized(false);
+      } finally {
+        if (!isCancelled) setLoading(false);
+      }
     }
-    setIsAuthorized(true);
-    fetchData();
-  }, [router, isSignedIn]);
+
+    checkAuthAndFetch();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [router, isSignedIn, user?.walletAddress]);
 
   // ── Calculations & Treasury Metrics ────────────────────────────────────
 
@@ -583,12 +620,62 @@ export default function AdminDashboard() {
   });
 
   if (!isAuthorized) {
+    if (authError) {
+      return (
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 selection:bg-white selection:text-black">
+          <AdminNavbar />
+          <div className="card-glass max-w-md w-full p-8 md:p-10 border border-white/10 rounded-3xl text-center flex flex-col items-center gap-6 animate-fade-in shadow-2xl relative z-10">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-2xl text-red-400">
+              🛡️
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.25em] text-red-400 font-mono">
+                Access Restricted
+              </span>
+              <h2 className="text-2xl font-bold tracking-tight">Admin Authority Required</h2>
+              <p className="text-xs text-[#888] leading-relaxed max-w-sm mx-auto">
+                {authError}
+              </p>
+            </div>
+
+            {chainStatus?.admin_wallet && (
+              <div className="w-full p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col gap-1 text-left font-mono text-[0.65rem]">
+                <span className="text-[#666] uppercase text-[0.55rem]">Designated Admin Key:</span>
+                <span className="text-white truncate select-all">{chainStatus.admin_wallet}</span>
+                {user?.walletAddress && (
+                  <>
+                    <span className="text-[#666] uppercase text-[0.55rem] mt-2">Connected Keypair:</span>
+                    <span className="text-amber-400 truncate select-all">{user.walletAddress}</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center pt-2">
+              <button
+                onClick={() => triggerConnect()}
+                className="btn-circuit py-3 px-6 text-xs justify-center"
+              >
+                <span>Switch Wallet</span>
+              </button>
+              <Link
+                href="/"
+                className="btn-outline-circuit py-3 px-6 text-xs justify-center border-white/15 hover:border-white/30 text-white/80 hover:text-white"
+              >
+                <span>Return Home</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-2 border-white/10 border-t-white rounded-full animate-spin" />
-          <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#444]">
-            Authorizing Administrative Clearance
+          <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666]">
+            Authorizing Administrative Clearance...
           </span>
         </div>
       </div>

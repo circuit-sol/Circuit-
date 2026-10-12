@@ -8,8 +8,8 @@ import { useAuth } from '@/lib/auth-context';
 import { confirmDelivery, parseError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import SignInModal from '@/components/SignInModal';
-import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
-import { formatSerialNumber } from '@/lib/utils';
+import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById } from '@/lib/db';
+import { formatSerialNumber, solscanTxUrl } from '@/lib/utils';
 import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
 import * as backendApi from '@/lib/backendApi';
 
@@ -165,17 +165,17 @@ export default function ConfirmPage() {
       await updateOrderDelivery(user.email, deliveryLocation, deliveryAddress);
 
       // 2. Process Solana Escrow confirm release
-      const result = await confirmDelivery(latestOrder.drop_id);
+      await confirmDelivery(latestOrder.id || latestOrder.drop_id);
 
       // 3. Complete order delivery state update
-      await updateOrderStatus(result.txSignature, 'delivered');
+      await updateOrderStatus(latestOrder.tx_signature || latestOrder.id, 'delivered');
 
       setTxState('success');
       setTxResult({
-        txSignature: result.txSignature,
-        solscanUrl: result.solscanUrl,
-        fundsReleased: result.fundsReleased,
-        designerAddress: result.designerAddress,
+        txSignature: latestOrder.tx_signature || undefined,
+        solscanUrl: latestOrder.tx_signature ? solscanTxUrl(latestOrder.tx_signature) : undefined,
+        fundsReleased: 0,
+        designerAddress: '',
       });
       showToast('✓', 'Delivery confirmed');
     } catch (err) {
@@ -187,7 +187,7 @@ export default function ConfirmPage() {
     }
   };
 
-  const ed = activeEdition || DEFAULT_CIRCUIT_EDITION;
+  const ed = activeEdition;
 
   return (
     <section className="min-h-screen flex items-center justify-center px-6 pt-[72px] pb-12" aria-label="Confirm Delivery">
@@ -254,14 +254,14 @@ export default function ConfirmPage() {
             {/* Item Preview */}
             <div className="w-full flex items-center gap-4 bg-white/[0.03] border border-white/[0.08] p-4 rounded-2xl">
               <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-white/10 relative">
-                <Image src={ed.images?.[0]?.url || '/yellow-gown.jpg'} alt={ed.name} fill className="object-cover" />
+                <Image src={ed?.images?.[0]?.url || '/satin.png'} alt={ed?.name || latestOrder.drop_name || 'Circuit Garment'} fill className="object-cover" />
               </div>
               <div className="flex flex-col text-left">
                 <span className="text-[0.6rem] font-bold text-[#666] uppercase tracking-wider">Active Order</span>
-                <span className="text-sm font-bold truncate max-w-[240px]">{ed.name}</span>
+                <span className="text-sm font-bold truncate max-w-[240px]">{ed?.name || latestOrder.drop_name || 'Circuit Garment'}</span>
                 <span className="text-[0.6rem] font-mono text-[#555]">
                   Size: {latestOrder.size || 'M'} | Status: {latestOrder.status}
-                  {latestOrder.garment_serial && ` | Edition Run: ${formatSerialNumber(latestOrder.garment_serial, (activeEdition || ed).max_supply)}`}
+                  {latestOrder.garment_serial && ` | Edition Run: ${formatSerialNumber(latestOrder.garment_serial, ed?.max_supply || 50)}`}
                 </span>
               </div>
             </div>
@@ -326,7 +326,9 @@ export default function ConfirmPage() {
               Your collection has been verified. Atelier balance settlement unlocks per the batch schedule.
             </p>
             <div className="flex gap-6 justify-center text-[0.65rem] font-bold uppercase tracking-widest font-mono pt-1">
-              <a href={txResult.solscanUrl} target="_blank" rel="noopener" className="text-[#666] hover:text-white transition-colors">Explorer Proof ↗</a>
+              {txResult.solscanUrl && (
+                <a href={txResult.solscanUrl} target="_blank" rel="noopener" className="text-[#666] hover:text-white transition-colors">Explorer Proof ↗</a>
+              )}
               <Link href={`/passport?order=${latestOrder.id}`} className="text-white underline underline-offset-4">Digital Passport →</Link>
             </div>
           </div>

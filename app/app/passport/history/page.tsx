@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
-import { getUserOrders, getEditions, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
+import { getUserOrders, getEditions } from '@/lib/db';
 import { solscanTxUrl, solanaExplorerTxUrl, formatSerialNumber, resolveUniqueOrderSerials } from '@/lib/utils';
 import * as backendApi from '@/lib/backendApi';
 import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
@@ -19,7 +19,7 @@ interface ShipmentModalProps {
 
 function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
   const status = order.status || 'pending';
-  const activeEdition = edition || DEFAULT_CIRCUIT_EDITION;
+  const activeEdition = edition;
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -82,7 +82,7 @@ function ShipmentModal({ order, edition, onClose }: ShipmentModalProps) {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
               <span className="text-[0.6rem] text-[#444] uppercase block mb-1">Edition</span>
               <strong className="text-xs font-semibold text-amber-400">
-                {formatSerialNumber(order.garment_serial || order.order_number, activeEdition.max_supply)}
+                {formatSerialNumber(order.garment_serial || order.order_number, activeEdition?.max_supply || 50)}
               </strong>
             </div>
           </div>
@@ -379,8 +379,10 @@ export default function HistoryPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {orders.map((order, index) => {
                 const ed = editionsMap[order.drop_id];
-                const activeEdition = ed || DEFAULT_CIRCUIT_EDITION;
+                const activeEdition = ed;
                 const status = order.status || 'pending';
+                const garmentName = activeEdition?.name || order.drop_name || 'Circuit Garment';
+                const maxSupply = activeEdition?.max_supply || 50;
 
                 return (
                   <div 
@@ -392,8 +394,8 @@ export default function HistoryPage() {
                     {/* Top image wrapper */}
                     <div className="aspect-[16/10] relative overflow-hidden bg-[#0a0a0a]">
                       <Image 
-                        src={activeEdition.images?.[0]?.url || '/satin.png'} 
-                        alt={activeEdition.name}
+                        src={activeEdition?.images?.[0]?.url || '/satin.png'} 
+                        alt={garmentName}
                         fill
                         className="object-cover opacity-60 group-hover:scale-105 group-hover:opacity-85 transition-all duration-1000"
                       />
@@ -428,13 +430,13 @@ export default function HistoryPage() {
                           <span className="text-xs text-[#888] font-mono">Size: {order.size || 'M'}</span>
                         </div>
                         <h3 className="text-xl font-bold tracking-tight text-white group-hover:text-white/95 transition-colors">
-                          {activeEdition.name}
+                          {garmentName}
                         </h3>
                         <div className="flex flex-col gap-1.5 font-mono text-[0.68rem] text-[#666]">
                           <div className="flex justify-between">
                             <span>Edition:</span>
                             <span className="text-[#aaa] font-semibold">
-                              {formatSerialNumber(order.garment_serial || order.order_number, activeEdition.max_supply)}
+                              {formatSerialNumber(order.garment_serial || order.order_number, maxSupply)}
                             </span>
                           </div>
                         </div>

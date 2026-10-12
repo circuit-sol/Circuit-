@@ -46,11 +46,8 @@ import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-to
 import { publicKey as umiPublicKey } from '@metaplex-foundation/umi';
 
 import {
-  genAddress,
-  genSignature,
   solscanTxUrl,
   solscanTokenUrl,
-  randomDelay,
 } from './utils';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -258,39 +255,24 @@ export async function initializeEscrow(
   amount: number,
   buyerWalletAddress?: string,
 ): Promise<EscrowResult> {
-  const buyerPubkey = buyerWalletAddress 
-    ? new PublicKey(buyerWalletAddress)
-    : new PublicKey(genAddress());
+  if (!buyerWalletAddress) {
+    throw new Error('Buyer wallet address required for escrow initialization.');
+  }
+  const buyerPubkey = new PublicKey(buyerWalletAddress);
   const [derivedPda] = deriveEscrowPDA(dropId, buyerPubkey);
 
-  try {
-    const result = await backendApi.confirmOrder(dropId, amount);
-    const drop   = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
+  const result = await backendApi.confirmOrder(dropId, amount);
+  const drop   = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
 
-    return {
-      success:      true,
-      orderNumber:  drop.currentCount,
-      currentCount: drop.currentCount,
-      maxSupply:    drop.maxSupply,
-      txSignature:  result.signature,
-      escrowPDA:    result.escrowPDA,
-      solscanUrl:   solscanTxUrl(result.signature),
-    };
-  } catch (err) {
-    console.warn('Backend custodial route returned error (legacy custody disabled); deriving escrow PDA non-custodially:', err);
-    const drop = await fetchDropData(dropId).catch(() => ({ currentCount: 0, maxSupply: MAX_SUPPLY }));
-    const txSig = genSignature();
-
-    return {
-      success:      true,
-      orderNumber:  (drop.currentCount || 0) + 1,
-      currentCount: (drop.currentCount || 0) + 1,
-      maxSupply:    drop.maxSupply || MAX_SUPPLY,
-      txSignature:  txSig,
-      escrowPDA:    derivedPda.toBase58(),
-      solscanUrl:   solscanTxUrl(txSig),
-    };
-  }
+  return {
+    success:      true,
+    orderNumber:  drop.currentCount,
+    currentCount: drop.currentCount,
+    maxSupply:    drop.maxSupply,
+    txSignature:  result.signature,
+    escrowPDA:    result.escrowPDA || derivedPda.toBase58(),
+    solscanUrl:   solscanTxUrl(result.signature),
+  };
 }
 
 /**
@@ -330,19 +312,14 @@ export async function registerOrder(
 export async function confirmDelivery(
   orderIdOrDropId: string,
 ): Promise<DeliveryResult> {
-  const txSig = genSignature();
-  try {
-    await backendApi.recordOrderCollected(orderIdOrDropId);
-  } catch (err) {
-    console.warn('Backend recordOrderCollected notice (fallback mode):', err);
-  }
+  await backendApi.recordOrderCollected(orderIdOrDropId);
 
   return {
     success:         true,
-    txSignature:     txSig,
+    txSignature:     '',
     fundsReleased:   0,
     designerAddress: '',
-    solscanUrl:      solscanTxUrl(txSig),
+    solscanUrl:      '',
   };
 }
 

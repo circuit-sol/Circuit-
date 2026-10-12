@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getEditionById, getUserOrders, updateOrderStatusLifecycle, DEFAULT_CIRCUIT_EDITION } from '@/lib/db';
+import { getEditionById, getUserOrders, updateOrderStatusLifecycle } from '@/lib/db';
 import { useAuth } from '@/lib/auth-context';
 import * as backendApi from '@/lib/backendApi';
 import { executeVerifiedCancel } from '@/lib/solana-service';
@@ -355,7 +355,7 @@ function PassportContent() {
               }
             }
 
-            const finalEdition = editionData || DEFAULT_CIRCUIT_EDITION;
+            const finalEdition = editionData;
             const pieceId = ord.id || ord.purchase_signature || ord.tx_signature;
 
             return {
@@ -485,7 +485,7 @@ function PassportContent() {
   const status = order.status || 'pending';
   const isMinted = ['produced', 'shipped', 'delivered'].includes(status);
   const passportUrl = typeof window !== 'undefined' ? `${window.location.origin}/passport?order=${orderId}` : '';
-  const activeEdition = edition || DEFAULT_CIRCUIT_EDITION;
+  const activeEdition = edition || null;
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-white selection:bg-white selection:text-black overflow-x-hidden">
@@ -616,8 +616,8 @@ function PassportContent() {
             <div className="lg:col-span-5 sticky top-32" style={{ animation: 'fadeIn 0.6s ease-out' }}>
               <div className="relative aspect-[4/5] md:aspect-square w-full rounded-[2.5rem] overflow-hidden border border-white/10 group shadow-2xl">
                 <Image 
-                  src={activeEdition.images?.[0]?.url || "/satin.png"} 
-                  alt={activeEdition.name} 
+                  src={activeEdition?.images?.[0]?.url || "/satin.png"} 
+                  alt={activeEdition?.name || order?.drop_name || "Circuit Garment"} 
                   fill 
                   className="object-cover group-hover:scale-105 transition-transform duration-1000"
                 />
@@ -627,15 +627,15 @@ function PassportContent() {
                 <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between z-10">
                   <div className="bg-black/60 backdrop-blur-[20px] rounded-full px-4 py-2 text-[0.6rem] font-bold uppercase tracking-[0.1em] border border-white/[0.12] flex items-center gap-2">
                     <span className={`w-1.5 h-1.5 rounded-full ${isMinted ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400 shadow-[0_0_8px_#fbbf24] animate-pulse'}`} />
-                    {activeEdition.name}
+                    {activeEdition?.name || order?.drop_name || 'Circuit Piece'}
                   </div>
                   {order?.garment_serial ? (
                     <span className="text-[0.6rem] font-mono text-white/90 bg-white/10 border border-white/20 px-3 py-1.5 rounded-full font-bold">
-                      Edition: {formatSerialNumber(order.garment_serial, activeEdition.max_supply)}
+                      Edition: {formatSerialNumber(order.garment_serial, activeEdition?.max_supply || 50)}
                     </span>
                   ) : (
                     <span className="text-[0.6rem] font-mono text-white/50 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
-                      Edition: #{String(order?.order_number || 1).padStart(2, '0')} of {activeEdition.max_supply || 50}
+                      Edition: #{String(order?.order_number || 1).padStart(2, '0')} of {activeEdition?.max_supply || 50}
                     </span>
                   )}
                 </div>
@@ -717,10 +717,10 @@ function PassportContent() {
                 {[
                   {
                     label: 'Edition',
-                    value: formatSerialNumber(order?.garment_serial || order?.order_number, activeEdition.max_supply) + (status === 'pending' ? ' (Reserved)' : ''),
+                    value: formatSerialNumber(order?.garment_serial || order?.order_number, activeEdition?.max_supply || 50) + (status === 'pending' ? ' (Reserved)' : ''),
                   },
                   { label: 'Size', value: order?.size || 'Medium' },
-                  { label: 'Collection Cap', value: `${activeEdition.max_supply || 50} Units` },
+                  { label: 'Collection Cap', value: `${activeEdition?.max_supply || 50} Units` },
                   { label: 'Origin', value: 'Nigeria' },
                 ].map((stat, i) => (
                   <div key={i} className="p-6 rounded-3xl bg-white/[0.02] border border-white/10 flex flex-col justify-between min-h-[110px]">

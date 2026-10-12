@@ -28,7 +28,7 @@ export const DROP_ID = 'drop-zero';
 export const PRICE_SOL = 0.8;
 export const PRICE_DISPLAY = '0.8 SOL';
 export const MAX_SUPPLY = 40;
-export const DEMO_START_COUNT = 38; // Close to sold out for demo dramatic effect
+export const DEMO_START_COUNT = 0;
 
 // ── Brand Identity ──────────────────────────────────────────────────
 export const BRAND = {
