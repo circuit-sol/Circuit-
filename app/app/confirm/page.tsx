@@ -12,6 +12,7 @@ import { updateOrderStatus, updateOrderDelivery, getUserOrders, getEditionById }
 import { formatSerialNumber, solscanTxUrl } from '@/lib/utils';
 import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
 import * as backendApi from '@/lib/backendApi';
+import { QRCodeCanvas } from 'qrcode.react';
 
 type TxState = 'idle' | 'loading' | 'signing' | 'success' | 'error';
 
@@ -34,6 +35,23 @@ export default function ConfirmPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const processingRef = useRef(false);
   const router = useRouter();
+
+  const passportUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/passport?order=${latestOrder?.id || ''}`
+    : `https://circuit.fashion/passport?order=${latestOrder?.id || ''}`;
+
+  const handleDownloadQR = () => {
+    const canvas = document.getElementById('confirm-garment-qr') as HTMLCanvasElement;
+    if (!canvas) return;
+    const pngUrl = canvas.toDataURL('image/png');
+    const downloadLink = document.createElement('a');
+    downloadLink.href = pngUrl;
+    downloadLink.download = `circuit-${latestOrder?.id || 'garment'}-qr.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    showToast('✓ QR Downloaded', 'Authenticity label image saved to your device.');
+  };
 
   // Auto-redirect to digital passport after successful confirmation
   useEffect(() => {
@@ -324,6 +342,47 @@ export default function ConfirmPage() {
                 </span>
               )}
             </button>
+
+            {/* Garment Authenticity QR Code Card */}
+            <div className="w-full flex flex-col items-center p-5 rounded-2xl bg-white/[0.02] border border-white/[0.08] gap-3">
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[0.62rem] font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                  Garment Authenticity Label
+                </span>
+                <span className="text-[0.6rem] font-mono text-[#888]">
+                  {latestOrder.garment_serial
+                    ? `Serial #${latestOrder.garment_serial}`
+                    : 'NFC / QR Sync'}
+                </span>
+              </div>
+              <div className="bg-white p-3.5 rounded-2xl shadow-lg my-1">
+                <QRCodeCanvas
+                  id="confirm-garment-qr"
+                  value={passportUrl}
+                  size={140}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+              <p className="text-[0.62rem] text-[#888] font-mono leading-relaxed max-w-[280px]">
+                Scan with any smartphone camera to verify permanent on-chain provenance and escrow status.
+              </p>
+              <div className="flex gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={handleDownloadQR}
+                  className="btn-outline-circuit flex-1 py-2 text-xs border-white/10 text-white/80 hover:text-white font-mono justify-center"
+                >
+                  📥 Save QR
+                </button>
+                <Link
+                  href={`/passport?order=${latestOrder.id}`}
+                  className="btn-circuit flex-1 py-2 text-xs font-mono justify-center"
+                >
+                  Passport →
+                </Link>
+              </div>
+            </div>
           </>
         )}
 

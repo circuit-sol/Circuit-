@@ -6,6 +6,7 @@ const { createClient } = require("@supabase/supabase-js");
 const createEditionImageRoutes = require("./editionImageRoutes");
 const createBatchRoutes = require("./batchRoutes");
 const createChainRoutes = require("./chain/routes");
+const { normalizeSocialLinks } = require("./editionSocial");
 
 if (!process.env.SUPABASE_URL)
   throw new Error("SUPABASE_URL is not set in environment");
@@ -818,6 +819,15 @@ router.post("/editions", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "BRAND_ACCESS_DENIED" });
     }
 
+    let socialLinks = undefined;
+    if (body.social_links !== undefined) {
+      try {
+        socialLinks = normalizeSocialLinks(body.social_links);
+      } catch (err) {
+        return res.status(400).json({ error: "INVALID_SOCIAL_LINKS" });
+      }
+    }
+
     // Explicit fields prevent caller-controlled ownership or chain status.
     const payload = {
       id: body.id,
@@ -832,6 +842,7 @@ router.post("/editions", requireAuth, async (req, res) => {
       embroidery: body.embroidery?.trim() || "",
       is_active: false,
       chain_status: "pending",
+      ...(socialLinks ? { social_links: socialLinks } : {}),
     };
 
     const { data, error } = await supabase
@@ -1047,6 +1058,7 @@ router.patch(
         ...Object.keys(textLimits),
         "price_usd",
         "max_supply",
+        "social_links",
       ]);
 
       const unsupportedFields = Object.keys(body).filter(
@@ -1077,6 +1089,14 @@ router.patch(
         }
 
         changes[field] = body[field].trim();
+      }
+
+      if (Object.hasOwn(body, "social_links")) {
+        try {
+          changes.social_links = normalizeSocialLinks(body.social_links);
+        } catch (err) {
+          return res.status(400).json({ error: "INVALID_SOCIAL_LINKS" });
+        }
       }
 
       if (Object.hasOwn(body, "price_usd")) {

@@ -48,10 +48,86 @@ function PassportContent() {
   const [showComplimentModal, setShowComplimentModal] = useState(false);
   const [complimentMessage, setComplimentMessage] = useState('');
   const [isComplimented, setIsComplimented] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingStars, setRatingStars] = useState(5);
+  const [ratingTags, setRatingTags] = useState<string[]>(['Exceptional Craftsmanship', 'True to Size']);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isRated, setIsRated] = useState(false);
+  const [savedRating, setSavedRating] = useState<number | null>(null);
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [cancelCountdown, setCancelCountdown] = useState<{ hours: number; minutes: number; seconds: number; isExpired: boolean } | null>(null);
   const { user, isSignedIn } = useAuth();
   const { signTransaction } = useWallet();
+
+  // Load existing rating for active order
+  useEffect(() => {
+    if (order?.id && typeof window !== 'undefined') {
+      try {
+        const ratings = JSON.parse(localStorage.getItem('circuit_collector_ratings') || '[]');
+        const existing = ratings.find((r: any) => r.order_id === order.id);
+        if (existing) {
+          setIsRated(true);
+          setSavedRating(existing.stars || 5);
+        } else {
+          setIsRated(false);
+          setSavedRating(null);
+        }
+      } catch (_) {}
+    }
+  }, [order?.id]);
+
+  const handleSubmitRating = () => {
+    if (!order) return;
+    try {
+      const ratings = JSON.parse(localStorage.getItem('circuit_collector_ratings') || '[]');
+      const newRating = {
+        order_id: order.id,
+        user_email: user?.email || 'collector@circuit.sol',
+        stars: ratingStars,
+        tags: ratingTags,
+        message: ratingComment.trim(),
+        created_at: new Date().toISOString(),
+      };
+      ratings.push(newRating);
+      localStorage.setItem('circuit_collector_ratings', JSON.stringify(ratings));
+
+      if (ratingComment.trim()) {
+        const compliments = JSON.parse(localStorage.getItem('circuit_compliments') || '[]');
+        compliments.push({
+          order_id: order.id,
+          user_email: user?.email || 'collector@circuit.sol',
+          message: `[★ ${ratingStars}/5] ${ratingComment.trim()} (Tags: ${ratingTags.join(', ')})`,
+          created_at: new Date().toISOString(),
+        });
+        localStorage.setItem('circuit_compliments', JSON.stringify(compliments));
+      }
+
+      setIsRated(true);
+      setSavedRating(ratingStars);
+      setShowRatingModal(false);
+      showToast('✓ Rating Submitted', `Thank you! You rated this atelier ★ ${ratingStars}.0.`);
+    } catch {
+      showToast('✓ Rating Submitted', 'Thank you for your feedback!');
+    }
+  };
+
+  const handleDownloadQR = () => {
+    const canvas = document.getElementById('garment-authenticity-qr') as HTMLCanvasElement;
+    if (!canvas) return;
+    const pngUrl = canvas.toDataURL('image/png');
+    const downloadLink = document.createElement('a');
+    downloadLink.href = pngUrl;
+    const serialStr = order?.garment_serial ? `edition-${order.garment_serial}` : 'garment';
+    downloadLink.download = `circuit-${edition?.id || 'piece'}-${serialStr}-qr.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    showToast('✓ QR Downloaded', 'Authenticity label image saved to your device.');
+  };
+
+  const passportUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/passport?order=${order?.id || ''}${order?.unit_index ? `&unit=${order.unit_index}` : ''}`
+    : `https://circuit.fashion/passport?order=${order?.id || ''}`;
 
   const handleSelectPiece = (piece: WardrobePiece) => {
     setOrderId(piece.id);
@@ -319,7 +395,7 @@ function PassportContent() {
         const batchCache = new Map<string, backendApi.Batch | null>();
         const editionCache = new Map<string, any>();
 
-        const pieces: WardrobePiece[] = await Promise.all(
+        const pieceArrays: WardrobePiece[][] = await Promise.all(
           rawOrders.map(async (ord: any) => {
             let batchData: backendApi.Batch | null = null;
             if (ord.batch_id) {
@@ -354,7 +430,25 @@ function PassportContent() {
             const finalEdition = editionData;
             const pieceId = ord.id || ord.purchase_signature || ord.tx_signature;
 
-            return {
+            // If order has individual garments array, return a piece for each unit
+            if (Array.isArray(ord.garments) && ord.garments.length > 0) {
+              const sortedGarments = [...ord.garments].sort((a: any, b: any) => (Number(a.unit_index) || 0) - (Number(b.unit_index) || 0));
+              return sortedGarments.map((g: any, gIdx: number) => ({
+                id: `${pieceId}-unit-${g.unit_index || gIdx + 1}`,
+                order: { ...ord, unit_index: g.unit_index || gIdx + 1, garment_serial: g.garment_serial },
+                edition: finalEdition,
+                batch: batchData,
+                displayTitle: finalEdition?.name || batchData?.name || ord.drop_name || 'Circuit Garment',
+                thumbnail: finalEdition?.images?.[0]?.url || '/satin.png',
+                size: ord.size || 'M',
+                quantity: 1,
+                status: ord.status || 'pending',
+                garmentSerial: String(g.garment_serial),
+                createdAt: ord.created_at || new Date().toISOString(),
+              }));
+            }
+
+            return [{
               id: pieceId,
               order: ord,
               edition: finalEdition,
@@ -364,11 +458,13 @@ function PassportContent() {
               size: ord.size || 'M',
               quantity: ord.quantity || 1,
               status: ord.status || 'pending',
-              garmentSerial: ord.garment_serial,
+              garmentSerial: ord.garment_serial ? String(ord.garment_serial) : undefined,
               createdAt: ord.created_at || new Date().toISOString(),
-            };
+            }];
           })
         );
+
+        const pieces: WardrobePiece[] = pieceArrays.flat();
 
         if (isCancelled) return;
 
@@ -551,7 +647,6 @@ function PassportContent() {
 
   const status = order.status || 'pending';
   const isMinted = ['produced', 'shipped', 'delivered'].includes(status);
-  const passportUrl = typeof window !== 'undefined' ? `${window.location.origin}/passport?order=${orderId}` : '';
   const activeEdition = edition || null;
 
   return (
@@ -736,43 +831,81 @@ function PassportContent() {
                   </p>
                 </div>
 
-                {/* Share/Verify (Visible ONLY if produced/minted) */}
-                {isMinted && (
-                  <button 
-                    onClick={() => setShowQR(!showQR)}
-                    className="flex flex-col items-center gap-3 group shrink-0"
-                  >
-                    <div className="w-16 h-16 rounded-[1.5rem] bg-white/[0.03] border border-white/10 flex items-center justify-center group-hover:bg-white/[0.06] transition-all group-hover:scale-105 shadow-2xl">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M7 7h.01M17 7h.01M17 17h.01M7 17h.01"/>
-                      </svg>
-                    </div>
-                    <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#444] group-hover:text-white transition-colors">Verify</span>
-                  </button>
-                )}
+                {/* Share/Verify QR Code Button */}
+                <button 
+                  onClick={() => setShowQR(true)}
+                  className="flex flex-col items-center gap-2 group shrink-0"
+                  title="View Garment Verification QR Code & NFC Badge"
+                >
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-[1.5rem] bg-white/[0.04] border border-white/10 flex items-center justify-center group-hover:bg-white/[0.08] transition-all group-hover:scale-105 shadow-2xl">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M7 7h.01M17 7h.01M17 17h.01M7 17h.01"/>
+                    </svg>
+                  </div>
+                  <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#666] group-hover:text-white transition-colors">QR Badge</span>
+                </button>
               </header>
 
-              {/* Social Verify Modal */}
-              {showQR && isMinted && (
-                <div className="card-glass p-10 md:p-14 flex flex-col items-center animate-scale-in border-white/20 relative rounded-[2.5rem]">
-                  <button 
-                    onClick={() => setShowQR(false)}
-                    className="absolute top-6 right-6 w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors text-xl"
-                  >
-                    ×
-                  </button>
-                  <div className="bg-white p-6 rounded-[2rem] mb-10 shadow-[0_0_60px_rgba(255,255,255,0.1)]">
-                    <QRCodeCanvas 
-                      value={passportUrl}
-                      size={220}
-                      level="H"
-                    />
-                  </div>
-                  <div className="text-center">
-                    <h4 className="text-sm font-bold uppercase tracking-[0.25em] mb-3 text-white">Authenticity Shield</h4>
-                    <p className="text-[0.65rem] text-[#666] max-w-[260px] leading-relaxed mx-auto uppercase tracking-widest font-medium">
-                      Scan this QR code to verify physical ownership verification on the Circuit Ledger.
+              {/* Garment Authenticity QR Code Modal */}
+              {showQR && (
+                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+                  <div className="card-glass p-8 md:p-12 flex flex-col items-center animate-scale-in border border-white/20 relative rounded-[2.5rem] max-w-sm w-full shadow-2xl">
+                    <button 
+                      onClick={() => setShowQR(false)}
+                      className="absolute top-5 right-5 w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/10 text-white/70 hover:text-white transition-colors text-base"
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+
+                    <div className="flex flex-col items-center text-center mb-6">
+                      <span className="text-[0.6rem] font-bold font-mono text-emerald-400 uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-2">
+                        Authenticity Shield
+                      </span>
+                      <h4 className="text-base font-bold text-white tracking-tight">
+                        {activeEdition?.name || order?.drop_name || 'Circuit Piece'}
+                      </h4>
+                      <p className="text-[0.65rem] font-mono text-[#888] mt-0.5">
+                        {order?.garment_serial
+                          ? `Edition ${formatSerialNumber(order.garment_serial, activeEdition?.max_supply || 50)}`
+                          : `Unit Serial: #${String(order?.order_number || 1).padStart(2, '0')}`}
+                      </p>
+                    </div>
+
+                    <div className="bg-white p-5 rounded-3xl mb-6 shadow-[0_0_50px_rgba(255,255,255,0.15)] flex items-center justify-center">
+                      <QRCodeCanvas 
+                        id="garment-authenticity-qr"
+                        value={passportUrl}
+                        size={190}
+                        level="H"
+                        includeMargin={true}
+                      />
+                    </div>
+
+                    <p className="text-[0.65rem] text-[#888] text-center leading-relaxed mb-6 font-mono max-w-[260px]">
+                      Permanent physical verification link on Solana. Scan with any camera or NFC smartphone to verify authentic provenance.
                     </p>
+
+                    <div className="flex flex-col gap-2 w-full">
+                      <button
+                        onClick={handleDownloadQR}
+                        className="btn-circuit py-3 px-4 justify-center text-xs font-mono font-bold"
+                      >
+                        <span>📥 Download QR Label (PNG)</span>
+                        <span className="btn-arrow">↓</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                            navigator.clipboard.writeText(passportUrl);
+                            showToast('✓ Link Copied', 'Passport verification URL copied to clipboard.');
+                          }
+                        }}
+                        className="btn-outline-circuit py-2.5 px-4 justify-center text-xs border-white/10 text-white/70 hover:text-white font-mono"
+                      >
+                        📋 Copy Verification Link
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1043,20 +1176,30 @@ function PassportContent() {
                 </div>
               </div>
 
-              {/* Dispute & Compliment Feedback Section */}
+              {/* Buyer Rating & Atelier Feedback Section */}
               <div className="p-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="text-xs font-bold text-white block">Atelier Feedback & Order Support</span>
-                  <span className="text-[0.65rem] text-[#888] font-mono">Send positive compliments or report sizing/delivery issues.</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white block">Atelier Review & Collector Rating</span>
+                    {isRated && savedRating && (
+                      <span className="text-[0.65rem] font-mono font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        ★ {savedRating}.0 Verified
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[0.65rem] text-[#888] font-mono">
+                    {isRated 
+                      ? 'Your feedback is verified and attached to this collector piece.'
+                      : 'Rate craftsmanship, garment fit, and dispatch quality.'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowComplimentModal(true)}
-                    disabled={isComplimented}
-                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition-all flex items-center gap-1.5"
+                    onClick={() => setShowRatingModal(true)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 transition-all flex items-center gap-1.5 shadow-sm"
                   >
-                    <span>👍</span>
-                    <span>{isComplimented ? 'Compliment Sent' : 'Compliment'}</span>
+                    <span>★</span>
+                    <span>{isRated ? `Rated (${savedRating || 5}★)` : 'Rate Atelier'}</span>
                   </button>
 
                   <button
@@ -1064,49 +1207,112 @@ function PassportContent() {
                     disabled={isReported}
                     className="btn-outline-circuit py-2 px-3.5 text-xs border-white/20 text-[#aaa] hover:text-white flex items-center gap-1.5"
                   >
-                    <span>👎</span>
+                    <span>⚠️</span>
                     <span>{isReported ? 'Report Logged' : 'Report Issue'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Leave a Compliment Modal */}
-              {showComplimentModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-[#111] border border-white/10 rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-fade-in">
+              {/* Rate Atelier & Review Modal */}
+              {showRatingModal && (
+                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+                  <div className="bg-[#111] border border-white/10 rounded-3xl p-6 md:p-8 max-w-lg w-full flex flex-col gap-5 animate-scale-in shadow-2xl">
                     <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">✨</span>
-                        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Leave a Compliment</h3>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">✨</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Rate Atelier Craftsmanship</h3>
+                          <span className="text-[0.65rem] text-[#666] font-mono">Order #{order.order_number || 1} • {activeEdition?.name || 'Garment'}</span>
+                        </div>
                       </div>
-                      <button onClick={() => setShowComplimentModal(false)} className="text-[#666] hover:text-white text-lg">✕</button>
+                      <button onClick={() => setShowRatingModal(false)} className="text-[#666] hover:text-white text-lg">✕</button>
                     </div>
-                    <p className="text-xs text-[#888] leading-relaxed">
-                      Loved the garment craftsmanship, fit, or tailoring? Send a positive note to the atelier.
-                    </p>
-                    <textarea
-                      value={complimentMessage}
-                      onChange={(e) => setComplimentMessage(e.target.value.slice(0, 500))}
-                      placeholder="Share what you loved about this piece..."
-                      className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-white/30 min-h-[90px]"
-                    />
-                    <div className="flex justify-between items-center text-[0.65rem] text-[#666] font-mono">
-                      <span>{complimentMessage.length}/500 chars</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setShowComplimentModal(false)}
-                          className="btn-outline-circuit py-2 px-4 text-xs border-white/10 text-[#888]"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSendCompliment}
-                          disabled={!complimentMessage.trim()}
-                          className="btn-circuit py-2 px-5 text-xs uppercase"
-                        >
-                          <span>Send Compliment</span>
-                        </button>
+
+                    {/* Star Rating Selector */}
+                    <div className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setRatingStars(star)}
+                            className={`text-3xl transition-transform hover:scale-125 focus:outline-none ${
+                              star <= ratingStars ? 'text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)]' : 'text-neutral-700'
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
                       </div>
+                      <span className="text-xs font-mono font-bold text-amber-400">
+                        {ratingStars === 5 && '★★★★★ Exceptional (5.0)'}
+                        {ratingStars === 4 && '★★★★☆ Great Quality (4.0)'}
+                        {ratingStars === 3 && '★★★☆☆ Satisfactory (3.0)'}
+                        {ratingStars === 2 && '★★☆☆☆ Needs Improvement (2.0)'}
+                        {ratingStars === 1 && '★☆☆☆☆ Unsatisfactory (1.0)'}
+                      </span>
+                    </div>
+
+                    {/* Quality Tag Chips */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888]">Craftsmanship Badges</span>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          'Exceptional Craftsmanship',
+                          'True to Size',
+                          'Fast Delivery',
+                          'Premium Fabric',
+                          'Flawless Finish',
+                          'Museum Quality',
+                        ].map((tag) => {
+                          const isSelected = ratingTags.includes(tag);
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => {
+                                setRatingTags((prev) =>
+                                  isSelected ? prev.filter((t) => t !== tag) : [...prev, tag]
+                                );
+                              }}
+                              className={`text-[0.68rem] px-3 py-1.5 rounded-full font-mono transition-all border ${
+                                isSelected
+                                  ? 'bg-amber-400/20 text-amber-300 border-amber-400/40 shadow-sm'
+                                  : 'bg-white/[0.03] text-[#777] border-white/5 hover:border-white/20'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : '+ '}{tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Feedback Comment */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888]">Collector Note (Optional)</span>
+                      <textarea
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value.slice(0, 500))}
+                        placeholder="Detail your thoughts on fabric hand-feel, fit silhouette, and packaging..."
+                        className="w-full bg-black border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-400/40 min-h-[90px] font-mono leading-relaxed"
+                      />
+                      <span className="text-[0.62rem] text-[#666] font-mono text-right">{ratingComment.length}/500</span>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2 border-t border-white/5">
+                      <button
+                        onClick={() => setShowRatingModal(false)}
+                        className="btn-outline-circuit py-2 px-4 text-xs border-white/10 text-[#888]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSubmitRating}
+                        className="btn-circuit py-2.5 px-6 text-xs uppercase font-mono font-bold bg-amber-400 text-black hover:bg-amber-300"
+                      >
+                        <span>Submit Rating</span>
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -190,6 +190,35 @@ export interface ChainIntent {
   [key: string]: unknown;
 }
 
+export interface GarmentUnit {
+  unit_index: number;
+  garment_serial: number | string;
+  edition_id?: string;
+}
+
+export interface BatchStats {
+  batch_id: string;
+  edition_id: string;
+  source: string;
+  as_of: string;
+  max_supply: number;
+  supply_scope: string;
+  supply_enforced: boolean;
+  batch: {
+    purchased_units: number;
+    cancelled_units: number;
+    claimed_units: number;
+    fully_refunded_units: number;
+  };
+  edition: {
+    purchased_units: number;
+    cancelled_units: number;
+    claimed_units: number;
+    fully_refunded_units: number;
+  };
+  last_recorded_purchase_at?: string;
+}
+
 export interface ChainOrder {
   id: string;
   batch_id: string;
@@ -208,7 +237,8 @@ export interface ChainOrder {
   refunded_lamports: string;
   collected_at?: string;
   created_at?: string;
-  garment_serial?: string;
+  garment_serial?: string | number;
+  garments?: GarmentUnit[];
 }
 
 // ── Session Token ──────────────────────────────────────────────────────
@@ -604,6 +634,16 @@ export function getChainStatus() {
     operational_wallet: string;
     admin_wallet: string;
   }>('/api/chain/status', {
+    method: 'GET',
+  });
+}
+
+/**
+ * Public Batch & Edition Live Supply Stats.
+ * No JWT required. Returns verified database claimed units vs max supply.
+ */
+export function getBatchStats(batchId: string) {
+  return request<{ stats: BatchStats }>(`/api/chain/batches/${encodeURIComponent(batchId)}/stats`, {
     method: 'GET',
   });
 }

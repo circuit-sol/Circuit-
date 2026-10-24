@@ -154,6 +154,17 @@ function DropPageContent() {
         // Helper to resolve accurate booked count across on-chain escrow, local cache, and API
         async function resolveMintedCount(edId: string, b: backendApi.Batch | null) {
           let count = 0;
+
+          // 0. Query public batch stats from API (authoritative DB claimed units & max supply)
+          if (b?.id) {
+            try {
+              const res = await backendApi.getBatchStats(b.id);
+              if (typeof res?.stats?.edition?.claimed_units === 'number') {
+                return res.stats.edition.claimed_units;
+              }
+            } catch (_) {}
+          }
+
           // 1. Check on-chain batch escrow vault directly
           if (b?.id && b.chain_status === 'initialized') {
             try {
@@ -369,17 +380,33 @@ function DropPageContent() {
     try {
       // 0. JIT Stock Availability Check right when buyer clicks Preorder
       try {
-        const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
-        const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
-        if (countRes.ok) {
-          const { count } = await countRes.json();
-          setMintedCount(count);
-          if (count >= activeEdition.max_supply) {
-            showToast('Sold Out', 'Sorry! This drop reached maximum capacity a moment ago.');
-            setTxState('soldout');
-            setIsVerifyingStock(false);
-            processingRef.current = false;
-            return;
+        if (selectedBatch?.id) {
+          const res = await backendApi.getBatchStats(selectedBatch.id);
+          if (typeof res?.stats?.edition?.claimed_units === 'number') {
+            const currentClaimed = res.stats.edition.claimed_units;
+            setMintedCount(currentClaimed);
+            const totalMax = res.stats.max_supply || activeEdition.max_supply || 0;
+            if (totalMax > 0 && currentClaimed + quantity > totalMax) {
+              showToast('Sold Out', 'Sorry! This drop has insufficient capacity remaining.');
+              setTxState('soldout');
+              setIsVerifyingStock(false);
+              processingRef.current = false;
+              return;
+            }
+          }
+        } else {
+          const BASE = (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
+          const countRes = await fetch(`${BASE}/api/db/orders/count/${encodeURIComponent(activeEdition.id)}`);
+          if (countRes.ok) {
+            const { count } = await countRes.json();
+            setMintedCount(count);
+            if (count >= activeEdition.max_supply) {
+              showToast('Sold Out', 'Sorry! This drop reached maximum capacity a moment ago.');
+              setTxState('soldout');
+              setIsVerifyingStock(false);
+              processingRef.current = false;
+              return;
+            }
           }
         }
       } catch {
@@ -761,8 +788,28 @@ function DropPageContent() {
               <span className="block">Proceed</span>
               <span className="block bg-gradient-to-b from-white to-[#666] bg-clip-text text-transparent">With Order</span>
             </h1>
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-              <h2 className="text-[1.8rem] md:text-[2.2rem] font-light text-[#A3A3A3] tracking-[-0.02em]">{activeEdition.name}</h2>
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {(activeEdition.brand_logo || activeEdition.brand?.logo_url) && (
+                    <div className="w-5 h-5 rounded-full overflow-hidden border border-white/20 relative shrink-0">
+                      <Image
+                        src={activeEdition.brand_logo || activeEdition.brand?.logo_url}
+                        alt={activeEdition.brand_name || 'Brand Logo'}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  )}
+                  <span className="text-[0.68rem] uppercase tracking-[0.22em] font-mono text-emerald-400 font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    {activeEdition.brand_name || activeEdition.brand?.name || 'Verified Atelier'}
+                  </span>
+                  <span className="text-[0.68rem] font-mono font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                    ★ 4.9 Verified Craft
+                  </span>
+                </div>
+                <h2 className="text-[1.8rem] md:text-[2.2rem] font-light text-white/90 tracking-[-0.02em]">{activeEdition.name}</h2>
+              </div>
               {/* Brand Social & Support Links */}
               {activeEdition.social_links && (
                 <div className="flex items-center gap-2">

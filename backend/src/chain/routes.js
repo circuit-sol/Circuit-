@@ -85,6 +85,12 @@ module.exports=function createChainRoutes(db,options={}) {
     await result(db.from('chain_intents').select('id').limit(1));
     res.json({status:'ready',...await chain.readiness()});
   }));
+  router.get('/batches/:id/stats',run(async(req,res)=>{
+    const batchId=uuid(req.params.id);
+    const data=await rpc('circuit_batch_stats',{p_batch_id:batchId});
+    ensure(data,'BATCH_NOT_FOUND',404);
+    res.json({stats:data});
+  }));
   router.use(requireAuth);
   router.use(async(req,res,next)=>{
     try {

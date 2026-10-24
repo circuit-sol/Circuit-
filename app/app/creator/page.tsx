@@ -80,6 +80,42 @@ export default function CreatorStudioPage() {
       .slice(0, 32);
   };
 
+  const formatSocialLinks = (form: { instagram?: string; twitter?: string; whatsapp?: string; support_email?: string }) => {
+    let instagram = (form.instagram || '').trim();
+    if (instagram) {
+      if (instagram.startsWith('@')) instagram = instagram.slice(1);
+      if (!instagram.startsWith('http://') && !instagram.startsWith('https://')) {
+        instagram = `https://instagram.com/${instagram}`;
+      }
+    }
+
+    let twitter = (form.twitter || '').trim();
+    if (twitter) {
+      if (twitter.startsWith('@')) twitter = twitter.slice(1);
+      if (!twitter.startsWith('http://') && !twitter.startsWith('https://')) {
+        twitter = `https://x.com/${twitter}`;
+      }
+    }
+
+    let whatsapp = (form.whatsapp || '').trim().replace(/[\s\-()]/g, '');
+    if (whatsapp && !whatsapp.startsWith('+')) {
+      if (whatsapp.startsWith('0')) {
+        whatsapp = `+234${whatsapp.slice(1)}`;
+      } else {
+        whatsapp = `+${whatsapp}`;
+      }
+    }
+
+    let support_email = (form.support_email || '').trim();
+
+    return {
+      whatsapp,
+      instagram,
+      twitter,
+      support_email,
+    };
+  };
+
   // Step 1: Edition Design Form
   const [editionForm, setEditionForm] = useState<{
     id: string;
@@ -435,6 +471,7 @@ export default function CreatorStudioPage() {
 
     setIsSavingDraft(true);
     try {
+      const formattedSocials = formatSocialLinks(editionForm);
       if (isEditingExisting && editingEditionId) {
         await backendApi.updateEditionDraft(editingEditionId, {
           name: editionForm.name.trim(),
@@ -444,12 +481,7 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
-          social_links: {
-            instagram: editionForm.instagram.trim() || undefined,
-            twitter: editionForm.twitter.trim() || undefined,
-            whatsapp: editionForm.whatsapp.trim() || undefined,
-            support_email: editionForm.support_email.trim() || undefined,
-          },
+          social_links: formattedSocials,
         });
       } else {
         await backendApi.createEdition({
@@ -462,12 +494,7 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
-          social_links: {
-            instagram: editionForm.instagram.trim() || undefined,
-            twitter: editionForm.twitter.trim() || undefined,
-            whatsapp: editionForm.whatsapp.trim() || undefined,
-            support_email: editionForm.support_email.trim() || undefined,
-          },
+          social_links: formattedSocials,
         });
         setIsEditingExisting(true);
         setEditingEditionId(slugId);
@@ -731,6 +758,7 @@ export default function CreatorStudioPage() {
     try {
       // Step A: Save or Update Edition Draft
       setDeployStepText('1/4 Saving collection design metadata...');
+      const formattedSocials = formatSocialLinks(editionForm);
       if (isEditingExisting && editingEditionId) {
         await backendApi.updateEditionDraft(editingEditionId, {
           name: editionForm.name.trim(),
@@ -740,12 +768,7 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
-          social_links: {
-            instagram: editionForm.instagram.trim() || undefined,
-            twitter: editionForm.twitter.trim() || undefined,
-            whatsapp: editionForm.whatsapp.trim() || undefined,
-            support_email: editionForm.support_email.trim() || undefined,
-          },
+          social_links: formattedSocials,
         });
       } else {
         await backendApi.createEdition({
@@ -758,12 +781,7 @@ export default function CreatorStudioPage() {
           fabric: editionForm.fabric.trim(),
           headpiece: editionForm.headpiece.trim(),
           embroidery: editionForm.embroidery.trim(),
-          social_links: {
-            instagram: editionForm.instagram.trim() || undefined,
-            twitter: editionForm.twitter.trim() || undefined,
-            whatsapp: editionForm.whatsapp.trim() || undefined,
-            support_email: editionForm.support_email.trim() || undefined,
-          },
+          social_links: formattedSocials,
         });
       }
 
@@ -1380,6 +1398,77 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
 
+                {/* Brand Presence & Customer Care (Socials & Contacts) */}
+                <div className="flex flex-col gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/10">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">🛡️</span>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-white font-mono">Brand Trust & Customer Care</h3>
+                    </div>
+                    <p className="text-[0.65rem] text-[#888] font-mono leading-relaxed">
+                      Provide verified contact channels for your buyers. These links appear on your storefront drop page and order receipts.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono flex items-center justify-between">
+                        <span>WhatsApp Concierge</span>
+                        <span className="text-[0.55rem] text-emerald-400 font-mono">Auto-formats to +234...</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="+234 800 000 0000"
+                        value={editionForm.whatsapp}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono flex items-center justify-between">
+                        <span>Customer Support Email</span>
+                        <span className="text-[0.55rem] text-[#666] font-mono">Direct inbox</span>
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="care@atelier.com"
+                        value={editionForm.support_email}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, support_email: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono flex items-center justify-between">
+                        <span>Instagram Profile</span>
+                        <span className="text-[0.55rem] text-[#666] font-mono">@handle or URL</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="@atelier or https://instagram.com/..."
+                        value={editionForm.instagram}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, instagram: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono flex items-center justify-between">
+                        <span>Twitter / 𝕏 Profile</span>
+                        <span className="text-[0.55rem] text-[#666] font-mono">@handle or URL</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="@atelier or https://x.com/..."
+                        value={editionForm.twitter}
+                        onChange={(e) => setEditionForm(prev => ({ ...prev, twitter: e.target.value }))}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between pt-4 border-t border-white/10">
                   <button
                     type="button"
@@ -1712,6 +1801,29 @@ export default function CreatorStudioPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Brand Social & Customer Care Channels Review */}
+                  <div className="flex flex-col gap-2 pt-4 border-t border-white/10 md:col-span-2">
+                    <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">Brand Trust & Care Signals</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">WhatsApp</span>
+                        <span className="text-emerald-400 truncate">{editionForm.whatsapp || 'Not set'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">Instagram</span>
+                        <span className="text-white truncate">{editionForm.instagram || 'Not set'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">Twitter / 𝕏</span>
+                        <span className="text-white truncate">{editionForm.twitter || 'Not set'}</span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-0.5">
+                        <span className="text-[0.6rem] text-[#777] uppercase">Support Email</span>
+                        <span className="text-white truncate">{editionForm.support_email || 'Not set'}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Deployment Results Card */}
