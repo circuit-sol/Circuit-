@@ -11,6 +11,7 @@ import { executeBatchInitialize, parseSolanaError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import { solscanTxUrl } from '@/lib/utils';
 import { getLiveSolPrice, DEFAULT_SOL_MARKET_PRICE } from '@/lib/price-service';
+import { downloadOfficialProductionGuide, exportProductionPlannerExcel } from '@/lib/productionGuide';
 
 interface ApparelImage {
   url: string;
@@ -2030,18 +2031,72 @@ export default function CreatorStudioPage() {
                 <h2 className="text-2xl font-bold">Production Guide</h2>
                 <p className="text-xs text-[#888] mt-1">Confirmed orders sorted by size, color and units to cut.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="btn-outline-circuit py-2 px-4 text-xs font-mono self-start sm:self-auto"
-              >
-                <span>🖨️ Print Cutting Guide</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadOfficialProductionGuide}
+                  className="btn-outline-circuit py-2 px-3 text-xs font-mono border-white/10 text-white/80 hover:text-white flex items-center gap-1.5"
+                  title="Download the official blank Circuit Collection Production Guide workbook"
+                >
+                  <span>📥 Download Template (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstEd = editions[0];
+                    const firstBatches = firstEd ? batchesByEdition[firstEd.id] : [];
+                    const firstBatch = firstBatches?.[0];
+                    const orders = firstBatch ? ordersByBatch[firstBatch.id] || [] : [];
+                    exportProductionPlannerExcel({
+                      collectionName: firstEd?.name || 'Circuit Studio Collection',
+                      brandName: selectedBrand?.name || 'Circuit Atelier',
+                      totalUnitsPlanned: firstEd?.max_supply || 50,
+                      productionWindow: firstBatch ? `${new Date(firstBatch.opens_at).toLocaleDateString()} - ${new Date(firstBatch.closes_at).toLocaleDateString()}` : undefined,
+                      targetCompletion: firstBatch?.release_at ? new Date(firstBatch.release_at).toLocaleDateString() : undefined,
+                      fabricSpec: firstEd?.fabric,
+                      embroiderySpec: firstEd?.embroidery,
+                      headpieceSpec: firstEd?.headpiece,
+                      pickupLocation: firstBatch?.pickup_locations?.[0]?.name,
+                      orders,
+                    });
+                    showToast('✓ Production Planner Downloaded', 'Excel Production Guide generated and saved.');
+                  }}
+                  className="btn-circuit py-2 px-4 text-xs font-mono font-bold flex items-center gap-1.5 bg-white text-black hover:bg-neutral-200"
+                  title="Export live collection production data to Excel"
+                >
+                  <span>📊 Export Production Planner (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="btn-outline-circuit py-2 px-3 text-xs font-mono border-white/10 text-[#888] hover:text-white"
+                  title="Print cutting table layout"
+                >
+                  <span>🖨️ Print</span>
+                </button>
+              </div>
             </div>
 
             {Object.keys(batchesByEdition).length === 0 ? (
-              <div className="card-glass p-12 text-center rounded-3xl border-white/10 text-xs text-[#888]">
-                No active production runs found. Once your drop gathers customer orders, your size cutting guide will populate here.
+              <div className="card-glass p-12 text-center rounded-3xl border-white/10 text-xs text-[#888] flex flex-col items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-xl">
+                  📊
+                </div>
+                <div className="max-w-md space-y-1">
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">No Active Production Batches Yet</h4>
+                  <p className="text-xs text-[#888] leading-relaxed">
+                    Once your drop gathers customer orders, your live size cutting guide will populate here. You can also download the official Excel template to plan your workshop offline.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={downloadOfficialProductionGuide}
+                    className="btn-circuit py-2.5 px-5 text-xs font-mono font-bold flex items-center gap-2"
+                  >
+                    <span>📥 Download Excel Production Planner (.xlsx)</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-8">
@@ -2054,9 +2109,30 @@ export default function CreatorStudioPage() {
                           <span className="text-[0.6rem] font-mono text-[#666] uppercase block">Collection</span>
                           <h3 className="text-xl font-bold">{ed?.name || editionId}</h3>
                         </div>
-                        <span className="text-xs font-mono text-emerald-400 font-bold">
-                          Cap: {ed?.max_supply || 50} pieces
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-emerald-400 font-bold">
+                            Cap: {ed?.max_supply || 50} pieces
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allBatchOrders = batches.flatMap(b => ordersByBatch[b.id] || []);
+                              exportProductionPlannerExcel({
+                                collectionName: ed?.name || editionId,
+                                brandName: selectedBrand?.name || 'Circuit Atelier',
+                                totalUnitsPlanned: ed?.max_supply || 50,
+                                fabricSpec: ed?.fabric,
+                                embroiderySpec: ed?.embroidery,
+                                headpieceSpec: ed?.headpiece,
+                                orders: allBatchOrders,
+                              });
+                              showToast('✓ Collection Planner Exported', `${ed?.name || 'Collection'} Excel guide downloaded.`);
+                            }}
+                            className="btn-outline-circuit py-1.5 px-3 text-xs font-mono border-white/15 text-white/80 hover:text-white flex items-center gap-1.5"
+                          >
+                            <span>📊 Export Collection Sheet</span>
+                          </button>
+                        </div>
                       </div>
 
                       {batches.map((b) => {
@@ -2077,16 +2153,40 @@ export default function CreatorStudioPage() {
 
                         return (
                           <div key={b.id} className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col gap-5">
-                            <div className="flex flex-wrap justify-between items-center gap-2">
+                            <div className="flex flex-wrap justify-between items-center gap-3">
                               <div>
                                 <span className="text-xs font-bold text-white uppercase font-mono">{b.name}</span>
                                 <span className="text-[0.65rem] text-[#888] font-mono block">
                                   Closes: {new Date(b.closes_at).toLocaleDateString()} | Ready: {new Date(b.release_at).toLocaleDateString()}
                                 </span>
                               </div>
-                              <span className="text-xs font-mono text-white bg-white/10 px-3 py-1 rounded-full font-bold">
-                                {totalCommitted} Pieces to Cut
-                              </span>
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-xs font-mono text-white bg-white/10 px-3 py-1 rounded-full font-bold">
+                                  {totalCommitted} Pieces to Cut
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    exportProductionPlannerExcel({
+                                      collectionName: ed?.name || b.name,
+                                      brandName: selectedBrand?.name || 'Circuit Atelier',
+                                      totalUnitsPlanned: ed?.max_supply || totalCommitted || 50,
+                                      productionWindow: `${new Date(b.opens_at).toLocaleDateString()} - ${new Date(b.closes_at).toLocaleDateString()}`,
+                                      targetCompletion: new Date(b.release_at).toLocaleDateString(),
+                                      fabricSpec: ed?.fabric,
+                                      embroiderySpec: ed?.embroidery,
+                                      headpieceSpec: ed?.headpiece,
+                                      pickupLocation: b.pickup_locations?.[0]?.name || b.pickup_locations?.[0]?.address,
+                                      orders: batchOrders,
+                                    });
+                                    showToast('✓ Batch Planner Exported', `${b.name} production guide downloaded.`);
+                                  }}
+                                  className="btn-outline-circuit py-1.5 px-3 text-xs font-mono border-white/15 hover:border-white/30 text-white flex items-center gap-1.5"
+                                  title="Download Excel Production Guide for this batch"
+                                >
+                                  <span>📥 Export Batch (.xlsx)</span>
+                                </button>
+                              </div>
                             </div>
 
                             {/* Automated Cutting Guide Table */}
