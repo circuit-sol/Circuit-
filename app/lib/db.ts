@@ -242,6 +242,35 @@ export function getEditionSocialLinks(editionId?: string, brandId?: string) {
   };
 }
 
+export function saveEditionDeliveryOption(editionId: string, options: {
+  allows_delivery: boolean;
+  delivery_fee_usd?: number;
+  delivery_notes?: string;
+}) {
+  if (typeof window === 'undefined' || !editionId) return;
+  try {
+    localStorage.setItem(`circuit_delivery_option_${editionId}`, JSON.stringify(options));
+  } catch (_) {}
+}
+
+export function getEditionDeliveryOption(editionId?: string): {
+  allows_delivery: boolean;
+  delivery_fee_usd: number;
+  delivery_notes: string;
+} {
+  if (typeof window !== 'undefined' && editionId) {
+    try {
+      const stored = localStorage.getItem(`circuit_delivery_option_${editionId}`);
+      if (stored) return JSON.parse(stored);
+    } catch (_) {}
+  }
+  return {
+    allows_delivery: false, // Default: deactivated by brand
+    delivery_fee_usd: 0,
+    delivery_notes: '',
+  };
+}
+
 function formatEditionImages(ed: any) {
   if (!ed) return ed;
   if (ed.images) {
@@ -261,6 +290,12 @@ function formatEditionImages(ed: any) {
   if (!ed.social_links || Object.keys(ed.social_links).length === 0) {
     ed.social_links = getEditionSocialLinks(ed.id, ed.brand_id);
   }
+
+  // Ensure delivery options configured by the brand are attached
+  const deliveryOpt = getEditionDeliveryOption(ed.id);
+  ed.allows_delivery = ed.allows_delivery !== undefined ? ed.allows_delivery : deliveryOpt.allows_delivery;
+  ed.delivery_fee_usd = ed.delivery_fee_usd !== undefined ? ed.delivery_fee_usd : deliveryOpt.delivery_fee_usd;
+  ed.delivery_notes = ed.delivery_notes !== undefined ? ed.delivery_notes : deliveryOpt.delivery_notes;
 
   return ed;
 }

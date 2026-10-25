@@ -90,6 +90,7 @@ export function resolvePricing(params: {
   selectedSize?: string;
   pricesBySize?: Record<string, number | string>;
   solRateUsd?: number | null;
+  extraUsd?: number | null;
 }): PricingResolution {
   const {
     editionPriceUsd,
@@ -98,6 +99,7 @@ export function resolvePricing(params: {
     selectedSize,
     pricesBySize,
     solRateUsd,
+    extraUsd,
   } = params;
 
   // 1. Resolve unit USD price: check variable size pricing first, then base edition price
@@ -123,8 +125,10 @@ export function resolvePricing(params: {
   }
 
   const safeQuantity = Math.max(1, quantity || 1);
-  const totalUsd = Number((unitUsd * safeQuantity).toFixed(2));
-  const totalSol = Number((unitSol * safeQuantity).toFixed(4));
+  const extra = Math.max(0, Number(extraUsd) || 0);
+  const totalUsd = Number(((unitUsd * safeQuantity) + extra).toFixed(2));
+  const extraSol = extra > 0 ? Number((extra / referenceSolRate).toFixed(4)) : 0;
+  const totalSol = Number(((unitSol * safeQuantity) + extraSol).toFixed(4));
 
   return {
     unitUsd,

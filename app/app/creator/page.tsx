@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useWallet } from '@solana/wallet-adapter-react';
 import * as backendApi from '@/lib/backendApi';
-import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks } from '@/lib/db';
+import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks, saveEditionDeliveryOption, getEditionDeliveryOption } from '@/lib/db';
 import { executeBatchInitialize, parseSolanaError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import { solscanTxUrl } from '@/lib/utils';
@@ -131,6 +131,9 @@ export default function CreatorStudioPage() {
     twitter: string;
     whatsapp: string;
     support_email: string;
+    allows_delivery: boolean;
+    delivery_fee_usd: string | number;
+    delivery_notes: string;
     images: ApparelImage[];
   }>({
     id: '',
@@ -145,6 +148,9 @@ export default function CreatorStudioPage() {
     twitter: '',
     whatsapp: '',
     support_email: '',
+    allows_delivery: false,
+    delivery_fee_usd: 0,
+    delivery_notes: '',
     images: [] as ApparelImage[],
   });
 
@@ -385,6 +391,9 @@ export default function CreatorStudioPage() {
       twitter: '',
       whatsapp: '',
       support_email: '',
+      allows_delivery: false,
+      delivery_fee_usd: 0,
+      delivery_notes: '',
       images: [],
     });
     setDeployResult(null);
@@ -399,6 +408,9 @@ export default function CreatorStudioPage() {
     setIsSlugManuallyEdited(true);
 
     const socials = ed.social_links || getEditionSocialLinks(ed.id, ed.brand_id) || {};
+    const deliveryOpt = ed.allows_delivery !== undefined
+      ? { allows_delivery: Boolean(ed.allows_delivery), delivery_fee_usd: ed.delivery_fee_usd || 0, delivery_notes: ed.delivery_notes || '' }
+      : getEditionDeliveryOption(ed.id);
 
     setEditionForm({
       id: ed.id,
@@ -413,6 +425,9 @@ export default function CreatorStudioPage() {
       twitter: socials.twitter || '',
       whatsapp: socials.whatsapp || '',
       support_email: socials.support_email || '',
+      allows_delivery: deliveryOpt.allows_delivery,
+      delivery_fee_usd: deliveryOpt.delivery_fee_usd,
+      delivery_notes: deliveryOpt.delivery_notes,
       images: (ed.images || []).map((img: any) => ({
         url: img.url,
         tag: img.tag || 'Look',
@@ -508,6 +523,13 @@ export default function CreatorStudioPage() {
         twitter: editionForm.twitter.trim() || undefined,
         whatsapp: editionForm.whatsapp.trim() || undefined,
         support_email: editionForm.support_email.trim() || undefined,
+      });
+
+      // Persist doorstep delivery configuration
+      saveEditionDeliveryOption(slugId, {
+        allows_delivery: Boolean(editionForm.allows_delivery),
+        delivery_fee_usd: Number(editionForm.delivery_fee_usd) || 0,
+        delivery_notes: editionForm.delivery_notes.trim(),
       });
 
       // Upload new images
@@ -791,6 +813,12 @@ export default function CreatorStudioPage() {
         twitter: editionForm.twitter.trim() || undefined,
         whatsapp: editionForm.whatsapp.trim() || undefined,
         support_email: editionForm.support_email.trim() || undefined,
+      });
+
+      saveEditionDeliveryOption(slugId, {
+        allows_delivery: Boolean(editionForm.allows_delivery),
+        delivery_fee_usd: Number(editionForm.delivery_fee_usd) || 0,
+        delivery_notes: editionForm.delivery_notes.trim(),
       });
 
       // Step B: Upload Media
@@ -1470,6 +1498,115 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
 
+                {/* Fulfillment & Doorstep Delivery Settings */}
+                <div className="flex flex-col gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/10">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">📦</span>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-white font-mono">Fulfillment & Delivery Options</h3>
+                    </div>
+                    <span className={`text-[0.6rem] font-mono px-2 py-0.5 rounded-full border ${
+                      editionForm.allows_delivery
+                        ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                        : 'border-white/10 text-[#888] bg-white/[0.02]'
+                    }`}>
+                      {editionForm.allows_delivery ? 'Doorstep Delivery: Activated' : 'Doorstep Delivery: Deactivated (Station Pickup Only)'}
+                    </span>
+                  </div>
+
+                  <p className="text-[0.65rem] text-[#888] font-mono leading-relaxed">
+                    Decide how your buyers receive this collection piece. You can keep it strictly exclusive to in-person Atelier Stations or activate direct courier delivery to buyer doorsteps.
+                  </p>
+
+                  {/* Mode Selectors */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditionForm(prev => ({ ...prev, allows_delivery: false }))}
+                      className={`p-4 rounded-xl text-left border transition-all flex flex-col justify-between gap-2 ${
+                        !editionForm.allows_delivery
+                          ? 'border-white bg-white/[0.06] shadow-[0_0_20px_rgba(255,255,255,0.05)]'
+                          : 'border-white/10 bg-[#0D0D0D]/60 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                          <span>📍</span> Atelier Station Only
+                        </span>
+                        {!editionForm.allows_delivery && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                        )}
+                      </div>
+                      <p className="text-[0.65rem] text-[#888] leading-relaxed">
+                        Physical pickup only. Buyer collects directly from your verified studio station with instant NFC tag authentication.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditionForm(prev => ({ ...prev, allows_delivery: true }))}
+                      className={`p-4 rounded-xl text-left border transition-all flex flex-col justify-between gap-2 ${
+                        editionForm.allows_delivery
+                          ? 'border-emerald-500/50 bg-emerald-500/[0.06] shadow-[0_0_20px_rgba(16,185,129,0.08)]'
+                          : 'border-white/10 bg-[#0D0D0D]/60 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                          <span>🚚</span> Enable Doorstep Delivery
+                        </span>
+                        {editionForm.allows_delivery && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                        )}
+                      </div>
+                      <p className="text-[0.65rem] text-[#888] leading-relaxed">
+                        Buyers can choose either Atelier Station pickup OR provide their home/business address for bonded courier dispatch.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Configurable Delivery Surcharge and Dispatch Terms if activated */}
+                  {editionForm.allows_delivery && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-white/5 animate-fade-in">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono flex items-center justify-between">
+                          <span>Delivery Surcharge (USD)</span>
+                          <span className="text-[0.55rem] text-emerald-400 font-mono">0.00 = Free Delivery</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="15.00"
+                          value={editionForm.delivery_fee_usd}
+                          onChange={(e) => setEditionForm(prev => ({ ...prev, delivery_fee_usd: e.target.value }))}
+                          className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                        />
+                        <span className="text-[0.58rem] text-[#666] font-mono">
+                          Added to order total when buyer selects Doorstep Delivery on storefront.
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[0.6rem] uppercase tracking-wider text-[#aaa] font-mono flex items-center justify-between">
+                          <span>Courier Coverage / Notes</span>
+                          <span className="text-[0.55rem] text-[#666] font-mono">Visible to buyers</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Nationwide insured courier within 48h of production finish"
+                          value={editionForm.delivery_notes}
+                          onChange={(e) => setEditionForm(prev => ({ ...prev, delivery_notes: e.target.value }))}
+                          className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                        />
+                        <span className="text-[0.58rem] text-[#666] font-mono">
+                          e.g. Regions covered, transit partner, or dispatch turnaround.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between pt-4 border-t border-white/10">
                   <button
                     type="button"
@@ -1823,6 +1960,49 @@ export default function CreatorStudioPage() {
                         <span className="text-[0.6rem] text-[#777] uppercase">Support Email</span>
                         <span className="text-white truncate">{editionForm.support_email || 'Not set'}</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Fulfillment & Delivery Configuration Review */}
+                  <div className="flex flex-col gap-2 pt-4 border-t border-white/10 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[0.65rem] font-bold uppercase tracking-widest text-[#666] font-mono">
+                        Fulfillment Policy
+                      </span>
+                      <span className={`text-[0.6rem] font-mono px-2 py-0.5 rounded-full border ${
+                        editionForm.allows_delivery
+                          ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                          : 'border-white/10 text-[#888] bg-white/[0.02]'
+                      }`}>
+                        {editionForm.allows_delivery ? 'Doorstep Delivery: Activated' : 'Doorstep Delivery: Deactivated (Station Only)'}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-black/40 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">{editionForm.allows_delivery ? '🚚' : '📍'}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-white font-bold">
+                            {editionForm.allows_delivery
+                              ? 'Doorstep Courier & Atelier Pickup Enabled'
+                              : 'Atelier Collection Station Pickup Only'}
+                          </span>
+                          <span className="text-[0.65rem] text-[#888]">
+                            {editionForm.allows_delivery
+                              ? editionForm.delivery_notes || 'Bonded courier dispatch to buyer address'
+                              : 'Doorstep shipping disabled. In-person authentication and physical collection only.'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {editionForm.allows_delivery && (
+                        <div className="sm:text-right shrink-0">
+                          <span className="text-[0.6rem] text-[#777] uppercase block">Delivery Surcharge</span>
+                          <span className="text-emerald-400 font-bold">
+                            {Number(editionForm.delivery_fee_usd) > 0 ? `+$${Number(editionForm.delivery_fee_usd).toFixed(2)} USD` : 'Free Delivery'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

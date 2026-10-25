@@ -73,6 +73,12 @@ function DropPageContent() {
   const [paymentMethod, setPaymentMethod] = useState<'fiat' | 'crypto'>('crypto');
   const [solPrice, setSolPrice] = useState<number | null>(null);
   const [showFiatModal, setShowFiatModal] = useState(false);
+  const [fiatWaitlistEmail, setFiatWaitlistEmail] = useState('');
+  const [fiatWaitlistJoined, setFiatWaitlistJoined] = useState(false);
+  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryCity, setDeliveryCity] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
   const [copiedTx, setCopiedTx] = useState(false);
   const processingRef = useRef(false);
   const router = useRouter();
@@ -335,6 +341,10 @@ function DropPageContent() {
   const isSoldOut = activeEdition ? mintedCount >= maxSupply : false;
   const fillPercent = maxSupply > 0 ? Math.min(100, (mintedCount / maxSupply) * 100) : 0;
 
+  // Delivery Options Configuration
+  const allowsDelivery = Boolean(activeEdition?.allows_delivery);
+  const deliveryFeeUsd = allowsDelivery && fulfillmentType === 'delivery' ? Number(activeEdition?.delivery_fee_usd) || 0 : 0;
+
   // Authoritative Unified Pricing across entire app
   const batchLamports = (selectedBatch?.pricing?.prices_by_size_lamports && selectedSize && selectedBatch.pricing.prices_by_size_lamports[selectedSize])
     || selectedBatch?.pricing?.unit_price_lamports;
@@ -346,6 +356,7 @@ function DropPageContent() {
     selectedSize,
     pricesBySize: activeEdition?.prices_by_size,
     solRateUsd: solPrice,
+    extraUsd: deliveryFeeUsd,
   });
 
   const unitSol = pricing.unitSol;
@@ -369,6 +380,18 @@ function DropPageContent() {
     if (paymentMethod === 'fiat') {
       setShowFiatModal(true);
       return;
+    }
+
+    // Doorstep delivery address validation
+    if (fulfillmentType === 'delivery') {
+      if (!deliveryAddress.trim()) {
+        showToast('Delivery Address Required', 'Please enter your street address for bonded courier delivery.');
+        return;
+      }
+      if (!deliveryCity.trim()) {
+        showToast('City / Region Required', 'Please enter your city and state for delivery.');
+        return;
+      }
     }
 
     processingRef.current = true;
@@ -483,6 +506,11 @@ function DropPageContent() {
               pickup_location_id: pickupLocId,
               order_number: assignedPieceNum,
               garment_serial: String(assignedPieceNum),
+              fulfillment_type: fulfillmentType,
+              delivery_address: fulfillmentType === 'delivery' ? deliveryAddress.trim() : undefined,
+              delivery_city: fulfillmentType === 'delivery' ? deliveryCity.trim() : undefined,
+              delivery_phone: fulfillmentType === 'delivery' ? deliveryPhone.trim() : undefined,
+              delivery_fee_usd: deliveryFeeUsd,
             };
             const existing = JSON.parse(localStorage.getItem('circuit_orders') || '[]');
             localStorage.setItem('circuit_orders', JSON.stringify([richOrder, ...existing]));
@@ -505,7 +533,9 @@ function DropPageContent() {
             editionName: activeEdition.name,
             batchName: selectedBatch.name,
             releaseAt: selectedBatch.release_at,
-            pickupLocation: selectedBatch.pickup_locations?.find((l) => (l.id || '') === pickupLocId)?.name || 'Official Atelier Station',
+            pickupLocation: fulfillmentType === 'delivery'
+              ? `Doorstep Courier (${deliveryAddress.trim()}, ${deliveryCity.trim()})`
+              : selectedBatch.pickup_locations?.find((l) => (l.id || '') === pickupLocId)?.name || 'Official Atelier Station',
           });
           showToast('✓ Confirmed', `Order #${(mintedCount || 0) + 1} confirmed on Solana Devnet!`);
           setTimeout(() => {
@@ -1022,8 +1052,16 @@ function DropPageContent() {
 
             {/* Method Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Option 1: In-Person Collection Station (Active) */}
-              <div className="p-4 rounded-2xl border border-white/20 bg-white/[0.06] shadow-[0_0_20px_rgba(255,255,255,0.03)] flex flex-col justify-between relative overflow-hidden">
+              {/* Option 1: In-Person Collection Station */}
+              <button
+                type="button"
+                onClick={() => setFulfillmentType('pickup')}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between relative overflow-hidden ${
+                  fulfillmentType === 'pickup'
+                    ? 'border-white bg-white/[0.08] shadow-[0_0_20px_rgba(255,255,255,0.06)]'
+                    : 'border-white/10 bg-white/[0.02] hover:border-white/30'
+                }`}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
@@ -1032,77 +1070,174 @@ function DropPageContent() {
                     </svg>
                     <span className="text-xs font-bold text-white tracking-wide">Atelier Station</span>
                   </div>
-                  <span className="text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border border-emerald-400/30 text-emerald-400 bg-emerald-400/10">
-                    Active
+                  <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                    fulfillmentType === 'pickup'
+                      ? 'border-emerald-400/40 text-emerald-400 bg-emerald-400/10'
+                      : 'border-white/10 text-[#888] bg-transparent'
+                  }`}>
+                    {fulfillmentType === 'pickup' ? 'Selected' : 'Station Pickup'}
                   </span>
                 </div>
                 <p className="text-[0.68rem] text-[#aaa] leading-relaxed">
                   In-person authentication & NFC verification at official brand studio station.
                 </p>
-              </div>
+              </button>
 
-              {/* Option 2: Delivery Coverage (Greyed Out / Disabled Future Feature) */}
-              <div
-                className="p-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.015] opacity-60 cursor-not-allowed select-none flex flex-col justify-between relative overflow-hidden group"
-                title="Delivery Coverage will be available in an upcoming release"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-[#777]">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#666]">
-                      <rect x="1" y="3" width="15" height="13" />
-                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                      <circle cx="5.5" cy="18.5" r="2.5" />
-                      <circle cx="18.5" cy="18.5" r="2.5" />
-                    </svg>
-                    <span className="text-xs font-bold tracking-wide text-[#888]">Delivery Coverage</span>
+              {/* Option 2: Doorstep Courier Delivery (Controlled by Brand Edition Settings) */}
+              {allowsDelivery ? (
+                <button
+                  type="button"
+                  onClick={() => setFulfillmentType('delivery')}
+                  className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between relative overflow-hidden ${
+                    fulfillmentType === 'delivery'
+                      ? 'border-emerald-500/60 bg-emerald-500/[0.08] shadow-[0_0_20px_rgba(16,185,129,0.1)]'
+                      : 'border-white/10 bg-white/[0.02] hover:border-white/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-white">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
+                        <rect x="1" y="3" width="15" height="13" />
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                        <circle cx="5.5" cy="18.5" r="2.5" />
+                        <circle cx="18.5" cy="18.5" r="2.5" />
+                      </svg>
+                      <span className="text-xs font-bold tracking-wide">Doorstep Delivery</span>
+                    </div>
+                    <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                      fulfillmentType === 'delivery'
+                        ? 'border-emerald-400/40 text-emerald-400 bg-emerald-400/10'
+                        : 'border-white/10 text-emerald-400/80 bg-white/[0.02]'
+                    }`}>
+                      {Number(activeEdition?.delivery_fee_usd) > 0 ? `+$${Number(activeEdition.delivery_fee_usd).toFixed(2)}` : 'Free Delivery'}
+                    </span>
                   </div>
-                  <span className="text-[0.58rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-amber-400/20 text-amber-400/80 bg-amber-400/5">
-                    Future Feature
-                  </span>
-                </div>
-                <p className="text-[0.68rem] text-[#666] leading-relaxed">
-                  Insured door-to-door bonded courier logistics with tamper-evident transit escrow.
-                </p>
-                <div className="mt-2 text-[0.6rem] font-mono text-[#555] flex items-center gap-1">
-                  <span>🔒 Regional carrier rollout pending</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Active Station Selector */}
-            <div className="flex flex-col gap-2 mt-1">
-              <span className="text-[0.62rem] text-[#666] uppercase tracking-[0.1em] font-semibold">
-                Select Collection Station
-              </span>
-              {selectedBatch && selectedBatch.pickup_locations?.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  <select
-                    value={selectedLocationId}
-                    onChange={(e) => setSelectedLocationId(e.target.value)}
-                    className="w-full bg-[#0d0d0d] border border-white/[0.12] rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-white/40"
-                  >
-                    {selectedBatch.pickup_locations.map((loc, idx) => (
-                      <option key={loc.id || idx} value={loc.id || `loc-${idx}`}>
-                        {loc.name} — {loc.address}, {loc.city}, {loc.country}
-                      </option>
-                    ))}
-                  </select>
-
-                  {(() => {
-                    const activeLoc = selectedBatch.pickup_locations.find((l) => (l.id || '') === selectedLocationId) || selectedBatch.pickup_locations[0];
-                    return activeLoc?.instructions ? (
-                      <p className="text-[0.65rem] text-[#777] font-mono italic px-1">
-                        ℹ Instructions: {activeLoc.instructions}
-                      </p>
-                    ) : null;
-                  })()}
-                </div>
+                  <p className="text-[0.68rem] text-[#aaa] leading-relaxed">
+                    Insured bonded courier dispatched directly to your home or office address.
+                  </p>
+                </button>
               ) : (
-                <div className="p-3 text-xs text-[#888] border border-white/[0.08] rounded-xl bg-white/[0.02]">
-                  Official Brand Studio Collection Station
+                <div
+                  className="p-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.015] opacity-60 cursor-not-allowed select-none flex flex-col justify-between relative overflow-hidden"
+                  title="Doorstep delivery has been deactivated by the brand for this drop"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-[#777]">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#666]">
+                        <rect x="1" y="3" width="15" height="13" />
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                        <circle cx="5.5" cy="18.5" r="2.5" />
+                        <circle cx="18.5" cy="18.5" r="2.5" />
+                      </svg>
+                      <span className="text-xs font-bold tracking-wide text-[#888]">Doorstep Delivery</span>
+                    </div>
+                    <span className="text-[0.55rem] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border border-white/10 text-[#777] bg-white/[0.02]">
+                      Deactivated by Brand
+                    </span>
+                  </div>
+                  <p className="text-[0.65rem] text-[#666] leading-relaxed">
+                    Atelier has designated this drop exclusively for in-person Atelier Station Pickup & NFC authentication.
+                  </p>
                 </div>
               )}
             </div>
+
+            {/* Dynamic Station Selector vs Courier Delivery Address */}
+            {fulfillmentType === 'pickup' ? (
+              <div className="flex flex-col gap-2 mt-1 animate-fade-in">
+                <span className="text-[0.62rem] text-[#666] uppercase tracking-[0.1em] font-semibold">
+                  Select Collection Station
+                </span>
+                {selectedBatch && selectedBatch.pickup_locations?.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    <select
+                      value={selectedLocationId}
+                      onChange={(e) => setSelectedLocationId(e.target.value)}
+                      className="w-full bg-[#0d0d0d] border border-white/[0.12] rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-white/40"
+                    >
+                      {selectedBatch.pickup_locations.map((loc, idx) => (
+                        <option key={loc.id || idx} value={loc.id || `loc-${idx}`}>
+                          {loc.name} — {loc.address}, {loc.city}, {loc.country}
+                        </option>
+                      ))}
+                    </select>
+
+                    {(() => {
+                      const activeLoc = selectedBatch.pickup_locations.find((l) => (l.id || '') === selectedLocationId) || selectedBatch.pickup_locations[0];
+                      return activeLoc?.instructions ? (
+                        <p className="text-[0.65rem] text-[#777] font-mono italic px-1">
+                          ℹ Instructions: {activeLoc.instructions}
+                        </p>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  <div className="p-3 text-xs text-[#888] border border-white/[0.08] rounded-xl bg-white/[0.02]">
+                    Official Brand Studio Collection Station
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 mt-1 p-4 rounded-2xl bg-white/[0.03] border border-white/10 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.62rem] text-white uppercase tracking-[0.1em] font-bold font-mono flex items-center gap-1.5">
+                    <span>📍</span> Bonded Courier Delivery Address
+                  </span>
+                  <span className="text-[0.55rem] font-mono text-emerald-400">
+                    {Number(activeEdition?.delivery_fee_usd) > 0 ? `Fee: +$${Number(activeEdition.delivery_fee_usd).toFixed(2)} USD` : 'Free Delivery'}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2.5 text-xs">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[0.6rem] uppercase tracking-wider text-[#888] font-mono">
+                      Street Address & Apt/Suite <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 14 Victoria Island Boulevard, Apt 4B"
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#888] font-mono">
+                        City & State / Region <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Lagos, Nigeria"
+                        value={deliveryCity}
+                        onChange={(e) => setDeliveryCity(e.target.value)}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[0.6rem] uppercase tracking-wider text-[#888] font-mono">
+                        Courier Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="e.g. +234 800 000 0000"
+                        value={deliveryPhone}
+                        onChange={(e) => setDeliveryPhone(e.target.value)}
+                        className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30 placeholder:text-white/20 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {activeEdition?.delivery_notes && (
+                    <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 text-[0.65rem] text-[#aaa] font-mono">
+                      <strong className="text-white">Brand Note:</strong> {activeEdition.delivery_notes}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sizing & Quantity */}
@@ -1160,15 +1295,21 @@ function DropPageContent() {
               <div className="flex bg-white/[0.02] border border-white/5 rounded-xl p-1 gap-1">
                 <button 
                   onClick={() => setPaymentMethod('crypto')}
-                  className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${paymentMethod === 'crypto' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
+                  className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 ${paymentMethod === 'crypto' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
                 >
-                  Crypto ({pricing.totalSolFormatted} SOL)
+                  <span>Solana Crypto ({pricing.totalSolFormatted} SOL)</span>
                 </button>
                 <button 
-                  onClick={() => setPaymentMethod('fiat')}
-                  className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all ${paymentMethod === 'fiat' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#666] hover:text-white hover:bg-white/[0.02]'}`}
+                  onClick={() => {
+                    setPaymentMethod('fiat');
+                    setShowFiatModal(true);
+                  }}
+                  className={`flex-1 py-3 text-xs font-bold uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 relative ${paymentMethod === 'fiat' ? 'bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'text-[#888] hover:text-white hover:bg-white/[0.02]'}`}
                 >
-                  Fiat ({pricing.totalUsdFormatted})
+                  <span>Card / Fiat</span>
+                  <span className="text-[0.55rem] font-mono font-bold tracking-tight px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-400 border border-amber-400/30 uppercase">
+                    Coming Soon
+                  </span>
                 </button>
               </div>
             </div>
@@ -1220,7 +1361,7 @@ function DropPageContent() {
                    selectedBatch?.opens_at && new Date(selectedBatch.opens_at).getTime() > Date.now() ?
                      `Opens at ${new Date(selectedBatch.opens_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` :
                    paymentMethod === 'fiat' ?
-                     `Checkout with Card (${pricing.totalUsdFormatted})` :
+                     `Card Checkout (Coming Soon — ${pricing.totalUsdFormatted})` :
                      `Pre-Order (${pricing.totalSolFormatted} SOL)`}
                 </span>
                 <span className="btn-arrow">
@@ -1457,7 +1598,7 @@ function DropPageContent() {
       {/* Fiat Checkout Legit Pending State Modal */}
       {showFiatModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/85 backdrop-blur-md px-4 animate-fade-in">
-          <div className="card-glass w-full max-w-md p-8 md:p-10 border border-white/15 rounded-3xl shadow-[0_50px_100px_rgba(0,0,0,0.9)] relative animate-scale-in">
+          <div className="card-glass w-full max-w-md p-7 md:p-9 border border-white/15 rounded-3xl shadow-[0_50px_100px_rgba(0,0,0,0.9)] relative animate-scale-in">
             <button 
               onClick={() => setShowFiatModal(false)}
               className="absolute top-5 right-5 text-[#666] hover:text-white transition-colors p-2 text-sm"
@@ -1465,58 +1606,117 @@ function DropPageContent() {
             >
               ✕
             </button>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-5">
               <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl mb-3 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
                   💳
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[0.6rem] font-bold font-mono tracking-widest uppercase text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                    Integration In Progress
+                  <span className="text-[0.6rem] font-bold font-mono tracking-widest uppercase text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                    Card Rails Coming Soon
                   </span>
                 </div>
-                <h3 className="text-xl font-bold tracking-tight">Card & Apple Pay Checkout</h3>
-                <p className="text-xs text-[#888] mt-1 max-w-xs leading-relaxed">
-                  Circuit direct-to-escrow credit card processing is finalizing compliance audit with our licensed payments partner.
+                <h3 className="text-xl font-bold tracking-tight text-white">Fiat & Apple Pay Processing</h3>
+                <p className="text-xs text-[#888] mt-1.5 max-w-xs leading-relaxed">
+                  Direct debit card, credit card, and Apple Pay checkouts are finalizing banking compliance with our payment rails partner.
                 </p>
               </div>
 
-              <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/10 flex flex-col gap-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-[#888]">Reservation Total:</span>
-                  <span className="font-bold text-white text-sm">{pricing.totalUsdFormatted}</span>
+              {/* Order Value Overview */}
+              <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/10 flex flex-col gap-2.5 text-xs font-mono">
+                <div className="flex justify-between items-center text-[#888]">
+                  <span>Item Subtotal ({quantity} unit{quantity > 1 ? 's' : ''}):</span>
+                  <span className="text-white font-bold">{pricing.unitUsdFormatted} × {quantity}</span>
                 </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-[#888]">Solana Equivalent:</span>
-                  <span className="font-mono text-emerald-400 font-bold">{pricing.totalSolFormatted} SOL</span>
+                {fulfillmentType === 'delivery' && (
+                  <div className="flex justify-between items-center text-[#888]">
+                    <span>Doorstep Courier Delivery:</span>
+                    <span className="text-emerald-400 font-bold">
+                      {deliveryFeeUsd > 0 ? `+$${deliveryFeeUsd.toFixed(2)} USD` : 'Free Delivery'}
+                    </span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-white/[0.06] flex justify-between items-center">
+                  <span className="text-white font-bold">Total Order Value:</span>
+                  <span className="text-sm font-bold text-white">{pricing.totalUsdFormatted}</span>
                 </div>
-                <div className="pt-2 border-t border-white/[0.06] text-[0.7rem] text-[#aaa] leading-relaxed">
-                  💡 <strong>Instant Preorder Available:</strong> You can secure your guaranteed piece immediately with zero gas fees using your Solana wallet.
+                <div className="flex justify-between items-center text-[0.7rem] text-[#aaa]">
+                  <span>Solana Equivalent:</span>
+                  <span className="text-emerald-400 font-bold font-mono">{pricing.totalSolFormatted} SOL</span>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
+              {/* Waitlist Notification Signup */}
+              <div className="p-3.5 rounded-2xl bg-amber-500/[0.04] border border-amber-500/20 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.62rem] font-bold uppercase tracking-wider text-amber-400 font-mono">
+                    Early Access Notification
+                  </span>
+                  {fiatWaitlistJoined && (
+                    <span className="text-[0.6rem] font-mono text-emerald-400 font-bold">✓ Joined Waitlist</span>
+                  )}
+                </div>
+
+                {!fiatWaitlistJoined ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      placeholder="Enter email for card launch alert..."
+                      value={fiatWaitlistEmail || user?.email || ''}
+                      onChange={(e) => setFiatWaitlistEmail(e.target.value)}
+                      className="flex-1 bg-[#0D0D0D] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400/50 font-mono placeholder:text-white/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetEmail = (fiatWaitlistEmail || user?.email || '').trim();
+                        if (!targetEmail || !targetEmail.includes('@')) {
+                          showToast('Email Required', 'Please enter a valid email address.');
+                          return;
+                        }
+                        if (typeof window !== 'undefined') {
+                          try {
+                            const list = JSON.parse(localStorage.getItem('circuit_fiat_waitlist') || '[]');
+                            if (!list.includes(targetEmail)) {
+                              localStorage.setItem('circuit_fiat_waitlist', JSON.stringify([...list, targetEmail]));
+                            }
+                          } catch (_) {}
+                        }
+                        setFiatWaitlistJoined(true);
+                        showToast('✓ Notification Saved', `We will alert you at ${targetEmail} once Card rails go live!`);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[0.68rem] font-bold uppercase tracking-wider transition-all whitespace-nowrap"
+                    >
+                      Alert Me
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[0.68rem] text-[#aaa] font-mono leading-relaxed">
+                    You are on the priority list. We will send you an invite as soon as Card checkout goes live.
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2.5 pt-1">
                 <button
                   type="button"
-                  className="btn-circuit w-full justify-center py-4 text-xs"
+                  className="btn-circuit w-full justify-center py-3.5 text-xs font-bold"
                   onClick={() => {
                     setPaymentMethod('crypto');
                     setShowFiatModal(false);
                     showToast('Switched to Solana', 'Ready to checkout instantly via your Solana wallet.');
                   }}
                 >
-                  <span>Switch to Solana Checkout (Instant)</span>
+                  <span>Pay with Solana Devnet Escrow (Instant)</span>
                   <span className="btn-arrow">→</span>
                 </button>
                 <button
                   type="button"
-                  className="btn-outline-circuit w-full justify-center py-3 text-xs border-white/10 text-white/70 hover:text-white"
-                  onClick={() => {
-                    setShowFiatModal(false);
-                    showToast('Notification Saved', 'We will alert you when Card / Apple Pay rails go live.');
-                  }}
+                  className="btn-outline-circuit w-full justify-center py-2.5 text-xs border-white/10 text-white/60 hover:text-white"
+                  onClick={() => setShowFiatModal(false)}
                 >
-                  Notify Me When Card Rails Launch
+                  Continue Browsing Drop
                 </button>
               </div>
             </div>
