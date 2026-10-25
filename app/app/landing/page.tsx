@@ -185,10 +185,6 @@ export default function LandingPage() {
               <div className="card-glass overflow-hidden relative aspect-[4/5] lg:aspect-square group border-white/[0.08]">
                 <Image src={selectedEdition?.images?.[0]?.url || "/satin.png"} alt="Process shot" fill className="object-cover opacity-60 group-hover:scale-105 transition-transform duration-1000" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute bottom-8 left-8">
-                  <div className="w-12 h-0.5 bg-white mb-4" />
-                  <p className="text-[0.65rem] font-bold uppercase tracking-widest text-white/40">Available Now</p>
-                </div>
               </div>
             </div>
           </div>
