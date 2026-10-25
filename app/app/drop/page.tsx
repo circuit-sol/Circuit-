@@ -782,7 +782,7 @@ function DropPageContent() {
                   type="button"
                   className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-emerald-400 px-3.5 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 transition-all"
                 >
-                  <span>Switch Piece ({allEditions.length})</span>
+                  <span>Other Drops</span>
                   <span className="text-[10px]">▾</span>
                 </button>
                 <div className="absolute right-0 top-full pt-2 w-64 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 z-50">
@@ -890,9 +890,11 @@ function DropPageContent() {
             </div>
           </div>
 
-          <p className="text-[0.95rem] text-[#A3A3A3] leading-[1.8] max-w-[540px]">
-            {activeEdition.description}
-          </p>
+          {activeEdition.description && (
+            <p className="text-[0.95rem] text-[#A3A3A3] leading-[1.8] max-w-[540px]">
+              {activeEdition.description.replace(/^limited\s+edition\s+/i, '')}
+            </p>
+          )}
 
           {/* Atelier Specifications Matrix */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-md overflow-hidden transition-all duration-300 hover:border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
@@ -917,7 +919,7 @@ function DropPageContent() {
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[0.6rem] font-mono font-semibold uppercase tracking-wider whitespace-nowrap">
-                  {isSoldOut ? 'Sold Out' : 'Active Batch'}
+                  {isSoldOut ? 'Sold Out' : 'Open Drop'}
                 </span>
               </div>
 
@@ -982,7 +984,7 @@ function DropPageContent() {
           {/* Preorder Batch Selector */}
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-baseline">
-              <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">Select Preorder Batch</span>
+              <span className="text-[0.65rem] text-[#666] uppercase tracking-[0.12em] font-bold">Select Drop</span>
               {selectedBatch?.closes_at && (
                 <span className="text-[0.65rem] font-mono text-[#888]">
                   Closes: {new Date(selectedBatch.closes_at).toLocaleDateString()}
@@ -1016,12 +1018,12 @@ function DropPageContent() {
                             ? 'border-amber-400/30 text-amber-400 bg-amber-400/10'
                             : 'border-emerald-400/30 text-emerald-400 bg-emerald-400/10'
                         }`}>
-                          {b.opens_at && new Date(b.opens_at).getTime() > Date.now() ? 'Opens Soon' : (b.sales_window_status || 'Open')}
+                          {b.opens_at && new Date(b.opens_at).getTime() > Date.now() ? 'Opens Soon' : (b.sales_window_status || 'Open Drop')}
                         </span>
                       </div>
                       <div className="text-[0.65rem] text-[#888] font-mono space-y-0.5">
                         <div>Estimated Arrival: {new Date(b.release_at).toLocaleDateString()}</div>
-                        <div>{b.pickup_locations?.length || 1} Pickup Station{(b.pickup_locations?.length || 1) > 1 ? 's' : ''}</div>
+                        <div>Collection Point: {b.pickup_locations?.[0]?.name ? `${b.pickup_locations[0].name} (${b.pickup_locations[0].city})` : 'Designated Atelier Point'}</div>
                       </div>
                     </button>
                   );
@@ -1030,10 +1032,10 @@ function DropPageContent() {
             ) : (
               <div className="p-5 rounded-2xl border border-white/[0.08] bg-white/[0.02] text-center flex flex-col items-center gap-1.5">
                 <span className="text-[0.6rem] font-bold uppercase tracking-widest text-amber-400 font-mono">
-                  Production Batch Pending
+                  Drop Schedule Pending
                 </span>
                 <p className="text-xs text-[#888] leading-relaxed max-w-sm">
-                  The atelier is finalizing production window dates and collection stations for this piece. Preorders will open once the schedule is confirmed.
+                  The atelier is finalizing production window dates and collection points for this piece. Preorders will open once the schedule is confirmed.
                 </p>
               </div>
             )}
@@ -1052,7 +1054,7 @@ function DropPageContent() {
 
             {/* Method Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Option 1: In-Person Collection Station */}
+              {/* Option 1: In-Person Collection Point */}
               <button
                 type="button"
                 onClick={() => setFulfillmentType('pickup')}
@@ -1068,22 +1070,22 @@ function DropPageContent() {
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
                       <circle cx="12" cy="10" r="3" />
                     </svg>
-                    <span className="text-xs font-bold text-white tracking-wide">Atelier Station</span>
+                    <span className="text-xs font-bold text-white tracking-wide">Collection Point</span>
                   </div>
                   <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
                     fulfillmentType === 'pickup'
                       ? 'border-emerald-400/40 text-emerald-400 bg-emerald-400/10'
                       : 'border-white/10 text-[#888] bg-transparent'
                   }`}>
-                    {fulfillmentType === 'pickup' ? 'Selected' : 'Station Pickup'}
+                    {fulfillmentType === 'pickup' ? 'Selected' : 'Collection Point'}
                   </span>
                 </div>
                 <p className="text-[0.68rem] text-[#aaa] leading-relaxed">
-                  In-person authentication & NFC verification at official brand studio station.
+                  Collect your order at the designated location. Scan your unique QR code to verify collection and securely complete your order.
                 </p>
               </button>
 
-              {/* Option 2: Doorstep Courier Delivery (Controlled by Brand Edition Settings) */}
+              {/* Option 2: Delivery (Controlled by Brand Edition Settings) */}
               {allowsDelivery ? (
                 <button
                   type="button"
@@ -1098,11 +1100,11 @@ function DropPageContent() {
                     <div className="flex items-center gap-2 text-white">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
                         <rect x="1" y="3" width="15" height="13" />
-                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 8" />
                         <circle cx="5.5" cy="18.5" r="2.5" />
                         <circle cx="18.5" cy="18.5" r="2.5" />
                       </svg>
-                      <span className="text-xs font-bold tracking-wide">Doorstep Delivery</span>
+                      <span className="text-xs font-bold tracking-wide">Delivery</span>
                     </div>
                     <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border ${
                       fulfillmentType === 'delivery'
@@ -1119,34 +1121,34 @@ function DropPageContent() {
               ) : (
                 <div
                   className="p-4 rounded-2xl border border-dashed border-white/10 bg-white/[0.015] opacity-60 cursor-not-allowed select-none flex flex-col justify-between relative overflow-hidden"
-                  title="Doorstep delivery has been deactivated by the brand for this drop"
+                  title="Delivery has been deactivated by the brand for this drop"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 text-[#777]">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#666]">
                         <rect x="1" y="3" width="15" height="13" />
-                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 8" />
                         <circle cx="5.5" cy="18.5" r="2.5" />
                         <circle cx="18.5" cy="18.5" r="2.5" />
                       </svg>
-                      <span className="text-xs font-bold tracking-wide text-[#888]">Doorstep Delivery</span>
+                      <span className="text-xs font-bold tracking-wide text-[#888]">Delivery</span>
                     </div>
                     <span className="text-[0.55rem] font-bold font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border border-white/10 text-[#777] bg-white/[0.02]">
                       Deactivated by Brand
                     </span>
                   </div>
                   <p className="text-[0.65rem] text-[#666] leading-relaxed">
-                    Atelier has designated this drop exclusively for in-person Atelier Station Pickup & NFC authentication.
+                    Atelier has designated this drop exclusively for in-person Collection Point pickup & QR verification.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Dynamic Station Selector vs Courier Delivery Address */}
+            {/* Dynamic Collection Point vs Courier Delivery Address */}
             {fulfillmentType === 'pickup' ? (
               <div className="flex flex-col gap-2 mt-1 animate-fade-in">
                 <span className="text-[0.62rem] text-[#666] uppercase tracking-[0.1em] font-semibold">
-                  Select Collection Station
+                  Select Collection Point
                 </span>
                 {selectedBatch && selectedBatch.pickup_locations?.length > 0 ? (
                   <div className="flex flex-col gap-2">
@@ -1320,15 +1322,12 @@ function DropPageContent() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Protected by Circuit Escrow</span>
               </div>
-              <ul className="space-y-1 list-disc list-inside text-[#888] font-mono text-[0.63rem]">
+              <ul className="space-y-1.5 list-disc list-inside text-[#888] font-mono text-[0.65rem]">
                 <li>
-                  <strong className="text-white">24-Hour Free Cancellation:</strong> 100% individual refund available within 24 hours of purchase, even near batch close.
+                  <strong className="text-white">Protected Payment:</strong> Your money stays safe until you receive and confirm your order.
                 </li>
                 <li>
-                  <strong className="text-white">Protected Payment:</strong> Your money is held safely in escrow until you receive and confirm your piece.
-                </li>
-                <li>
-                  <strong className="text-white">Atelier Support & Mediation:</strong> Direct customer care backed by Circuit dispute protection.
+                  <strong className="text-white">Customer Support:</strong> Get direct support from the brand, with Circuit ready to help resolve any issues.
                 </li>
               </ul>
             </div>

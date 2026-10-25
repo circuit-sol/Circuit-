@@ -227,8 +227,8 @@ export default function LandingPage() {
         <section className="section-container pt-10 pb-16 md:pt-16 md:pb-32">
           <div className="flex items-end justify-between mb-8 md:mb-12">
             <div className="flex flex-col gap-2">
-              <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666]">Craftsmanship</span>
-              <h2 className="text-2xl md:text-4xl font-bold tracking-tight">Atelier Craftsmanship.</h2>
+              <span className="text-[0.6rem] font-bold uppercase tracking-[0.3em] text-[#666]">Made to order</span>
+              <h2 className="text-2xl md:text-4xl font-bold tracking-tight">A better way to fashion.</h2>
             </div>
             <span className="text-[0.65rem] font-mono text-[#666] uppercase tracking-widest hidden sm:block border border-white/10 px-4 py-2 rounded-full">
               Made to Measure // Circuit

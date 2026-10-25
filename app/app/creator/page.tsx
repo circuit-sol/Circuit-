@@ -1130,7 +1130,7 @@ export default function CreatorStudioPage() {
             <div className="grid grid-cols-3 gap-3">
               {[
                 { num: 1, title: 'Your Piece', desc: 'Photos, fabric and details' },
-                { num: 2, title: 'Dates & Pickup', desc: 'When orders open and where buyers collect' },
+                { num: 2, title: 'Dates & Collection', desc: 'When orders open and where buyers collect' },
                 { num: 3, title: 'Publish', desc: 'Approve and go live' },
               ].map((s) => (
                 <div
@@ -1340,7 +1340,7 @@ export default function CreatorStudioPage() {
                     />
                     <div className="flex items-center justify-between text-[0.6rem] font-mono text-[#888] px-1">
                       <span>≈ {Number(((Number(editionForm.price_usd) || 0) / (liveSolPrice || DEFAULT_SOL_MARKET_PRICE)).toFixed(4))} SOL</span>
-                      <span className="text-emerald-400/80">Oracle: 1 SOL ≈ ${liveSolPrice.toFixed(2)}</span>
+                      <span className="text-emerald-400/80">1 SOL ≈ ${liveSolPrice.toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -1625,17 +1625,17 @@ export default function CreatorStudioPage() {
                     }}
                     className="btn-circuit px-8 py-3.5 text-xs font-bold uppercase tracking-wider"
                   >
-                    <span>Proceed to Dates & Pickup →</span>
+                    <span>Proceed to Dates & Collection →</span>
                   </button>
                 </div>
               </div>
             )}
 
-            {/* STEP 2: PREORDER TERMS & PICKUP STATIONS */}
+            {/* STEP 2: PREORDER TERMS & COLLECTION */}
             {wizardStep === 2 && (
               <div className="card-glass p-8 border-white/10 rounded-3xl flex flex-col gap-6 animate-fade-in">
                 <div className="border-b border-white/10 pb-4">
-                  <h2 className="text-xl font-bold">Step 2: Dates & Pickup</h2>
+                  <h2 className="text-xl font-bold">Step 2: Dates & Collection</h2>
                   <p className="text-xs text-[#888] mt-1">When orders open and where buyers collect.</p>
                 </div>
 
@@ -1764,7 +1764,7 @@ export default function CreatorStudioPage() {
 
                   <div className="flex flex-col gap-2">
                     <label className="text-[0.65rem] font-bold uppercase tracking-wider text-[#888] font-mono flex items-center">
-                      4. Pickup Date <span className="text-red-400 font-bold ml-1">*</span>
+                      4. Collection Date <span className="text-red-400 font-bold ml-1">*</span>
                     </label>
                     <input
                       type="datetime-local"
@@ -1775,14 +1775,14 @@ export default function CreatorStudioPage() {
                   </div>
                 </div>
 
-                {/* Pickup Station Details */}
+                {/* Collection Point Details */}
                 <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col gap-4">
                   <div className="flex items-center gap-2">
                     <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
                       <circle cx="12" cy="9" r="2.5" />
                     </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">Pickup Location</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-white">Collection Point</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2133,35 +2133,6 @@ export default function CreatorStudioPage() {
                         <span>${ed.price_usd} USD</span>
                         <span>{ed.max_supply} pieces</span>
                       </div>
-
-                      {/* Care Channels Trust Indicators */}
-                      {ed.social_links && (
-                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 text-[0.6rem] font-mono text-[#777]">
-                          <span className="uppercase">Brand Channels:</span>
-                          <div className="flex items-center gap-1.5">
-                            {ed.social_links.instagram && (
-                              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-white/80 border border-white/5">
-                                IG
-                              </span>
-                            )}
-                            {ed.social_links.twitter && (
-                              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-white/80 border border-white/5">
-                                𝕏
-                              </span>
-                            )}
-                            {ed.social_links.whatsapp && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                WhatsApp
-                              </span>
-                            )}
-                            {ed.social_links.support_email && (
-                              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-white/80 border border-white/5">
-                                Email
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* Actions */}
@@ -2188,12 +2159,6 @@ export default function CreatorStudioPage() {
                           <span>{isPublished ? 'Storefront ➔' : 'Preview ↗'}</span>
                         </Link>
                       </div>
-
-                      {edBatches.length > 0 && (
-                        <span className="text-[0.65rem] font-mono text-[#777]">
-                          {edBatches.length} {edBatches.length === 1 ? 'Batch' : 'Batches'}
-                        </span>
-                      )}
                     </div>
                   </div>
                 );
