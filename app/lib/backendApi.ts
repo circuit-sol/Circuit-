@@ -348,6 +348,14 @@ export function createBrand(payload: { name: string; slug?: string; payment_wall
   }, true);
 }
 
+/** Update an existing brand's display name or payout wallet */
+export function updateBrand(brandId: string, payload: { name?: string; payment_wallet_address?: string }) {
+  return request<{ brand: Brand }>(`/api/brands/${encodeURIComponent(brandId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  }, true);
+}
+
 // ── Editions / Drops ───────────────────────────────────────────────────
 
 /** Public list of active and on-chain initialized editions */
@@ -829,6 +837,17 @@ export function getAdminReports() {
     { method: 'GET' },
     true
   );
+}
+
+/** Retrieve platform-wide brands, editions, batches, orders, and reports for Circuit admin */
+export function getAdminOverview() {
+  return request<{
+    brands: Brand[];
+    editions: Edition[];
+    batches: Batch[];
+    orders: ChainOrder[];
+    reports: Array<{ order_id: string; user_id: string; message: string; created_at: string }>;
+  }>('/api/chain/admin/overview', { method: 'GET' }, true);
 }
 
 /** Retrieve detailed chain order inspection for Circuit admin */

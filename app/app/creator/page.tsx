@@ -6,7 +6,18 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useWallet } from '@solana/wallet-adapter-react';
 import * as backendApi from '@/lib/backendApi';
-import { getEditions, uploadEditionImage, deleteEditionImage, saveEditionSocialLinks, getEditionSocialLinks, saveEditionDeliveryOption, getEditionDeliveryOption } from '@/lib/db';
+import {
+  getEditions,
+  uploadEditionImage,
+  deleteEditionImage,
+  saveEditionSocialLinks,
+  getEditionSocialLinks,
+  saveEditionDeliveryOption,
+  getEditionDeliveryOption,
+  saveCreatorBrandProfile,
+  getCreatorBrandProfile,
+  resolveCreatorDefaults,
+} from '@/lib/db';
 import { executeBatchInitialize, parseSolanaError } from '@/lib/solana-service';
 import { showToast } from '@/components/Toast';
 import { solscanTxUrl } from '@/lib/utils';
@@ -70,6 +81,29 @@ export default function CreatorStudioPage() {
   });
 
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  const [hasAutoFilledDefaults, setHasAutoFilledDefaults] = useState(false);
+
+  // Creator Account Registration & Editable Brand Profile Modal
+  const [brandModalMode, setBrandModalMode] = useState<'create' | 'edit' | null>(null);
+  const [isSavingBrand, setIsSavingBrand] = useState(false);
+  const [isBrandSlugEdited, setIsBrandSlugEdited] = useState(false);
+  const [brandForm, setBrandForm] = useState({
+    name: '',
+    slug: '',
+    payment_wallet_address: '',
+    support_email: '',
+    whatsapp: '',
+    instagram: '',
+    twitter: '',
+    pickup_name: '',
+    pickup_address: '',
+    pickup_city: '',
+    pickup_country: '',
+    pickup_instructions: '',
+    allows_delivery: false,
+    delivery_fee_usd: 0 as string | number,
+    delivery_notes: '',
+  });
 
   // Helper to slugify a name for collection URLs
   const slugify = (text: string) => {
@@ -162,12 +196,190 @@ export default function CreatorStudioPage() {
     closes_at: new Date(now + 86400000 * 7).toISOString().slice(0, 16), // +7 days
     production_starts_at: new Date(now + 86400000 * 10).toISOString().slice(0, 16), // +10 days (>= closes + 48h)
     release_at: new Date(now + 86400000 * 25).toISOString().slice(0, 16), // +25 days
-    pickup_name: 'Circuit Atelier Hub',
-    pickup_address: '14 Adeola Odeku Street, Victoria Island',
-    pickup_city: 'Lagos',
-    pickup_country: 'Nigeria',
+    pickup_name: '',
+    pickup_address: '',
+    pickup_city: '',
+    pickup_country: '',
     pickup_instructions: 'Please present your digital passport reference upon collection.',
   });
+
+  // Apply saved brand profile / previous drop defaults to a new drop form (all fields remain editable)
+  const applyCreatorDefaults = (
+    brandId: string | undefined,
+    edsList: any[],
+    batchesMap: Record<string, backendApi.Batch[]>,
+  ) => {
+    const defaults = resolveCreatorDefaults(brandId, edsList, batchesMap);
+    if (!defaults) {
+      setHasAutoFilledDefaults(false);
+      return;
+    }
+
+    setEditionForm(prev => ({
+      ...prev,
+      instagram: prev.instagram || defaults.instagram || '',
+      twitter: prev.twitter || defaults.twitter || '',
+      whatsapp: prev.whatsapp || defaults.whatsapp || '',
+      support_email: prev.support_email || defaults.support_email || '',
+      allows_delivery: defaults.allows_delivery ?? prev.allows_delivery,
+      delivery_fee_usd: defaults.delivery_fee_usd ?? prev.delivery_fee_usd,
+      delivery_notes: prev.delivery_notes || defaults.delivery_notes || '',
+    }));
+
+    setBatchForm(prev => ({
+      ...prev,
+      pickup_name: defaults.pickup_name || prev.pickup_name,
+      pickup_address: defaults.pickup_address || prev.pickup_address,
+      pickup_city: defaults.pickup_city || prev.pickup_city,
+      pickup_country: defaults.pickup_country || prev.pickup_country,
+      pickup_instructions: defaults.pickup_instructions || prev.pickup_instructions,
+    }));
+
+    setHasAutoFilledDefaults(true);
+  };
+
+  const openBrandModal = (mode: 'create' | 'edit') => {
+    if (mode === 'edit' && selectedBrand) {
+      const defaults = resolveCreatorDefaults(selectedBrand.id, editions, batchesByEdition);
+      setBrandForm({
+        name: selectedBrand.name || '',
+        slug: selectedBrand.slug || '',
+        payment_wallet_address: selectedBrand.payment_wallet_address || user?.walletAddress || '',
+        support_email: defaults?.support_email || user?.email || '',
+        whatsapp: defaults?.whatsapp || '',
+        instagram: defaults?.instagram || '',
+        twitter: defaults?.twitter || '',
+        pickup_name: defaults?.pickup_name || '',
+        pickup_address: defaults?.pickup_address || '',
+        pickup_city: defaults?.pickup_city || '',
+        pickup_country: defaults?.pickup_country || '',
+        pickup_instructions: defaults?.pickup_instructions || 'Please present your digital passport reference upon collection.',
+        allows_delivery: defaults?.allows_delivery ?? false,
+        delivery_fee_usd: defaults?.delivery_fee_usd ?? 0,
+        delivery_notes: defaults?.delivery_notes || '',
+      });
+      setIsBrandSlugEdited(true);
+    } else {
+      setBrandForm({
+        name: '',
+        slug: '',
+        payment_wallet_address: user?.walletAddress || '',
+        support_email: user?.email || '',
+        whatsapp: '',
+        instagram: '',
+        twitter: '',
+        pickup_name: '',
+        pickup_address: '',
+        pickup_city: '',
+        pickup_country: '',
+        pickup_instructions: 'Please present your digital passport reference upon collection.',
+        allows_delivery: false,
+        delivery_fee_usd: 0,
+        delivery_notes: '',
+      });
+      setIsBrandSlugEdited(false);
+    }
+    setBrandModalMode(mode);
+  };
+
+  const handleSaveBrandProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = brandForm.name.trim();
+    const slug = (brandForm.slug.trim() || slugify(name)).toLowerCase();
+    const payoutWallet = brandForm.payment_wallet_address.trim() || user?.walletAddress || '';
+
+    if (!name) {
+      showToast('Brand Name Required', 'Please enter your brand or studio name.');
+      return;
+    }
+    if (!slug || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+      showToast('Invalid Handle', 'Brand handle must be lowercase letters, numbers, and hyphens.');
+      return;
+    }
+    if (!payoutWallet || payoutWallet.length < 32 || payoutWallet.length > 44) {
+      showToast('Invalid Wallet', 'Please enter a valid Solana payout wallet address.');
+      return;
+    }
+
+    setIsSavingBrand(true);
+    try {
+      let savedBrand: backendApi.Brand;
+      if (brandModalMode === 'edit' && selectedBrand) {
+        const res = await backendApi.updateBrand(selectedBrand.id, {
+          name,
+          payment_wallet_address: payoutWallet,
+        });
+        savedBrand = res.brand;
+        setBrands(prev => prev.map(b => (b.id === savedBrand.id ? savedBrand : b)));
+      } else {
+        const res = await backendApi.createBrand({
+          name,
+          slug,
+          payment_wallet_address: payoutWallet,
+        });
+        savedBrand = res.brand;
+        setBrands(prev => [savedBrand, ...prev.filter(b => b.id !== savedBrand.id)]);
+      }
+
+      if (brandForm.support_email.trim() && !user?.email) {
+        backendApi.saveUserEmail(brandForm.support_email.trim()).catch(() => {});
+      }
+
+      const profileData = {
+        instagram: brandForm.instagram.trim(),
+        twitter: brandForm.twitter.trim(),
+        whatsapp: brandForm.whatsapp.trim(),
+        support_email: brandForm.support_email.trim(),
+        pickup_name: brandForm.pickup_name.trim(),
+        pickup_address: brandForm.pickup_address.trim(),
+        pickup_city: brandForm.pickup_city.trim(),
+        pickup_country: brandForm.pickup_country.trim(),
+        pickup_instructions: brandForm.pickup_instructions.trim(),
+        allows_delivery: Boolean(brandForm.allows_delivery),
+        delivery_fee_usd: Number(brandForm.delivery_fee_usd) || 0,
+        delivery_notes: brandForm.delivery_notes.trim(),
+      };
+
+      saveCreatorBrandProfile(savedBrand.id, profileData);
+      setSelectedBrand(savedBrand);
+
+      // Immediately pre-populate current new-drop form if not editing an existing drop
+      if (!isEditingExisting) {
+        setEditionForm(prev => ({
+          ...prev,
+          instagram: profileData.instagram,
+          twitter: profileData.twitter,
+          whatsapp: profileData.whatsapp,
+          support_email: profileData.support_email,
+          allows_delivery: profileData.allows_delivery,
+          delivery_fee_usd: profileData.delivery_fee_usd,
+          delivery_notes: profileData.delivery_notes,
+        }));
+        setBatchForm(prev => ({
+          ...prev,
+          pickup_name: profileData.pickup_name,
+          pickup_address: profileData.pickup_address,
+          pickup_city: profileData.pickup_city,
+          pickup_country: profileData.pickup_country,
+          pickup_instructions: profileData.pickup_instructions || prev.pickup_instructions,
+        }));
+        setHasAutoFilledDefaults(true);
+      }
+
+      setBrandModalMode(null);
+      showToast(
+        brandModalMode === 'edit' ? '✓ Brand Profile Updated' : '✓ Creator Account Registered',
+        brandModalMode === 'edit'
+          ? 'Your saved brand details will auto-fill future drops.'
+          : `${savedBrand.name} is registered and ready to launch drops.`
+      );
+    } catch (err: any) {
+      console.error('Save brand profile failed:', err);
+      showToast('✗ Registration Failed', err?.message || 'Could not save brand profile.');
+    } finally {
+      setIsSavingBrand(false);
+    }
+  };
 
   // Ensure the creator has an active, valid brand in Supabase brand_memberships
   const ensureValidBrand = async (): Promise<backendApi.Brand | null> => {
@@ -189,26 +401,8 @@ export default function CreatorStudioPage() {
       }
     } catch (_) {}
 
-    // Auto-provision brand for this creator
-    try {
-      const shortWallet = user.walletAddress.slice(0, 6).toLowerCase();
-      const brandName = 'Circuit Atelier Studio';
-      const baseSlug = 'circuit-atelier';
-      const slug = `${baseSlug}-${shortWallet}`;
-
-      const created = await backendApi.createBrand({
-        name: brandName,
-        slug,
-        payment_wallet_address: user.walletAddress,
-      });
-      if (created?.brand && uuidPattern.test(created.brand.id)) {
-        setSelectedBrand(created.brand);
-        setBrands(prev => [created.brand, ...prev.filter(b => b.id !== created.brand.id)]);
-        return created.brand;
-      }
-    } catch (err) {
-      console.error('Failed to provision atelier brand:', err);
-    }
+    // If no registered brand exists yet, prompt the creator registration modal
+    openBrandModal('create');
     return null;
   };
 
@@ -226,38 +420,18 @@ export default function CreatorStudioPage() {
       }).catch(() => {});
       try {
         const brandsRes = await backendApi.getMyBrands().catch(() => ({ brands: [] }));
-        let userBrands = brandsRes.brands || [];
+        const userBrands = brandsRes.brands || [];
 
         const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        let validBrand = userBrands.find(b => uuidPattern.test(b.id));
-
-        // If this creator doesn't have a brand registered yet, automatically create one in Supabase
-        if (!validBrand && user?.walletAddress) {
-          try {
-            const shortWallet = user.walletAddress.slice(0, 6).toLowerCase();
-            const brandName = 'Circuit Atelier Studio';
-            const baseSlug = 'circuit-atelier';
-            const slug = `${baseSlug}-${shortWallet}`;
-
-            const createdRes = await backendApi.createBrand({
-              name: brandName,
-              slug,
-              payment_wallet_address: user.walletAddress,
-            });
-            if (createdRes?.brand && uuidPattern.test(createdRes.brand.id)) {
-              validBrand = createdRes.brand;
-              userBrands = [createdRes.brand, ...userBrands];
-            }
-          } catch (createErr) {
-            console.warn('Auto-create brand notice:', createErr);
-          }
-        }
+        const validBrand = selectedBrand && userBrands.some(b => b.id === selectedBrand.id)
+          ? userBrands.find(b => b.id === selectedBrand.id)
+          : userBrands.find(b => uuidPattern.test(b.id)) || userBrands[0];
 
         setBrands(userBrands);
         if (validBrand) {
           setSelectedBrand(validBrand);
-        } else if (userBrands.length > 0) {
-          setSelectedBrand(userBrands[0]);
+        } else {
+          setSelectedBrand(null);
         }
 
         // Fetch managed editions
@@ -324,6 +498,9 @@ export default function CreatorStudioPage() {
           } catch (_) {}
         }
         setBatchesByEdition(batchMap);
+        if (!isEditingExisting && validBrand) {
+          applyCreatorDefaults(validBrand.id, managedList, batchMap);
+        }
       } catch (err) {
         console.error('Error loading creator studio data:', err);
       } finally {
@@ -378,6 +555,10 @@ export default function CreatorStudioPage() {
     setEditingBatchId(null);
     setEditingBatchRevision(1);
     setIsSlugManuallyEdited(false);
+
+    const defaults = resolveCreatorDefaults(selectedBrand?.id, editions, batchesByEdition);
+    setHasAutoFilledDefaults(Boolean(defaults));
+
     setEditionForm({
       id: '',
       name: '',
@@ -387,19 +568,34 @@ export default function CreatorStudioPage() {
       fabric: '',
       headpiece: '',
       embroidery: '',
-      instagram: '',
-      twitter: '',
-      whatsapp: '',
-      support_email: '',
-      allows_delivery: false,
-      delivery_fee_usd: 0,
-      delivery_notes: '',
+      instagram: defaults?.instagram || '',
+      twitter: defaults?.twitter || '',
+      whatsapp: defaults?.whatsapp || '',
+      support_email: defaults?.support_email || '',
+      allows_delivery: defaults?.allows_delivery ?? false,
+      delivery_fee_usd: defaults?.delivery_fee_usd ?? 0,
+      delivery_notes: defaults?.delivery_notes || '',
       images: [],
     });
+
+    if (defaults) {
+      setBatchForm(prev => ({
+        ...prev,
+        pickup_name: defaults.pickup_name || prev.pickup_name,
+        pickup_address: defaults.pickup_address || prev.pickup_address,
+        pickup_city: defaults.pickup_city || prev.pickup_city,
+        pickup_country: defaults.pickup_country || prev.pickup_country,
+        pickup_instructions: defaults.pickup_instructions || prev.pickup_instructions,
+      }));
+    }
+
     setDeployResult(null);
     setWizardStep(1);
     setActiveTab('wizard');
-    showToast('New Drop Form Ready', 'Configure your fresh collection pieces.');
+    showToast(
+      'New Drop Form Ready',
+      defaults ? 'Brand & collection details auto-filled from your saved profile.' : 'Configure your fresh collection pieces.'
+    );
   };
 
   const handleEditEdition = (ed: any) => {
@@ -527,6 +723,38 @@ export default function CreatorStudioPage() {
 
       // Persist doorstep delivery configuration
       saveEditionDeliveryOption(slugId, {
+        allows_delivery: Boolean(editionForm.allows_delivery),
+        delivery_fee_usd: Number(editionForm.delivery_fee_usd) || 0,
+        delivery_notes: editionForm.delivery_notes.trim(),
+      });
+
+      // Remember brand/creator defaults for future drops
+      saveCreatorBrandProfile(activeBrand.id, {
+        instagram: editionForm.instagram.trim(),
+        twitter: editionForm.twitter.trim(),
+        whatsapp: editionForm.whatsapp.trim(),
+        support_email: editionForm.support_email.trim(),
+        pickup_name: batchForm.pickup_name.trim(),
+        pickup_address: batchForm.pickup_address.trim(),
+        pickup_city: batchForm.pickup_city.trim(),
+        pickup_country: batchForm.pickup_country.trim(),
+        pickup_instructions: batchForm.pickup_instructions.trim(),
+        allows_delivery: Boolean(editionForm.allows_delivery),
+        delivery_fee_usd: Number(editionForm.delivery_fee_usd) || 0,
+        delivery_notes: editionForm.delivery_notes.trim(),
+      });
+
+      // Remember brand/creator defaults for future drops
+      saveCreatorBrandProfile(activeBrand.id, {
+        instagram: editionForm.instagram.trim(),
+        twitter: editionForm.twitter.trim(),
+        whatsapp: editionForm.whatsapp.trim(),
+        support_email: editionForm.support_email.trim(),
+        pickup_name: batchForm.pickup_name.trim(),
+        pickup_address: batchForm.pickup_address.trim(),
+        pickup_city: batchForm.pickup_city.trim(),
+        pickup_country: batchForm.pickup_country.trim(),
+        pickup_instructions: batchForm.pickup_instructions.trim(),
         allows_delivery: Boolean(editionForm.allows_delivery),
         delivery_fee_usd: Number(editionForm.delivery_fee_usd) || 0,
         delivery_notes: editionForm.delivery_notes.trim(),
@@ -821,6 +1049,22 @@ export default function CreatorStudioPage() {
         delivery_notes: editionForm.delivery_notes.trim(),
       });
 
+      // Remember brand/creator defaults for future drops
+      saveCreatorBrandProfile(activeBrand.id, {
+        instagram: editionForm.instagram.trim(),
+        twitter: editionForm.twitter.trim(),
+        whatsapp: editionForm.whatsapp.trim(),
+        support_email: editionForm.support_email.trim(),
+        pickup_name: batchForm.pickup_name.trim(),
+        pickup_address: batchForm.pickup_address.trim(),
+        pickup_city: batchForm.pickup_city.trim(),
+        pickup_country: batchForm.pickup_country.trim(),
+        pickup_instructions: batchForm.pickup_instructions.trim(),
+        allows_delivery: Boolean(editionForm.allows_delivery),
+        delivery_fee_usd: Number(editionForm.delivery_fee_usd) || 0,
+        delivery_notes: editionForm.delivery_notes.trim(),
+      });
+
       // Step B: Upload Media
       setDeployStepText('2/4 Synchronizing lookbook photography...');
       for (const img of editionForm.images) {
@@ -1066,31 +1310,55 @@ export default function CreatorStudioPage() {
             </p>
           </div>
 
-          {/* Active Brand Selector & Wallet Pill */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Active Brand Selector, Profile Controls & Wallet Pill */}
+          <div className="flex flex-wrap items-center gap-2.5">
             {brands.length > 0 ? (
-              <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-1.5 pl-3">
-                <span className="text-[0.65rem] uppercase font-bold text-[#666] font-mono">Brand:</span>
-                <select
-                  value={selectedBrand?.id}
-                  onChange={(e) => {
-                    const b = brands.find(item => item.id === e.target.value);
-                    if (b) setSelectedBrand(b);
-                  }}
-                  className="bg-transparent text-xs text-white font-bold font-mono focus:outline-none cursor-pointer pr-2"
+              <>
+                <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-1.5 pl-3">
+                  <span className="text-[0.65rem] uppercase font-bold text-[#666] font-mono">Brand:</span>
+                  <select
+                    value={selectedBrand?.id || ''}
+                    onChange={(e) => {
+                      const b = brands.find(item => item.id === e.target.value);
+                      if (b) {
+                        setSelectedBrand(b);
+                        if (!isEditingExisting) {
+                          applyCreatorDefaults(b.id, editions, batchesByEdition);
+                        }
+                      }
+                    }}
+                    className="bg-transparent text-xs text-white font-bold font-mono focus:outline-none cursor-pointer pr-2"
+                  >
+                    {brands.map(b => (
+                      <option key={b.id} value={b.id} className="bg-black text-white">
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openBrandModal('edit')}
+                  className="px-3 py-1.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-mono text-white/80 hover:text-white transition-colors"
                 >
-                  {brands.map(b => (
-                    <option key={b.id} value={b.id} className="bg-black text-white">
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  ✎ Edit Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openBrandModal('create')}
+                  className="px-3 py-1.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-mono text-white/80 hover:text-white transition-colors"
+                >
+                  + New Brand
+                </button>
+              </>
             ) : (
-              <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 rounded-2xl p-1.5 px-3">
-                <span className="text-[0.65rem] uppercase font-bold text-[#666] font-mono">My Studio:</span>
-                <span className="text-xs font-mono text-white font-bold">{selectedBrand?.name || 'Circuit Atelier Studio'}</span>
-              </div>
+              <button
+                type="button"
+                onClick={() => openBrandModal('create')}
+                className="px-3.5 py-1.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-xs font-mono text-emerald-300 font-bold transition-colors"
+              >
+                + Register Creator Brand
+              </button>
             )}
 
             <div className="px-3 py-1.5 rounded-2xl bg-white/[0.03] border border-white/10 text-xs font-mono text-emerald-400 flex items-center gap-1.5">
@@ -1099,6 +1367,30 @@ export default function CreatorStudioPage() {
             </div>
           </div>
         </div>
+
+        {/* Creator Account Onboarding Banner (shown when signed-in creator has no registered brand yet) */}
+        {!loading && brands.length === 0 && (
+          <div className="mb-8 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-500/[0.08] via-white/[0.03] to-transparent border border-emerald-500/25 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fade-in">
+            <div className="flex flex-col gap-2 max-w-2xl">
+              <span className="text-[0.65rem] font-mono font-bold uppercase tracking-[0.2em] text-emerald-400">
+                Step 0 — Creator Registration
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
+                Register Your Brand Profile
+              </h2>
+              <p className="text-xs sm:text-sm text-[#aaa] leading-relaxed">
+                Save your brand name, payout wallet, support contacts, and default collection point once. Every new drop you create will automatically pre-fill these details (and you can still edit them per drop).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => openBrandModal('create')}
+              className="btn-circuit px-6 py-3.5 text-xs font-bold uppercase tracking-wider shrink-0"
+            >
+              <span>Complete Brand Registration →</span>
+            </button>
+          </div>
+        )}
 
         {/* Studio Navigation Tabs */}
         <div className="flex gap-2 border-b border-white/[0.06] pb-4 mb-8 overflow-x-auto no-scrollbar">
@@ -1188,9 +1480,16 @@ export default function CreatorStudioPage() {
             {/* STEP 1: GARMENT DESIGN */}
             {wizardStep === 1 && (
               <div className="card-glass p-8 border-white/10 rounded-3xl flex flex-col gap-6 animate-fade-in">
-                <div className="border-b border-white/10 pb-4">
-                  <h2 className="text-xl font-bold">Step 1: Your Piece</h2>
-                  <p className="text-xs text-[#888] mt-1">Add your garment details and photos.</p>
+                <div className="border-b border-white/10 pb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold">Step 1: Your Piece</h2>
+                    <p className="text-xs text-[#888] mt-1">Add your garment details and photos.</p>
+                  </div>
+                  {hasAutoFilledDefaults && !isEditingExisting && (
+                    <span className="text-[0.65rem] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25">
+                      ✓ Brand details auto-filled (editable)
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1777,12 +2076,19 @@ export default function CreatorStudioPage() {
 
                 {/* Collection Point Details */}
                 <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col gap-4">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
-                      <circle cx="12" cy="9" r="2.5" />
-                    </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-white">Collection Point</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                      <span className="text-xs font-bold uppercase tracking-wider text-white">Collection Point</span>
+                    </div>
+                    {hasAutoFilledDefaults && !isEditingExisting && (
+                      <span className="text-[0.6rem] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25">
+                        ✓ Auto-filled (editable)
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2502,6 +2808,190 @@ export default function CreatorStudioPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Creator Account Registration & Editable Brand Profile Modal */}
+        {brandModalMode && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+            <form
+              onSubmit={handleSaveBrandProfile}
+              className="card-glass p-6 sm:p-8 max-w-2xl w-full rounded-3xl border-white/20 bg-[#0E0E0E]/95 shadow-2xl flex flex-col gap-5 my-8"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+                <div>
+                  <span className="text-[0.6rem] font-mono uppercase tracking-[0.2em] text-emerald-400 font-bold">
+                    {brandModalMode === 'edit' ? 'Creator Brand Profile' : 'Creator Registration'}
+                  </span>
+                  <h3 className="text-xl font-bold text-white mt-1">
+                    {brandModalMode === 'edit' ? 'Edit Saved Brand Details' : 'Register Your Brand Account'}
+                  </h3>
+                  <p className="text-xs text-[#888] mt-1">
+                    These details automatically pre-fill every new drop you create and remain editable per drop.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBrandModalMode(null)}
+                  className="text-[#666] hover:text-white text-sm px-2 py-1"
+                  aria-label="Close modal"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.65rem] font-mono uppercase text-[#aaa]">
+                    Brand / Studio Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Lagos Atelier"
+                    value={brandForm.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBrandForm(prev => ({
+                        ...prev,
+                        name: val,
+                        slug: !isBrandSlugEdited && brandModalMode === 'create' ? slugify(val) : prev.slug,
+                      }));
+                    }}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.65rem] font-mono uppercase text-[#aaa]">
+                    Brand Handle (Slug) <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    disabled={brandModalMode === 'edit'}
+                    placeholder="lagos-atelier"
+                    value={brandForm.slug}
+                    onChange={(e) => {
+                      setIsBrandSlugEdited(true);
+                      setBrandForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }));
+                    }}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30 disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.65rem] font-mono uppercase text-[#aaa]">
+                  Payout Wallet Address (Solana) <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={brandForm.payment_wallet_address}
+                  onChange={(e) => setBrandForm(prev => ({ ...prev, payment_wallet_address: e.target.value }))}
+                  className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                />
+              </div>
+
+              <div className="border-t border-white/10 pt-4">
+                <span className="text-[0.65rem] font-mono uppercase tracking-wider text-white/80 font-bold block mb-3">
+                  Default Contact & Social Channels (Auto-filled on new drops)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="email"
+                    placeholder="Support Email (e.g. care@atelier.com)"
+                    value={brandForm.support_email}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, support_email: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                  />
+                  <input
+                    type="text"
+                    placeholder="WhatsApp (e.g. +234 800 000 0000)"
+                    value={brandForm.whatsapp}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Instagram (@handle or URL)"
+                    value={brandForm.instagram}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, instagram: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Twitter / X (@handle or URL)"
+                    value={brandForm.twitter}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, twitter: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-white/10 pt-4">
+                <span className="text-[0.65rem] font-mono uppercase tracking-wider text-white/80 font-bold block mb-3">
+                  Default Collection Point (Auto-filled on new drops)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Location Name"
+                    value={brandForm.pickup_name}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, pickup_name: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                  <input
+                    type="text"
+                    placeholder="City"
+                    value={brandForm.pickup_city}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, pickup_city: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Country"
+                    value={brandForm.pickup_country}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, pickup_country: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Street Address"
+                    value={brandForm.pickup_address}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, pickup_address: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Collection Instructions for Buyers"
+                    value={brandForm.pickup_instructions}
+                    onChange={(e) => setBrandForm(prev => ({ ...prev, pickup_instructions: e.target.value }))}
+                    className="bg-[#0D0D0D] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setBrandModalMode(null)}
+                  className="px-5 py-2.5 rounded-xl text-xs font-mono uppercase tracking-wider text-[#aaa] hover:text-white border border-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingBrand}
+                  className="btn-circuit px-6 py-2.5 text-xs font-bold uppercase tracking-wider"
+                >
+                  <span>{isSavingBrand ? 'Saving...' : brandModalMode === 'edit' ? 'Save Brand Profile' : 'Register Brand →'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </main>

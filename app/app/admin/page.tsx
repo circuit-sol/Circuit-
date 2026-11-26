@@ -13,6 +13,7 @@ import {
 } from '@/lib/db';
 import * as backendApi from '@/lib/backendApi';
 import { executeBatchInitialize } from '@/lib/solana-service';
+import { Transaction } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useAuth } from '@/lib/auth-context';
 import { solscanTxUrl, formatSerialNumber } from '@/lib/utils';
@@ -89,13 +90,33 @@ export default function AdminDashboard() {
   const { signTransaction } = useWallet();
   const router = useRouter();
 
-  // Navigation: 5 Architecture Decision Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'curation' | 'orders' | 'disputes' | 'broadcasts'>('overview');
+  // Navigation: 4 Spec Modules + Overview + Orders + Broadcasts
+  const [activeTab, setActiveTab] = useState<'overview' | 'brands' | 'collections' | 'disputes' | 'payments' | 'curation' | 'orders' | 'broadcasts'>('overview');
+
+  // Spec Module States
+  const [brandSearch, setBrandSearch] = useState('');
+  const [selectedBrandDetail, setSelectedBrandDetail] = useState<backendApi.Brand | null>(null);
+  const [collectionStatusFilter, setCollectionStatusFilter] = useState<'all' | 'open' | 'closed' | 'fulfilled'>('all');
+  const [selectedCollectionDetailId, setSelectedCollectionDetailId] = useState<string | null>(null);
+  const [fulfilledDropIds, setFulfilledDropIds] = useState<string[]>([]);
+  const [selectedDisputeCollectionId, setSelectedDisputeCollectionId] = useState<string | null>(null);
+  const [escrowByBatchId, setEscrowByBatchId] = useState<Record<string, {
+    frozen: boolean;
+    advance_claimed: boolean;
+    balance_claimed: boolean;
+    advance_eligible_at?: string;
+    balance_eligible_at?: string;
+    total_deposited?: string;
+    total_seller_paid?: string;
+  }>>({});
+  const [togglingFreezeBatchId, setTogglingFreezeBatchId] = useState<string | null>(null);
 
   // Core Data States
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  // TEMP: Tracks when /api/chain/status is unavailable so the UI shell renders for testing; remove when switching to fail-closed.
+  const [isChainFallbackMode, setIsChainFallbackMode] = useState(false);
   const [liveSolPrice, setLiveSolPrice] = useState<number>(DEFAULT_SOL_MARKET_PRICE);
   const [orders, setOrders] = useState<Order[]>([]);
   const [editions, setEditions] = useState<Edition[]>([]);
@@ -160,14 +181,23 @@ export default function AdminDashboard() {
         console.warn('Chain status notice:', chainErr);
       }
 
-      // 2. Fetch Brands
+      // 2. Fetch Platform-Wide Admin Overview (Brands, Editions, Batches, Orders, Reports)
+      let overviewData: Awaited<ReturnType<typeof backendApi.getAdminOverview>> | null = null;
       try {
-        const brandsRes = await backendApi.getMyBrands();
-        if (brandsRes?.brands && Array.isArray(brandsRes.brands)) {
-          setBrands(brandsRes.brands);
+        overviewData = await backendApi.getAdminOverview();
+        if (overviewData?.brands) {
+          setBrands(overviewData.brands);
         }
-      } catch (brandErr) {
-        console.warn('Could not fetch brands:', brandErr);
+      } catch (overviewErr) {
+        console.warn('Admin overview endpoint unavailable, falling back to scoped endpoints:', overviewErr);
+        try {
+          const brandsRes = await backendApi.getMyBrands();
+          if (brandsRes?.brands && Array.isArray(brandsRes.brands)) {
+            setBrands(brandsRes.brands);
+          }
+        } catch (brandErr) {
+          console.warn('Could not fetch brands:', brandErr);
+        }
       }
 
       // 3. Multi-Source Orders Aggregation (DB, Chain Orders, Batch Orders, and Local Storage)
@@ -203,13 +233,21 @@ export default function AdminDashboard() {
         }
       } catch (_) {}
 
-      // Source B: Chain orders for authenticated wallet
-      try {
-        const chainRes = await backendApi.getMyChainOrders();
-        if (chainRes?.orders && Array.isArray(chainRes.orders)) {
-          chainRes.orders.forEach((o) => addAdminOrder(o));
-        }
-      } catch (_) {}
+      // Source B: Platform chain orders from admin overview (or scoped fallback)
+      if (overviewData?.orders && Array.isArray(overviewData.orders)) {
+        const batchToEdition = new Map<string, string>();
+        (overviewData.batches || []).forEach((b) => {
+          if (b.id && b.edition_id) batchToEdition.set(b.id, b.edition_id);
+        });
+        overviewData.orders.forEach((o) => addAdminOrder(o, batchToEdition.get(o.batch_id)));
+      } else {
+        try {
+          const chainRes = await backendApi.getMyChainOrders();
+          if (chainRes?.orders && Array.isArray(chainRes.orders)) {
+            chainRes.orders.forEach((o) => addAdminOrder(o));
+          }
+        } catch (_) {}
+      }
 
       // Source C: Local storage cached receipts
       if (typeof window !== 'undefined') {
@@ -221,26 +259,53 @@ export default function AdminDashboard() {
         } catch (_) {}
       }
 
-      // 4. Fetch Editions & Batches, and pull orders for each active batch
-      const editionsList = await getEditions(false);
+      // 4. Fetch Editions & Batches (prefer platform-wide admin overview)
+      const editionsList = overviewData?.editions?.length ? overviewData.editions : await getEditions(false);
       setEditions(editionsList || []);
 
-      for (const ed of editionsList || []) {
-        try {
-          const bRes = await backendApi.getMyBatches({ editionId: ed.id });
-          if (bRes?.batches) {
-            setBatchesByEdition(prev => ({ ...prev, [ed.id]: bRes.batches }));
-            for (const b of bRes.batches) {
-              try {
-                const oRes = await backendApi.getBatchOrders(b.id);
-                if (oRes?.orders && Array.isArray(oRes.orders)) {
-                  oRes.orders.forEach((o) => addAdminOrder(o, ed.id));
-                }
-              } catch (_) {}
+      if (overviewData?.batches && Array.isArray(overviewData.batches)) {
+        const grouped: Record<string, backendApi.Batch[]> = {};
+        overviewData.batches.forEach((b) => {
+          if (!grouped[b.edition_id]) grouped[b.edition_id] = [];
+          grouped[b.edition_id].push(b);
+        });
+        setBatchesByEdition(grouped);
+
+        // Fetch live escrow state for initialized batches (for Money / Payment Oversight)
+        const initializedBatches = overviewData.batches.filter((b) => b.chain_status === 'initialized');
+        const escrowEntries = await Promise.all(
+          initializedBatches.slice(0, 25).map(async (b) => {
+            try {
+              const eRes = await backendApi.getBatchEscrow(b.id);
+              return [b.id, eRes.escrow] as const;
+            } catch {
+              return null;
             }
+          })
+        );
+        const nextEscrow: typeof escrowByBatchId = {};
+        escrowEntries.forEach((entry) => {
+          if (entry) nextEscrow[entry[0]] = entry[1];
+        });
+        setEscrowByBatchId(nextEscrow);
+      } else {
+        for (const ed of editionsList || []) {
+          try {
+            const bRes = await backendApi.getMyBatches({ editionId: ed.id });
+            if (bRes?.batches) {
+              setBatchesByEdition(prev => ({ ...prev, [ed.id]: bRes.batches }));
+              for (const b of bRes.batches) {
+                try {
+                  const oRes = await backendApi.getBatchOrders(b.id);
+                  if (oRes?.orders && Array.isArray(oRes.orders)) {
+                    oRes.orders.forEach((o) => addAdminOrder(o, ed.id));
+                  }
+                } catch (_) {}
+              }
+            }
+          } catch (e) {
+            console.warn(`Could not load batches for ${ed.id}:`, e);
           }
-        } catch (e) {
-          console.warn(`Could not load batches for ${ed.id}:`, e);
         }
       }
 
@@ -265,6 +330,8 @@ export default function AdminDashboard() {
           setApprovedDropIds(savedApprovals);
           const savedSuspensions = JSON.parse(localStorage.getItem('circuit_suspended_brands') || '[]');
           setSuspendedBrandIds(savedSuspensions);
+          const savedFulfilled = JSON.parse(localStorage.getItem('circuit_fulfilled_drops') || '[]');
+          setFulfilledDropIds(savedFulfilled);
         } catch (_) {}
       }
 
@@ -276,24 +343,36 @@ export default function AdminDashboard() {
         } catch (_) {}
       }
 
-      try {
-        const repRes = await backendApi.getAdminReports();
-        if (repRes?.reports && Array.isArray(repRes.reports)) {
-          const formatted: DisputeItem[] = repRes.reports.map((r, i) => ({
-            id: `disp-${i + 1}`,
+      const orderToDropMap = new Map<string, string>();
+      ordersList.forEach((o) => {
+        if (o.id && o.drop_id) orderToDropMap.set(o.id, o.drop_id);
+      });
+
+      const rawReports = overviewData?.reports && Array.isArray(overviewData.reports)
+        ? overviewData.reports
+        : await backendApi.getAdminReports().then((r) => r?.reports).catch(() => null);
+
+      if (rawReports && Array.isArray(rawReports)) {
+        const savedLocal = typeof window !== 'undefined'
+          ? JSON.parse(localStorage.getItem('circuit_disputes_list') || '[]') as DisputeItem[]
+          : [];
+        const localByOrder = new Map(savedLocal.map((d) => [d.order_id, d]));
+
+        const formatted: DisputeItem[] = rawReports.map((r, i) => {
+          const existingLocal = localByOrder.get(r.order_id);
+          return {
+            id: existingLocal?.id || `disp-${i + 1}`,
             order_id: r.order_id,
             user_email: r.user_id || 'buyer@circuit.sol',
-            drop_id: (r as any).drop_id || (r as any).batch_id || '',
+            drop_id: existingLocal?.drop_id || (r as any).drop_id || orderToDropMap.get(r.order_id) || '',
             reason: r.message,
-            status: 'active',
-            is_frozen: true,
+            status: existingLocal?.status || 'active',
+            is_frozen: existingLocal?.is_frozen ?? true,
             created_at: r.created_at || new Date().toISOString(),
-          }));
-          setDisputes(formatted);
-        } else {
-          loadFallbackDisputes();
-        }
-      } catch (e) {
+          };
+        });
+        setDisputes(formatted);
+      } else {
         loadFallbackDisputes();
       }
 
@@ -341,10 +420,11 @@ export default function AdminDashboard() {
         const chainRes = await backendApi.getChainStatus().catch(() => null);
         if (isCancelled) return;
 
-        if (chainRes) {
+        if (chainRes && chainRes.admin_wallet) {
           setChainStatus(chainRes);
+          setIsChainFallbackMode(false);
           const adminKey = chainRes.admin_wallet;
-          if (adminKey && user.walletAddress !== adminKey) {
+          if (user.walletAddress !== adminKey) {
             setIsAuthorized(false);
             setAuthError(
               `Connected keypair (${user.walletAddress.slice(0, 4)}...${user.walletAddress.slice(-4)}) does not match the designated Circuit Admin Authority (${adminKey.slice(0, 4)}...${adminKey.slice(-4)}).`
@@ -352,6 +432,9 @@ export default function AdminDashboard() {
             setLoading(false);
             return;
           }
+        } else {
+          // TEMP: Fail-open UI shell for testing when /api/chain/status is unreachable; remove for fail-closed production.
+          setIsChainFallbackMode(true);
         }
 
         setIsAuthorized(true);
@@ -599,6 +682,80 @@ export default function AdminDashboard() {
     window.print();
   };
 
+  // Collection Management Status (Open vs Closed vs Fulfilled — strictly separate)
+  const getCollectionLifecycleStatus = (ed: Edition): 'open' | 'closed' | 'fulfilled' => {
+    const edOrders = orders.filter((o) => o.drop_id === ed.id && o.status !== 'cancelled');
+    const allOrdersDelivered = edOrders.length > 0 && edOrders.every((o) => o.status === 'delivered');
+    if (fulfilledDropIds.includes(ed.id) || allOrdersDelivered) {
+      return 'fulfilled';
+    }
+    const edBatches = batchesByEdition[ed.id] || [];
+    const nowMs = Date.now();
+    const hasOpenBatch = edBatches.some(
+      (b) => b.is_active && b.chain_status === 'initialized' && new Date(b.closes_at).getTime() > nowMs
+    );
+    if (hasOpenBatch) return 'open';
+    const hasClosedBatch = edBatches.some((b) => new Date(b.closes_at).getTime() <= nowMs);
+    if (hasClosedBatch || ed.is_active === false) return 'closed';
+    return 'open';
+  };
+
+  const toggleDropFulfilled = (editionId: string) => {
+    const isCurrentlyFulfilled = fulfilledDropIds.includes(editionId);
+    const next = isCurrentlyFulfilled
+      ? fulfilledDropIds.filter((id) => id !== editionId)
+      : [...fulfilledDropIds, editionId];
+    setFulfilledDropIds(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('circuit_fulfilled_drops', JSON.stringify(next));
+    }
+    showToast(
+      isCurrentlyFulfilled ? 'Marked Closed' : '✓ Marked Fulfilled',
+      isCurrentlyFulfilled
+        ? 'Collection returned to Closed status.'
+        : 'Collection marked as Fulfilled.'
+    );
+  };
+
+  // Money / Payment Oversight: On-chain Freeze / Unfreeze 70% Escrow
+  const handleEscrowFreezeToggle = async (batchId: string, freeze: boolean) => {
+    if (!signTransaction) {
+      showToast('Wallet Required', 'Connect the designated Admin Authority wallet to sign freeze/unfreeze.');
+      return;
+    }
+    setTogglingFreezeBatchId(batchId);
+    try {
+      const intent = await backendApi.prepareBatchAction(batchId, {
+        action: freeze ? 'freeze' : 'unfreeze',
+        reason: freeze ? 'Admin payment hold activated via Oversight' : 'Admin payment hold lifted via Oversight',
+      });
+      const tx = Transaction.from(Buffer.from(intent.transaction_base64, 'base64'));
+      const signed = await signTransaction(tx);
+      const signedBase64 = Buffer.from(signed.serialize()).toString('base64');
+      const sub = await backendApi.submitChainIntent(intent.intent_id, signedBase64);
+      await backendApi.confirmChainIntent(intent.intent_id, sub.signature);
+
+      setEscrowByBatchId((prev) => ({
+        ...prev,
+        [batchId]: {
+          ...(prev[batchId] || { advance_claimed: false, balance_claimed: false }),
+          frozen: freeze,
+        },
+      }));
+      showToast(
+        freeze ? '🥶 Escrow Frozen' : '🔓 Escrow Unfrozen',
+        freeze
+          ? '70% payment release is now frozen on-chain.'
+          : '70% payment hold removed on-chain.'
+      );
+    } catch (err: any) {
+      console.error('Escrow freeze toggle failed:', err);
+      showToast('✗ Action Failed', err?.message || 'Could not update escrow freeze state.');
+    } finally {
+      setTogglingFreezeBatchId(null);
+    }
+  };
+
   // Orders Filtering
   const activeOrdersForTab = selectedOrdersEditionId === null || selectedOrdersEditionId === 'all'
     ? orders
@@ -688,6 +845,23 @@ export default function AdminDashboard() {
 
       <main className="section-container pt-32 pb-24 print:p-0 print:pt-0">
 
+        {/* TEMP: Fail-open UI shell notice for testing (remove when switching /admin to strict fail-closed) */}
+        {isChainFallbackMode && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-xs font-mono text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
+            <div className="space-y-1">
+              <span className="font-bold uppercase tracking-wider text-amber-400 block">
+                ⚠ Temporary Testing Mode — Unverified UI Shell (Fail-Open)
+              </span>
+              <p className="text-amber-100/80 leading-relaxed">
+                <code className="text-white">/api/chain/status</code> is currently unreachable or did not return an on-chain <code className="text-white">admin_wallet</code>. This UI shell is temporarily rendered for testing; backend <code className="text-white">/api/chain/admin/*</code> routes still enforce <code className="text-white">CircuitConfig.adminAuthority</code>. This fallback will be removed when switching to fail-closed gating.
+              </p>
+            </div>
+            <span className="text-[0.6rem] uppercase px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 shrink-0 self-start sm:self-center">
+              TEMP NOTICE
+            </span>
+          </div>
+        )}
+
         {/* ── Protocol Clearance Header ─────────────────────────────────── */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 pb-6 border-b border-white/10 print:hidden">
           <div>
@@ -729,10 +903,17 @@ export default function AdminDashboard() {
         {/* ── Architecture Decisions Tabs ──────────────────────────────── */}
         <div className="flex flex-wrap gap-2 border-b border-white/10 pb-4 mb-10 print:hidden">
           {[
-            { id: 'overview', label: 'Treasury & Oversight', count: null },
-            { id: 'curation', label: 'Drop & Brand Curation', count: editions.length },
+            { id: 'overview', label: 'Overview', count: null },
+            { id: 'brands', label: 'Brand Management', count: brands.length },
+            { id: 'collections', label: 'Collection Management', count: editions.length },
+            {
+              id: 'disputes',
+              label: 'Dispute Tank',
+              count: disputes.filter(d => d.status === 'active' || d.status === 'investigating').length,
+              highlight: true,
+            },
+            { id: 'payments', label: 'Money / Payment Oversight', count: Object.keys(escrowByBatchId).length || allBatches.length },
             { id: 'orders', label: 'Orders & Fulfillment', count: orders.length },
-            { id: 'disputes', label: 'Dispute Mediation', count: disputes.filter(d => d.status === 'active').length, highlight: true },
             { id: 'broadcasts', label: 'Batch Announcements', count: broadcasts.length },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
@@ -770,6 +951,98 @@ export default function AdminDashboard() {
         ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === 'overview' && (
           <div className="space-y-10 animate-fade-in">
+
+            {/* 4 Main Dashboard Features (Circuit Admin Spec) */}
+            {(() => {
+              const openCount = editions.filter((ed) => getCollectionLifecycleStatus(ed) === 'open').length;
+              const closedCount = editions.filter((ed) => getCollectionLifecycleStatus(ed) === 'closed').length;
+              const fulfilledCount = editions.filter((ed) => getCollectionLifecycleStatus(ed) === 'fulfilled').length;
+              const unresolvedDisputes = disputes.filter((d) => d.status === 'active' || d.status === 'investigating').length;
+              const frozenEscrows = Object.values(escrowByBatchId).filter((e) => e.frozen).length;
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('brands')}
+                    className="card-glass p-6 border-white/10 hover:border-white/30 text-left transition-all group"
+                  >
+                    <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#888] mb-2 block font-mono">
+                      Brand Management
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold text-white font-mono">{brands.length}</span>
+                      <span className="text-xs text-[#666] group-hover:text-white transition-colors">Inspect →</span>
+                    </div>
+                    <p className="text-[0.65rem] text-[#888] mt-2 font-mono">
+                      Onboarded brands & profiles
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('collections')}
+                    className="card-glass p-6 border-white/10 hover:border-white/30 text-left transition-all group"
+                  >
+                    <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#888] mb-2 block font-mono">
+                      Collection Management
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold text-white font-mono">{editions.length}</span>
+                      <span className="text-xs text-[#666] group-hover:text-white transition-colors">Inspect →</span>
+                    </div>
+                    <p className="text-[0.65rem] text-[#888] mt-2 font-mono">
+                      <span className="text-emerald-400">{openCount} Open</span> · <span className="text-amber-400">{closedCount} Closed</span> · <span className="text-blue-400">{fulfilledCount} Fulfilled</span>
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('disputes')}
+                    className={`card-glass p-6 text-left transition-all group ${
+                      unresolvedDisputes > 0
+                        ? 'border-red-500/40 bg-red-950/[0.08] hover:border-red-400'
+                        : 'border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#888] mb-2 block font-mono">
+                      Dispute Tank
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold text-white font-mono flex items-center gap-2">
+                        <span>{unresolvedDisputes > 0 ? '🔴' : '🟢'}</span>
+                        <span>{unresolvedDisputes}</span>
+                      </span>
+                      <span className="text-xs text-[#666] group-hover:text-white transition-colors">Resolve →</span>
+                    </div>
+                    <p className="text-[0.65rem] mt-2 font-mono">
+                      {unresolvedDisputes > 0 ? (
+                        <span className="text-red-400 font-bold">Action required — grouped by drop</span>
+                      ) : (
+                        <span className="text-emerald-400">No unresolved disputes</span>
+                      )}
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('payments')}
+                    className="card-glass p-6 border-white/10 hover:border-white/30 text-left transition-all group"
+                  >
+                    <span className="text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#888] mb-2 block font-mono">
+                      Money / Payment Oversight
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-3xl font-bold text-white font-mono">${activeEscrowVolume.toFixed(0)}</span>
+                      <span className="text-xs text-[#666] group-hover:text-white transition-colors">30% / 70% →</span>
+                    </div>
+                    <p className="text-[0.65rem] text-[#888] mt-2 font-mono">
+                      {frozenEscrows > 0 ? `🥶 ${frozenEscrows} frozen hold(s)` : 'Compare 30% & 70% payouts'}
+                    </p>
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Treasury KPI Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -917,6 +1190,470 @@ export default function AdminDashboard() {
 
             </div>
 
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            BRAND MANAGEMENT (Admin Spec §1)
+        ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'brands' && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+              <div>
+                <h2 className="text-xl font-bold text-white">Brand Management ({brands.length})</h2>
+                <p className="text-xs text-[#888] mt-1">
+                  Inspect onboarded brand profiles, payout wallets, collections, and account status.
+                </p>
+              </div>
+              <input
+                type="text"
+                placeholder="Search brands by name, slug, or wallet..."
+                value={brandSearch}
+                onChange={(e) => setBrandSearch(e.target.value)}
+                className="bg-[#0D0D0D] border border-white/10 rounded-xl px-4 py-2 text-xs text-white font-mono w-full md:w-72 focus:outline-none focus:border-white/30"
+              />
+            </div>
+
+            {(() => {
+              const filteredBrands = brands.filter((b) =>
+                b.name.toLowerCase().includes(brandSearch.toLowerCase()) ||
+                b.slug.toLowerCase().includes(brandSearch.toLowerCase()) ||
+                (b.payment_wallet_address || '').toLowerCase().includes(brandSearch.toLowerCase())
+              );
+
+              if (filteredBrands.length === 0) {
+                return (
+                  <div className="card-glass p-12 text-center border-dashed border-white/10">
+                    <p className="text-sm text-[#888]">No onboarded brands found matching your filter.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredBrands.map((b) => {
+                      const brandEditions = editions.filter((ed) => ed.brand_id === b.id);
+                      const isSuspended = suspendedBrandIds.includes(b.id);
+                      const isSelected = selectedBrandDetail?.id === b.id;
+
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => setSelectedBrandDetail(b)}
+                          className={`card-glass p-5 cursor-pointer transition-all flex flex-col justify-between gap-4 ${
+                            isSelected
+                              ? 'border-white/50 bg-white/[0.04]'
+                              : isSuspended
+                                ? 'border-red-500/30 bg-red-950/[0.05]'
+                                : 'border-white/10 hover:border-white/30'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <h3 className="font-bold text-white text-sm">{b.name}</h3>
+                                <span className="text-[0.65rem] font-mono text-[#777]">@{b.slug}</span>
+                              </div>
+                              <span className={`text-[0.6rem] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                                isSuspended
+                                  ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              }`}>
+                                {isSuspended ? 'Suspended' : 'Active'}
+                              </span>
+                            </div>
+                            <p className="text-[0.65rem] font-mono text-[#888] truncate">
+                              Wallet: {b.payment_wallet_address}
+                            </p>
+                          </div>
+
+                          <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs font-mono">
+                            <span className="text-white/80">{brandEditions.length} Collection(s)</span>
+                            <span className="text-[#666]">Click to inspect →</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Brand Detail Panel */}
+                  <div className="card-glass p-6 border-white/10 h-fit sticky top-28 space-y-5">
+                    {selectedBrandDetail ? (
+                      <>
+                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/10">
+                          <div>
+                            <span className="text-[0.6rem] font-mono uppercase text-[#888]">Brand Profile</span>
+                            <h3 className="text-lg font-bold text-white">{selectedBrandDetail.name}</h3>
+                            <span className="text-xs font-mono text-[#777]">@{selectedBrandDetail.slug}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleBrandSuspension(selectedBrandDetail.id, selectedBrandDetail.name)}
+                            className={`px-3 py-1.5 rounded-lg text-[0.65rem] font-mono font-bold uppercase border ${
+                              suspendedBrandIds.includes(selectedBrandDetail.id)
+                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                : 'bg-red-500/15 text-red-400 border-red-500/30'
+                            }`}
+                          >
+                            {suspendedBrandIds.includes(selectedBrandDetail.id) ? 'Reinstate' : 'Suspend'}
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 text-xs font-mono">
+                          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                            <span className="text-[0.6rem] text-[#666] uppercase block">Brand ID</span>
+                            <span className="text-white/80 break-all">{selectedBrandDetail.id}</span>
+                          </div>
+                          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                            <span className="text-[0.6rem] text-[#666] uppercase block">Payout Wallet</span>
+                            <span className="text-white/80 break-all">{selectedBrandDetail.payment_wallet_address}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-[0.65rem] font-mono uppercase text-[#888] block">
+                            Collections ({editions.filter((ed) => ed.brand_id === selectedBrandDetail.id).length})
+                          </span>
+                          {editions.filter((ed) => ed.brand_id === selectedBrandDetail.id).length === 0 ? (
+                            <p className="text-xs text-[#666] font-mono">No collections created yet.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                              {editions.filter((ed) => ed.brand_id === selectedBrandDetail.id).map((ed) => {
+                                const st = getCollectionLifecycleStatus(ed);
+                                return (
+                                  <button
+                                    key={ed.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedCollectionDetailId(ed.id);
+                                      setActiveTab('collections');
+                                    }}
+                                    className="w-full text-left p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 flex items-center justify-between text-xs"
+                                  >
+                                    <span className="font-bold text-white truncate pr-2">{ed.name}</span>
+                                    <span className={`text-[0.6rem] font-mono uppercase px-2 py-0.5 rounded-full ${
+                                      st === 'open'
+                                        ? 'bg-emerald-500/15 text-emerald-400'
+                                        : st === 'fulfilled'
+                                          ? 'bg-blue-500/15 text-blue-400'
+                                          : 'bg-amber-500/15 text-amber-400'
+                                    }`}>
+                                      {st}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="py-12 text-center text-xs text-[#777] font-mono">
+                        Select any brand card to view its profile, payout wallet, and collections.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            COLLECTION MANAGEMENT (Admin Spec §2 — Open / Closed / Fulfilled)
+        ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'collections' && (
+          <div className="space-y-8 animate-fade-in">
+            {(() => {
+              const openDrops = editions.filter((ed) => getCollectionLifecycleStatus(ed) === 'open');
+              const closedDrops = editions.filter((ed) => getCollectionLifecycleStatus(ed) === 'closed');
+              const fulfilledDrops = editions.filter((ed) => getCollectionLifecycleStatus(ed) === 'fulfilled');
+              const visibleDrops = collectionStatusFilter === 'all'
+                ? editions
+                : collectionStatusFilter === 'open'
+                  ? openDrops
+                  : collectionStatusFilter === 'closed'
+                    ? closedDrops
+                    : fulfilledDrops;
+              const selectedEd = editions.find((ed) => ed.id === selectedCollectionDetailId) || visibleDrops[0] || null;
+              const selectedBrand = selectedEd ? brands.find((b) => b.id === selectedEd.brand_id) : null;
+              const selectedOrders = selectedEd ? orders.filter((o) => o.drop_id === selectedEd.id) : [];
+
+              return (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Collection Management</h2>
+                      <p className="text-xs text-[#888] mt-1">
+                        Open, Closed, and Fulfilled are strictly separate statuses. Closing a drop does not mark it fulfilled.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'all', label: `All (${editions.length})` },
+                        { id: 'open', label: `Open (${openDrops.length})` },
+                        { id: 'closed', label: `Closed (${closedDrops.length})` },
+                        { id: 'fulfilled', label: `Fulfilled (${fulfilledDrops.length})` },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setCollectionStatusFilter(f.id as any)}
+                          className={`px-4 py-1.5 rounded-full text-xs font-mono font-bold uppercase transition-all ${
+                            collectionStatusFilter === f.id
+                              ? 'bg-white text-black'
+                              : 'bg-white/[0.03] text-white/60 hover:text-white border border-white/10'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="space-y-3">
+                      {visibleDrops.length === 0 ? (
+                        <div className="card-glass p-8 text-center border-dashed border-white/10 text-xs text-[#777] font-mono">
+                          No collections in this status.
+                        </div>
+                      ) : (
+                        visibleDrops.map((ed) => {
+                          const st = getCollectionLifecycleStatus(ed);
+                          const edBrand = brands.find((b) => b.id === ed.brand_id);
+                          const edOrderCount = orders.filter((o) => o.drop_id === ed.id).length;
+                          const isSelected = selectedEd?.id === ed.id;
+
+                          return (
+                            <button
+                              key={ed.id}
+                              type="button"
+                              onClick={() => setSelectedCollectionDetailId(ed.id)}
+                              className={`w-full text-left card-glass p-4 transition-all flex items-center justify-between gap-3 ${
+                                isSelected ? 'border-white/50 bg-white/[0.05]' : 'border-white/10 hover:border-white/25'
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-white text-sm truncate">{ed.name}</h4>
+                                <p className="text-[0.65rem] font-mono text-[#777] truncate">
+                                  {edBrand?.name || 'Brand'} · {edOrderCount} order(s)
+                                </p>
+                              </div>
+                              <span className={`text-[0.6rem] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold shrink-0 ${
+                                st === 'open'
+                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                  : st === 'fulfilled'
+                                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              }`}>
+                                {st}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="lg:col-span-2 card-glass p-6 border-white/10 space-y-5">
+                      {selectedEd ? (
+                        <>
+                          <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-white/10">
+                            <div>
+                              <span className="text-[0.6rem] font-mono uppercase text-[#888]">
+                                {selectedBrand?.name || 'Associated Brand'} · {selectedEd.id}
+                              </span>
+                              <h3 className="text-xl font-bold text-white">{selectedEd.name}</h3>
+                              <p className="text-xs font-mono text-[#888] mt-1">
+                                ${selectedEd.price_usd} USD · Max Supply: {selectedEd.max_supply} · Orders: {selectedOrders.length}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getCollectionLifecycleStatus(selectedEd) !== 'open' && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleDropFulfilled(selectedEd.id)}
+                                  className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold uppercase border ${
+                                    getCollectionLifecycleStatus(selectedEd) === 'fulfilled'
+                                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                                      : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                                  }`}
+                                >
+                                  {getCollectionLifecycleStatus(selectedEd) === 'fulfilled'
+                                    ? 'Revert to Closed'
+                                    : '✓ Mark Fulfilled'}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedOrdersEditionId(selectedEd.id);
+                                  setActiveTab('orders');
+                                }}
+                                className="px-3.5 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/15 text-xs font-mono text-white"
+                              >
+                                Manage Orders →
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <span className="text-[0.65rem] font-mono uppercase text-[#888] block">
+                              Collection Orders ({selectedOrders.length})
+                            </span>
+                            {selectedOrders.length === 0 ? (
+                              <div className="p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 text-center text-xs text-[#777] font-mono">
+                                No orders recorded for this collection yet.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs font-mono">
+                                  <thead className="text-[0.6rem] uppercase text-[#777] border-b border-white/10">
+                                    <tr>
+                                      <th className="py-2 pr-3">Order</th>
+                                      <th className="py-2 pr-3">Buyer</th>
+                                      <th className="py-2 pr-3">Size / Serial</th>
+                                      <th className="py-2 pr-3">Amount</th>
+                                      <th className="py-2">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-white/5">
+                                    {selectedOrders.map((o) => (
+                                      <tr key={o.id}>
+                                        <td className="py-2.5 pr-3 text-white">{o.id.slice(0, 8)}...</td>
+                                        <td className="py-2.5 pr-3 text-[#aaa]">{o.email}</td>
+                                        <td className="py-2.5 pr-3 text-[#aaa]">
+                                          {o.size || 'M'} {o.garment_serial ? `(#${o.garment_serial})` : ''}
+                                        </td>
+                                        <td className="py-2.5 pr-3 text-white">${Number(o.amount_usd || 0).toFixed(2)}</td>
+                                        <td className="py-2.5 uppercase text-emerald-400">{o.status}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="py-12 text-center text-xs text-[#777] font-mono">
+                          Select a collection to inspect its status, brand, and order details.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            MONEY / PAYMENT OVERSIGHT (Admin Spec §4 & §5 — 30% vs 70% + Freeze)
+        ═══════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'payments' && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="pb-4 border-b border-white/10">
+              <h2 className="text-xl font-bold text-white">Money / Payment Oversight</h2>
+              <p className="text-xs text-[#888] mt-1">
+                Compare 30% advance payment status with 70% balance status per brand & collection, and freeze/unfreeze eligible 70% payouts.
+              </p>
+            </div>
+
+            <div className="card-glass border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-white/[0.03] text-[0.65rem] uppercase text-[#888] border-b border-white/10">
+                    <tr>
+                      <th className="p-4">Brand</th>
+                      <th className="p-4">Active Collection</th>
+                      <th className="p-4">30% Status</th>
+                      <th className="p-4">70% Status</th>
+                      <th className="p-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {allBatches.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-10 text-center text-[#777]">
+                          No collection batches available for payment oversight yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      allBatches.map((b) => {
+                        const ed = editions.find((e) => e.id === b.edition_id);
+                        const brand = brands.find((br) => br.id === (b.brand_id || ed?.brand_id));
+                        const escrow = escrowByBatchId[b.id];
+                        const isInitialized = b.chain_status === 'initialized';
+                        const isFrozen = Boolean(escrow?.frozen);
+                        const advanceConfirmed = Boolean(escrow?.advance_claimed);
+                        const balanceReleased = Boolean(escrow?.balance_claimed);
+                        const canHold = isInitialized && !balanceReleased;
+                        const isBusy = togglingFreezeBatchId === b.id;
+
+                        return (
+                          <tr key={b.id} className="hover:bg-white/[0.02]">
+                            <td className="p-4 font-bold text-white">
+                              {brand?.name || 'Brand'}
+                            </td>
+                            <td className="p-4">
+                              <div className="text-white font-bold">{ed?.name || b.edition_id}</div>
+                              <div className="text-[0.65rem] text-[#777]">{b.name}</div>
+                            </td>
+                            <td className="p-4">
+                              {advanceConfirmed ? (
+                                <span className="text-emerald-400 font-bold">✅ Confirmed</span>
+                              ) : (
+                                <span className="text-amber-300">⏳ Pending</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {balanceReleased ? (
+                                  <span className="text-emerald-400 font-bold">✅ Released</span>
+                                ) : (
+                                  <span className="text-amber-300">⏳ Pending</span>
+                                )}
+                                {isFrozen && (
+                                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[0.6rem] font-bold uppercase">
+                                    🥶 Frozen
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              {!isInitialized ? (
+                                <span className="text-[0.65rem] text-[#666]">Draft (Off-chain)</span>
+                              ) : balanceReleased ? (
+                                <span className="text-[0.65rem] text-[#666]">Settled</span>
+                              ) : isFrozen ? (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleEscrowFreezeToggle(b.id, false)}
+                                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-bold uppercase text-[0.65rem] disabled:opacity-50"
+                                >
+                                  {isBusy ? 'Signing...' : '🔓 Unfreeze'}
+                                </button>
+                              ) : canHold ? (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleEscrowFreezeToggle(b.id, true)}
+                                  className="px-3.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 font-bold uppercase text-[0.65rem] disabled:opacity-50"
+                                >
+                                  {isBusy ? 'Signing...' : '🥶 Freeze'}
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1430,6 +2167,103 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Dispute Tank: Grouped by Collection (Admin Spec §3) */}
+            {(() => {
+              const collectionGroups = editions.map((ed) => {
+                const edDisputes = disputes.filter((d) => d.drop_id === ed.id);
+                const openCount = edDisputes.filter((d) => d.status === 'active' || d.status === 'investigating').length;
+                const actionRequiredCount = edDisputes.filter((d) => d.status === 'active').length;
+                const underReviewCount = edDisputes.filter((d) => d.status === 'investigating').length;
+                const summaryStatus = actionRequiredCount > 0
+                  ? { icon: '🔴', label: 'Action required', cls: 'text-red-400 bg-red-500/15 border-red-500/30' }
+                  : underReviewCount > 0
+                    ? { icon: '🟠', label: 'Under review', cls: 'text-amber-400 bg-amber-500/15 border-amber-500/30' }
+                    : { icon: '🟢', label: 'No disputes', cls: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' };
+                return { edition: ed, openCount, summaryStatus, disputes: edDisputes };
+              });
+
+              const unmatchedDisputes = disputes.filter(
+                (d) => !d.drop_id || !editions.some((ed) => ed.id === d.drop_id)
+              );
+
+              return (
+                <div className="card-glass border-white/10 overflow-hidden">
+                  <div className="p-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 bg-white/[0.02]">
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                        Disputes by Collection
+                      </h3>
+                      <p className="text-[0.65rem] text-[#888] font-mono">
+                        Select a collection to inspect its disputes, affected orders, and resolution actions.
+                      </p>
+                    </div>
+                    {selectedDisputeCollectionId && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDisputeCollectionId(null)}
+                        className="text-xs font-mono text-white/70 hover:text-white underline"
+                      >
+                        Show All Collections
+                      </button>
+                    )}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="text-[0.6rem] uppercase text-[#777] border-b border-white/10">
+                        <tr>
+                          <th className="p-3.5">Collection</th>
+                          <th className="p-3.5">Open Disputes</th>
+                          <th className="p-3.5">Summary Status</th>
+                          <th className="p-3.5 text-right">View</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {collectionGroups.map((grp) => {
+                          const isSelected = selectedDisputeCollectionId === grp.edition.id;
+                          return (
+                            <tr
+                              key={grp.edition.id}
+                              onClick={() => setSelectedDisputeCollectionId(isSelected ? null : grp.edition.id)}
+                              className={`cursor-pointer transition-colors ${
+                                isSelected ? 'bg-white/[0.06]' : 'hover:bg-white/[0.02]'
+                              }`}
+                            >
+                              <td className="p-3.5 font-bold text-white">{grp.edition.name}</td>
+                              <td className="p-3.5 text-white">{grp.openCount}</td>
+                              <td className="p-3.5">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold border ${grp.summaryStatus.cls}`}>
+                                  <span>{grp.summaryStatus.icon}</span>
+                                  <span>{grp.summaryStatus.label}</span>
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-right text-[#888]">
+                                {isSelected ? 'Selected ✓' : 'Open →'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {unmatchedDisputes.length > 0 && (
+                          <tr
+                            onClick={() => setSelectedDisputeCollectionId(selectedDisputeCollectionId === '__unmatched__' ? null : '__unmatched__')}
+                            className="cursor-pointer hover:bg-white/[0.02]"
+                          >
+                            <td className="p-3.5 font-bold text-white/80">Unassigned / Other Orders</td>
+                            <td className="p-3.5 text-white">{unmatchedDisputes.filter((d) => d.status === 'active' || d.status === 'investigating').length}</td>
+                            <td className="p-3.5">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[0.65rem] font-bold border text-amber-400 bg-amber-500/15 border-amber-500/30">
+                                🔴 Action required
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right text-[#888]">Open →</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Filter Bar */}
             <div className="flex items-center gap-2 pb-4 border-b border-white/10">
               {(['all', 'active', 'frozen', 'resolved', 'compliments'] as const).map((tab) => (
@@ -1472,14 +2306,29 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Dispute Tickets List */}
-            {filteredDisputes.length === 0 ? (
-              <div className="card-glass p-16 text-center border-dashed border-white/10">
-                <p className="text-[#888] text-sm">No dispute escalations in this category. Platform mediation healthy.</p>
-              </div>
-            ) : (
+            {/* Dispute Tickets List (filtered by selected collection if chosen) */}
+            {(() => {
+              const scopedDisputes = selectedDisputeCollectionId
+                ? selectedDisputeCollectionId === '__unmatched__'
+                  ? filteredDisputes.filter((d) => !d.drop_id || !editions.some((ed) => ed.id === d.drop_id))
+                  : filteredDisputes.filter((d) => d.drop_id === selectedDisputeCollectionId)
+                : filteredDisputes;
+
+              if (scopedDisputes.length === 0) {
+                return (
+                  <div className="card-glass p-16 text-center border-dashed border-white/10">
+                    <p className="text-[#888] text-sm">
+                      {selectedDisputeCollectionId
+                        ? '🟢 No disputes recorded for this collection.'
+                        : 'No dispute escalations in this category. Platform mediation healthy.'}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
               <div className="space-y-4">
-                {filteredDisputes.map((d) => {
+                {scopedDisputes.map((d) => {
                   const isBusy = isProcessingDispute === d.id;
 
                   return (
@@ -1584,7 +2433,8 @@ export default function AdminDashboard() {
                   );
                 })}
               </div>
-            )}
+              );
+            })()}
 
           </div>
         )}

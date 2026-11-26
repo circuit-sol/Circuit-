@@ -528,6 +528,113 @@ router.post("/brands", requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/brands/:id — update brand name or payout wallet for an authorized owner/editor
+router.patch("/brands/:id", requireAuth, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  try {
+    const brandId = req.params.id;
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(brandId)) {
+      return res.status(400).json({ error: "INVALID_BRAND_ID" });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, wallet_address")
+      .eq("id", req.auth.userId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+
+    if (!user || user.wallet_address !== req.auth.walletAddress) {
+      return res.status(401).json({
+        error: "INVALID_OR_EXPIRED_SESSION",
+      });
+    }
+
+    const { data: membership, error: membershipError } = await supabase
+      .from("brand_memberships")
+      .select("role")
+      .eq("brand_id", brandId)
+      .eq("user_id", req.auth.userId)
+      .maybeSingle();
+
+    if (membershipError) throw membershipError;
+
+    if (!membership || !["owner", "editor"].includes(membership.role)) {
+      return res.status(403).json({ error: "BRAND_ACCESS_DENIED" });
+    }
+
+    const body = req.body || {};
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return res.status(400).json({ error: "INVALID_REQUEST_BODY" });
+    }
+
+    const allowedFields = new Set(["name", "payment_wallet_address"]);
+    const unsupported = Object.keys(body).filter((k) => !allowedFields.has(k));
+    if (unsupported.length) {
+      return res.status(400).json({
+        error: "UNSUPPORTED_FIELDS",
+        fields: unsupported,
+      });
+    }
+
+    const updates = {};
+    if (Object.hasOwn(body, "name")) {
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      if (name.length < 1 || name.length > 120) {
+        return res.status(400).json({
+          error: "INVALID_BRAND_NAME",
+          message: "Brand name must be between 1 and 120 characters.",
+        });
+      }
+      updates.name = name;
+    }
+
+    if (Object.hasOwn(body, "payment_wallet_address")) {
+      const paymentWallet =
+        typeof body.payment_wallet_address === "string"
+          ? body.payment_wallet_address.trim()
+          : "";
+      if (!paymentWallet || paymentWallet.length < 32 || paymentWallet.length > 44) {
+        return res.status(400).json({
+          error: "INVALID_PAYMENT_WALLET",
+          message: "Valid Solana payment wallet address required.",
+        });
+      }
+      updates.payment_wallet_address = paymentWallet;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "NO_UPDATES_PROVIDED" });
+    }
+
+    const { data: brand, error: updateError } = await supabase
+      .from("brands")
+      .update(updates)
+      .eq("id", brandId)
+      .select("id, name, slug, payment_wallet_address, created_at")
+      .single();
+
+    if (updateError) throw updateError;
+
+    return res.json({
+      brand: {
+        ...brand,
+        role: membership.role,
+      },
+    });
+  } catch (error) {
+    console.error("Update brand failed:", error.message);
+    return res.status(500).json({
+      error: "BRAND_UPDATE_FAILED",
+      message: error.message,
+    });
+  }
+});
+
 // ── BRANDS END ──────────────────────────────────────────────────────────────────
 
 // ── Editions ──────────────────────────────────────────────────────────────────
@@ -711,6 +818,7 @@ router.post("/editions", requireAuth, async (req, res) => {
       "fabric",
       "headpiece",
       "embroidery",
+      "social_links",
     ]);
 
     const unsupportedFields = Object.keys(body).filter(

@@ -465,3 +465,94 @@ export async function deleteEditionImage(id: string, path: string): Promise<bool
     return false;
   }
 }
+
+// ── Creator Brand Profile & Reusable Drop Defaults ──────────────────
+
+export interface CreatorBrandProfile {
+  brand_id: string;
+  instagram?: string;
+  twitter?: string;
+  whatsapp?: string;
+  support_email?: string;
+  pickup_name?: string;
+  pickup_address?: string;
+  pickup_city?: string;
+  pickup_country?: string;
+  pickup_instructions?: string;
+  allows_delivery?: boolean;
+  delivery_fee_usd?: number;
+  delivery_notes?: string;
+  updated_at?: string;
+}
+
+export function saveCreatorBrandProfile(brandId: string, profile: Omit<CreatorBrandProfile, 'brand_id' | 'updated_at'>) {
+  if (typeof window === 'undefined' || !brandId) return;
+  try {
+    const existing = getCreatorBrandProfile(brandId) || {};
+    const merged: CreatorBrandProfile = {
+      ...existing,
+      ...profile,
+      brand_id: brandId,
+      updated_at: new Date().toISOString(),
+    };
+    localStorage.setItem(`circuit_brand_profile_${brandId}`, JSON.stringify(merged));
+  } catch (_) {}
+}
+
+export function getCreatorBrandProfile(brandId?: string): CreatorBrandProfile | null {
+  if (typeof window === 'undefined' || !brandId) return null;
+  try {
+    const stored = localStorage.getItem(`circuit_brand_profile_${brandId}`);
+    if (stored) return JSON.parse(stored) as CreatorBrandProfile;
+  } catch (_) {}
+  return null;
+}
+
+/**
+ * Resolves reusable creator/brand defaults for a new drop:
+ * 1. Saved brand profile in localStorage
+ * 2. Fallback to the creator's most recent edition & batch from the database
+ */
+export function resolveCreatorDefaults(
+  brandId: string | undefined,
+  editions: any[],
+  batchesByEdition: Record<string, backendApi.Batch[]>,
+): CreatorBrandProfile | null {
+  const saved = getCreatorBrandProfile(brandId);
+  const brandEditions = brandId
+    ? editions.filter((ed) => !ed.brand_id || ed.brand_id === brandId)
+    : editions;
+
+  const latestEdition = brandEditions[0];
+  let latestBatch: backendApi.Batch | undefined;
+  for (const ed of brandEditions) {
+    const list = batchesByEdition[ed.id];
+    if (list && list.length > 0) {
+      latestBatch = list[0];
+      break;
+    }
+  }
+
+  if (!saved && !latestEdition && !latestBatch) return null;
+
+  const latestSocials = latestEdition?.social_links || (latestEdition ? getEditionSocialLinks(latestEdition.id, brandId) : {});
+  const latestDelivery = latestEdition ? getEditionDeliveryOption(latestEdition.id) : null;
+  const loc = latestBatch?.pickup_locations?.[0];
+  const addressParts = (loc?.address || '').split(',').map((s) => s.trim());
+
+  return {
+    brand_id: brandId || '',
+    instagram: saved?.instagram ?? latestSocials?.instagram ?? '',
+    twitter: saved?.twitter ?? latestSocials?.twitter ?? '',
+    whatsapp: saved?.whatsapp ?? latestSocials?.whatsapp ?? '',
+    support_email: saved?.support_email ?? latestSocials?.support_email ?? '',
+    pickup_name: saved?.pickup_name ?? loc?.name ?? '',
+    pickup_address: saved?.pickup_address ?? addressParts[0] ?? '',
+    pickup_city: saved?.pickup_city ?? loc?.city ?? addressParts[1] ?? '',
+    pickup_country: saved?.pickup_country ?? loc?.country ?? addressParts[2] ?? '',
+    pickup_instructions: saved?.pickup_instructions ?? loc?.instructions ?? '',
+    allows_delivery: saved?.allows_delivery ?? latestEdition?.allows_delivery ?? latestDelivery?.allows_delivery ?? false,
+    delivery_fee_usd: saved?.delivery_fee_usd ?? latestEdition?.delivery_fee_usd ?? latestDelivery?.delivery_fee_usd ?? 0,
+    delivery_notes: saved?.delivery_notes ?? latestEdition?.delivery_notes ?? latestDelivery?.delivery_notes ?? '',
+  };
+}

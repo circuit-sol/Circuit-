@@ -212,6 +212,17 @@ module.exports=function createChainRoutes(db,options={}) {
     await admin(req.auth);
     res.json({reports:await result(db.from('chain_reports').select('*').order('created_at',{ascending:false}).limit(100))});
   }));
+  router.get('/admin/overview',run(async(req,res)=>{
+    await admin(req.auth);
+    const [brands,editions,batches,orders,reports]=await Promise.all([
+      result(db.from('brands').select('id,name,slug,payment_wallet_address,created_at').order('created_at',{ascending:false}).limit(200)),
+      result(db.from('editions').select('*').order('created_at',{ascending:false}).limit(200)),
+      result(db.from('batches').select('*').order('created_at',{ascending:false}).limit(500)),
+      result(db.from('chain_orders').select('*').order('created_at',{ascending:false}).limit(500)),
+      result(db.from('chain_reports').select('*').order('created_at',{ascending:false}).limit(200)),
+    ]);
+    res.json({brands,editions,batches,orders,reports});
+  }));
   router.get('/batches/:id/orders',run(async(req,res)=>{
     const row=await batch(req.params.id);await managed(row,req.auth);
     res.json({orders:await result(db.from('chain_orders').select('*').eq('batch_id',row.id).order('created_at',{ascending:false}).limit(100))});
